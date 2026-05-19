@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CinéProche — Trouvez un cinéma près de chez vous</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css" />
+  <style>
+    /* ── Hero ── */
+    .hero {
+      min-height: calc(100vh - 60px - 90px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 60px 32px 48px;
+      gap: 28px;
+      text-align: center;
+    }
+    .hero-eyebrow {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--gray-400);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+    .hero h1 {
+      font-family: var(--font-display);
+      font-size: clamp(32px, 5vw, 48px);
+      font-weight: 400;
+      color: var(--black);
+      letter-spacing: -1px;
+      line-height: 1.15;
+      max-width: 600px;
+    }
+    .hero h1 em {
+      font-style: italic;
+      color: var(--gray-400);
+    }
+    .hero-sub {
+      font-size: 15px;
+      color: var(--gray-500);
+      max-width: 440px;
+      line-height: 1.6;
+    }
+
+    /* ── Search block ── */
+    .search-block {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      width: 100%;
+      max-width: 560px;
+    }
+
+    /* Toggle switch */
+    .search-toggle {
+      display: flex;
+      background: var(--gray-100);
+      border: 0.5px solid var(--gray-200);
+      border-radius: var(--radius-full);
+      padding: 3px;
+      gap: 2px;
+    }
+    .toggle-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      padding: 8px 20px;
+      border-radius: var(--radius-full);
+      cursor: pointer;
+      border: none;
+      background: none;
+      color: var(--gray-500);
+      transition: background var(--transition), color var(--transition);
+    }
+    .toggle-btn i { font-size: 14px; }
+    .toggle-btn.active { background: var(--black); color: var(--white); }
+
+    /* Barre de recherche */
+    .search-bar {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      border: 1.5px solid var(--gray-300);
+      border-radius: var(--radius-full);
+      overflow: hidden;
+      background: var(--white);
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .search-bar:focus-within {
+      border-color: var(--black);
+      box-shadow: 0 0 0 3px rgba(26,26,26,0.06);
+    }
+    .search-bar-icon {
+      padding: 0 14px 0 20px;
+      font-size: 17px;
+      color: var(--gray-400);
+      display: flex;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .search-bar input {
+      flex: 1;
+      border: none;
+      outline: none;
+      font-size: 15px;
+      padding: 14px 4px;
+      background: transparent;
+      color: var(--black);
+    }
+    .search-bar input::placeholder { color: var(--gray-400); }
+    .search-bar-btn {
+      margin: 5px;
+      background: var(--black);
+      color: var(--white);
+      border: none;
+      border-radius: var(--radius-full);
+      padding: 10px 22px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      transition: opacity var(--transition);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .search-bar-btn:hover { opacity: 0.82; }
+
+    /* Bouton géoloc */
+    .btn-locate {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 13px;
+      color: var(--gray-500);
+      background: none;
+      border: 0.5px solid var(--gray-200);
+      border-radius: var(--radius-full);
+      padding: 8px 16px;
+      cursor: pointer;
+      transition: background var(--transition), color var(--transition);
+    }
+    .btn-locate:hover { background: var(--gray-50); color: var(--black); }
+    .btn-locate.hidden { display: none; }
+
+    /* ── Animations hero ── */
+    .hero > * {
+      opacity: 0;
+      animation: fadeUp 0.5s ease forwards;
+    }
+    .hero > *:nth-child(1) { animation-delay: 0.05s; }
+    .hero > *:nth-child(2) { animation-delay: 0.12s; }
+    .hero > *:nth-child(3) { animation-delay: 0.19s; }
+    .hero > *:nth-child(4) { animation-delay: 0.26s; }
+    .hero > *:nth-child(5) { animation-delay: 0.33s; }
+  </style>
+</head>
+<body>
+
+<!-- ── HEADER ── -->
+<header class="site-header">
+  <div class="container">
+    <div class="header-inner">
+      <a href="index.html" class="logo">
+        <div class="logo-icon"><i class="ti ti-movie"></i></div>
+        <span class="logo-text">Ciné<span>Proche</span></span>
+      </a>
+      <div class="header-right">
+        <nav class="nav">
+          <a href="nouveautes.html">Nouveautés</a>
+          <a href="catalogue.html">Catalogue</a>
+          <a href="agenda.html">Mon agenda</a>
+          <a href="#contact">Contact</a>
+        </nav>
+        <button class="btn-user" title="Mon profil" onclick="window.location.href='agenda.html#profil'">
+          <i class="ti ti-user"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ── HERO ── -->
+<main>
+  <section class="hero">
+    <div class="hero-eyebrow">Séances en temps réel · Partout en France</div>
+
+    <h1>Trouvez un cinéma<br><em>près de chez vous</em></h1>
+
+    <p class="hero-sub">Recherchez par lieu ou par film, consultez les séances du jour et réservez en quelques clics.</p>
+
+    <div class="search-block">
+      <!-- Toggle -->
+      <div class="search-toggle">
+        <button class="toggle-btn active" id="btn-lieu" onclick="setMode('lieu')">
+          <i class="ti ti-map-pin"></i> Cinéma / Lieu
+        </button>
+        <button class="toggle-btn" id="btn-film" onclick="setMode('film')">
+          <i class="ti ti-movie"></i> Film
+        </button>
+      </div>
+
+      <!-- Barre -->
+      <div class="search-bar">
+        <span class="search-bar-icon"><i class="ti ti-map-pin" id="search-icon"></i></span>
+        <input type="text" id="search-input" placeholder="Ville, adresse ou code postal…" onkeydown="handleEnter(event)" />
+        <button class="search-bar-btn" onclick="doSearch()">
+          <i class="ti ti-search"></i> Rechercher
+        </button>
+      </div>
+
+      <!-- Géoloc -->
+      <button class="btn-locate" id="btn-locate" onclick="geolocate()">
+        <i class="ti ti-current-location"></i> Utiliser ma position
+      </button>
+    </div>
+  </section>
+
+  <!-- ── STATS ── -->
+  <div class="container">
+    <div class="footer-stats">
+      <div class="stat">
+        <div class="stat-number">2 400+</div>
+        <div class="stat-label">Cinémas référencés</div>
+      </div>
+      <div class="stat">
+        <div class="stat-number">850+</div>
+        <div class="stat-label">Villes couvertes</div>
+      </div>
+      <div class="stat">
+        <div class="stat-number">12 000+</div>
+        <div class="stat-label">Séances aujourd'hui</div>
+      </div>
+      <div class="stat">
+        <div class="stat-number">Mis à jour</div>
+        <div class="stat-label">toutes les heures</div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script src="js/data.js"></script>
+<script>
+  let searchMode = 'lieu';
+
+  function setMode(mode) {
+    searchMode = mode;
+    const input = document.getElementById('search-input');
+    const icon  = document.getElementById('search-icon');
+    const locate = document.getElementById('btn-locate');
+
+    document.getElementById('btn-lieu').classList.toggle('active', mode === 'lieu');
+    document.getElementById('btn-film').classList.toggle('active', mode === 'film');
+
+    if (mode === 'lieu') {
+      input.placeholder = 'Ville, adresse ou code postal…';
+      icon.className = 'ti ti-map-pin';
+      locate.classList.remove('hidden');
+    } else {
+      input.placeholder = 'Nom du film…';
+      icon.className = 'ti ti-movie';
+      locate.classList.add('hidden');
+    }
+    input.value = '';
+    input.focus();
+  }
+
+  function doSearch() {
+    const q = document.getElementById('search-input').value.trim();
+    if (!q) return;
+    const url = `resultats.html?q=${encodeURIComponent(q)}&mode=${searchMode}`;
+    window.location.href = url;
+  }
+
+  function handleEnter(e) {
+    if (e.key === 'Enter') doSearch();
+  }
+
+  function geolocate() {
+    const btn = document.getElementById('btn-locate');
+    btn.innerHTML = '<i class="ti ti-loader"></i> Localisation…';
+    btn.disabled = true;
+    if (!navigator.geolocation) {
+      alert('La géolocalisation n\'est pas disponible sur votre navigateur.');
+      btn.innerHTML = '<i class="ti ti-current-location"></i> Utiliser ma position';
+      btn.disabled = false;
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        window.location.href = `resultats.html?lat=${latitude}&lng=${longitude}&mode=lieu&q=Ma+position`;
+      },
+      () => {
+        alert('Impossible d\'obtenir votre position. Veuillez autoriser la géolocalisation.');
+        btn.innerHTML = '<i class="ti ti-current-location"></i> Utiliser ma position';
+        btn.disabled = false;
+      }
+    );
+  }
+</script>
+</body>
+</html>
