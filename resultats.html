@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Résultats — CinéProche</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css" />
+  <style>
+    .page-content { padding: 0 0 48px; }
+
+    /* ── BARRE RECHERCHE ── */
+    .search-wrap {
+      padding: 14px 0;
+      border-bottom: 0.5px solid var(--gray-200);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .search-bar {
+      display: flex;
+      align-items: center;
+      flex: 1;
+      max-width: 560px;
+      border: 1.5px solid var(--gray-300);
+      border-radius: var(--radius-full);
+      overflow: hidden;
+      background: var(--white);
+      transition: border-color 0.2s;
+    }
+    .search-bar:focus-within { border-color: var(--black); }
+    .search-bar-icon { padding: 0 12px 0 18px; font-size: 16px; color: var(--gray-400); display: flex; align-items: center; flex-shrink: 0; }
+    .search-bar input { flex: 1; border: none; outline: none; font-size: 14px; padding: 11px 4px; background: transparent; color: var(--black); }
+    .search-bar input::placeholder { color: var(--gray-400); }
+    .search-bar-clear { background: none; border: none; cursor: pointer; padding: 0 14px; color: var(--gray-400); font-size: 14px; display: flex; align-items: center; }
+    .btn-locate {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 13px; color: var(--gray-500);
+      background: none; border: 0.5px solid var(--gray-200);
+      border-radius: var(--radius-full); padding: 8px 14px;
+      cursor: pointer; white-space: nowrap;
+      transition: background var(--transition);
+    }
+    .btn-locate:hover { background: var(--gray-50); }
+
+    /* ── MODE TOGGLE ── */
+    .mode-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 0.5px solid var(--gray-200);
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .mode-toggle {
+      display: flex;
+      border: 0.5px solid var(--gray-200);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+    }
+    .mode-btn {
+      font-size: 12px;
+      padding: 7px 16px;
+      cursor: pointer;
+      background: none;
+      border: none;
+      color: var(--gray-500);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: background var(--transition), color var(--transition);
+      border-right: 0.5px solid var(--gray-200);
+    }
+    .mode-btn:last-child { border-right: none; }
+    .mode-btn.active { background: var(--black); color: var(--white); }
+    .mode-btn i { font-size: 13px; }
+    .results-info { font-size: 12px; color: var(--gray-500); display: flex; align-items: center; gap: 5px; }
+    .results-info i { color: var(--black); font-size: 13px; }
+
+    /* ══════════════════════════════
+       VUE CINÉMAS (mode lieu)
+    ══════════════════════════════ */
+    .view { display: none; }
+    .view.active { display: block; }
+
+    .cinema-item {
+      padding: 20px 0;
+      border-bottom: 0.5px solid var(--gray-200);
+      transition: background var(--transition);
+    }
+    .cinema-item:last-child { border-bottom: none; }
+
+    .cinema-item-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 14px;
+    }
+    .cinema-item-left { flex: 1; }
+    .cinema-rank-name { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+    .cinema-rank { font-size: 12px; font-weight: 500; color: var(--gray-400); min-width: 20px; }
+    .cinema-item-name { font-size: 15px; font-weight: 500; color: var(--black); }
+    .cinema-item-addr {
+      font-size: 12px; color: var(--gray-500);
+      display: flex; align-items: center; gap: 4px;
+      margin-left: 28px; margin-top: 2px;
+    }
+    .cinema-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; margin-left: 28px; }
+    .chip {
+      font-size: 11px; border-radius: var(--radius-full);
+      padding: 3px 9px; display: flex; align-items: center; gap: 3px;
+    }
+    .chip i { font-size: 11px; }
+    .chip-dist { border: 0.5px solid var(--gray-200); color: var(--gray-500); background: var(--gray-100); }
+    .chip-open { background: var(--green-bg); color: var(--green); }
+    .chip-closed { background: var(--red-bg); color: var(--red); }
+    .chip-equip { border: 0.5px solid var(--gray-200); color: var(--gray-500); }
+
+    .cinema-item-actions { display: flex; gap: 6px; flex-shrink: 0; }
+    .btn-nav {
+      display: flex; align-items: center; gap: 5px;
+      font-size: 12px; background: none;
+      color: var(--gray-500); border: 0.5px solid var(--gray-200);
+      border-radius: var(--radius-md); padding: 7px 12px;
+      cursor: pointer; transition: background var(--transition);
+    }
+    .btn-nav:hover { background: var(--gray-50); }
+    .btn-nav-primary {
+      background: var(--black); color: var(--white);
+      border-color: var(--black);
+    }
+    .btn-nav-primary:hover { opacity: 0.85; background: var(--black); }
+
+    /* Films miniatures */
+    .cinema-films-label {
+      font-size: 11px; font-weight: 500; color: var(--gray-400);
+      text-transform: uppercase; letter-spacing: 0.4px;
+      margin-bottom: 8px; margin-left: 28px;
+    }
+    .cinema-films {
+      display: flex; gap: 8px; margin-left: 28px;
+      overflow-x: auto; padding-bottom: 2px;
+    }
+    .film-thumb { flex-shrink: 0; width: 68px; cursor: pointer; }
+    .film-thumb-poster {
+      width: 68px; height: 96px; border-radius: var(--radius-md);
+      border: 0.5px solid var(--gray-200);
+      display: flex; align-items: center; justify-content: center;
+      position: relative; overflow: hidden;
+      transition: transform 0.15s, border-color 0.15s;
+    }
+    .film-thumb:hover .film-thumb-poster {
+      transform: translateY(-2px);
+      border-color: var(--gray-400);
+    }
+    .film-thumb-poster i { font-size: 20px; color: rgba(255,255,255,0.4); }
+    .film-thumb-title {
+      font-size: 10px; color: var(--gray-500); margin-top: 4px;
+      text-align: center; line-height: 1.3;
+      overflow: hidden; display: -webkit-box;
+      -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    }
+
+    /* ══════════════════════════════
+       VUE FILM (mode film)
+    ══════════════════════════════ */
+    .film-banner {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 16px 0;
+      border-bottom: 0.5px solid var(--gray-200);
+    }
+    .film-banner-poster {
+      width: 60px; height: 86px;
+      border-radius: var(--radius-md);
+      border: 0.5px solid var(--gray-200);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .film-banner-poster i { font-size: 22px; color: rgba(255,255,255,0.4); }
+    .film-banner-info { flex: 1; }
+    .film-banner-title { font-size: 17px; font-weight: 500; color: var(--black); margin-bottom: 5px; }
+    .film-banner-meta { font-size: 12px; color: var(--gray-500); display: flex; gap: 12px; flex-wrap: wrap; }
+    .film-banner-meta span { display: flex; align-items: center; gap: 4px; }
+    .film-banner-meta i { font-size: 12px; }
+    .btn-synopsis {
+      font-size: 12px; color: var(--gray-500);
+      border: 0.5px solid var(--gray-200); border-radius: var(--radius-md);
+      padding: 7px 14px; cursor: pointer; background: none;
+      transition: background var(--transition); white-space: nowrap; flex-shrink: 0;
+    }
+    .btn-synopsis:hover { background: var(--gray-50); }
+
+    /* Cinémas en mode film */
+    .film-cinema-row {
+      padding: 18px 0;
+      border-bottom: 0.5px solid var(--gray-200);
+    }
+    .film-cinema-row:last-child { border-bottom: none; }
+    .film-cinema-top {
+      display: flex; align-items: flex-start;
+      justify-content: space-between; gap: 12px; margin-bottom: 10px;
+    }
+    .film-cinema-left { flex: 1; }
+    .film-cinema-name { font-size: 14px; font-weight: 500; color: var(--black); margin-bottom: 3px; }
+    .film-cinema-addr { font-size: 12px; color: var(--gray-500); display: flex; align-items: center; gap: 4px; }
+
+    /* Séances */
+    .seances-wrap { margin-top: 2px; }
+    .seances-day-row { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+    .seances-day-row:last-child { margin-bottom: 0; }
+    .seances-day-label {
+      font-size: 11px; color: var(--gray-400); font-weight: 500;
+      min-width: 80px; text-transform: uppercase; letter-spacing: 0.3px;
+    }
+    .seances-pills { display: flex; gap: 5px; flex-wrap: wrap; }
+    .seance-pill {
+      font-size: 12px; border: 0.5px solid var(--gray-200);
+      border-radius: var(--radius-sm); padding: 5px 11px;
+      cursor: pointer; background: var(--white); color: var(--black);
+      transition: background var(--transition), color var(--transition), border-color var(--transition);
+    }
+    .seance-pill:hover { background: var(--black); color: var(--white); border-color: var(--black); }
+
+    /* Animations */
+    .cinema-item, .film-cinema-row {
+      opacity: 0;
+      animation: fadeUp 0.4s ease forwards;
+    }
+    .cinema-item:nth-child(1), .film-cinema-row:nth-child(1) { animation-delay: 0.04s; }
+    .cinema-item:nth-child(2), .film-cinema-row:nth-child(2) { animation-delay: 0.09s; }
+    .cinema-item:nth-child(3), .film-cinema-row:nth-child(3) { animation-delay: 0.14s; }
+    .cinema-item:nth-child(4), .film-cinema-row:nth-child(4) { animation-delay: 0.19s; }
+    .cinema-item:nth-child(5), .film-cinema-row:nth-child(5) { animation-delay: 0.24s; }
+    .cinema-item:nth-child(6), .film-cinema-row:nth-child(6) { animation-delay: 0.29s; }
+  </style>
+</head>
+<body>
+
+<!-- ── HEADER ── -->
+<header class="site-header">
+  <div class="container">
+    <div class="header-inner">
+      <a href="index.html" class="logo">
+        <div class="logo-icon"><i class="ti ti-movie"></i></div>
+        <span class="logo-text">Ciné<span>Proche</span></span>
+      </a>
+      <div class="header-right">
+        <nav class="nav">
+          <a href="nouveautes.html">Nouveautés</a>
+          <a href="catalogue.html">Catalogue</a>
+          <a href="agenda.html">Mon agenda</a>
+          <a href="#contact">Contact</a>
+        </nav>
+        <button class="btn-user" title="Mon profil" onclick="window.location.href='agenda.html'">
+          <i class="ti ti-user"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ── CONTENU ── -->
+<main class="container page-content">
+
+  <!-- Barre de recherche -->
+  <div class="search-wrap">
+    <div class="search-bar">
+      <span class="search-bar-icon"><i class="ti ti-search" id="bar-icon"></i></span>
+      <input type="text" id="main-search" onkeydown="searchEnter(event)" />
+      <button class="search-bar-clear" onclick="clearSearch()"><i class="ti ti-x"></i></button>
+    </div>
+    <button class="btn-locate" id="btn-locate" onclick="geolocate()">
+      <i class="ti ti-current-location"></i> Ma position
+    </button>
+  </div>
+
+  <!-- Toggle mode -->
+  <div class="mode-bar">
+    <div class="mode-toggle">
+      <button class="mode-btn" id="btn-mode-lieu" onclick="setMode('lieu')">
+        <i class="ti ti-map-pin"></i> Cinéma / Lieu
+      </button>
+      <button class="mode-btn" id="btn-mode-film" onclick="setMode('film')">
+        <i class="ti ti-movie"></i> Film
+      </button>
+    </div>
+    <div class="results-info" id="results-info"></div>
+  </div>
+
+  <!-- Vue LIEU -->
+  <div class="view" id="view-lieu">
+    <div id="cinemas-list"></div>
+  </div>
+
+  <!-- Vue FILM -->
+  <div class="view" id="view-film">
+    <div class="film-banner" id="film-banner"></div>
+    <div id="film-cinemas-list"></div>
+  </div>
+
+</main>
+
+<!-- ── OVERLAYS ── -->
+<div class="overlay" id="film-overlay"><div class="popup" id="film-popup"></div></div>
+
+<!-- Synopsis popup -->
+<div class="overlay" id="synopsis-overlay" onclick="closeSynopsis(event)">
+  <div class="popup" style="max-width:440px;">
+    <div style="padding:18px 20px 14px;border-bottom:0.5px solid var(--gray-200);">
+      <div style="font-size:16px;font-weight:500;color:var(--black);margin-bottom:2px;" id="syn-title"></div>
+      <div style="font-size:12px;color:var(--gray-500);" id="syn-meta"></div>
+    </div>
+    <div style="padding:16px 20px;">
+      <div style="font-size:13px;color:var(--gray-500);line-height:1.65;" id="syn-text"></div>
+    </div>
+    <button class="popup-close-btn" onclick="document.getElementById('synopsis-overlay').classList.remove('open');document.body.style.overflow='';">Fermer</button>
+  </div>
+</div>
+
+<!-- Réservation -->
+<div class="overlay" id="resa-overlay">
+  <div class="popup" style="max-width:420px;">
+    <div style="padding:20px 22px 16px;border-bottom:0.5px solid var(--gray-200);">
+      <div style="font-size:16px;font-weight:500;color:var(--black);margin-bottom:4px;" id="resa-film"></div>
+      <div style="font-size:13px;color:var(--gray-500);display:flex;align-items:center;gap:5px;">
+        <i class="ti ti-building"></i><span id="resa-cinema"></span>
+      </div>
+    </div>
+    <div style="padding:16px 22px;display:flex;flex-direction:column;gap:10px;border-bottom:0.5px solid var(--gray-200);">
+      <div style="display:flex;align-items:center;gap:12px;font-size:13px;">
+        <i class="ti ti-clock" style="color:var(--gray-400);"></i>
+        <span style="color:var(--gray-500);min-width:70px;">Séance</span>
+        <span style="font-weight:500;" id="resa-heure"></span>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;font-size:13px;">
+        <i class="ti ti-calendar" style="color:var(--gray-400);"></i>
+        <span style="color:var(--gray-500);min-width:70px;">Date</span>
+        <span style="font-weight:500;" id="resa-date"></span>
+      </div>
+    </div>
+    <div style="padding:14px 22px;display:flex;flex-direction:column;gap:8px;">
+      <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="confirmReservation()">
+        <i class="ti ti-external-link"></i> Réserver sur AlloCiné
+      </button>
+      <p style="font-size:11px;color:var(--gray-400);text-align:center;">
+        Vous serez redirigé vers AlloCiné. À votre retour, ajoutez la séance à votre agenda.
+      </p>
+      <button class="btn btn-secondary" style="width:100%;justify-content:center;" onclick="closeResaOverlay()">Annuler</button>
+    </div>
+  </div>
+</div>
+
+<!-- Retour après réservation -->
+<div class="overlay" id="retour-overlay">
+  <div class="popup" style="max-width:420px;">
+    <div style="padding:24px 22px 16px;text-align:center;border-bottom:0.5px solid var(--gray-200);">
+      <div style="width:48px;height:48px;background:var(--green-bg);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;">
+        <i class="ti ti-check" style="font-size:22px;color:var(--green);"></i>
+      </div>
+      <div style="font-size:16px;font-weight:500;color:var(--black);margin-bottom:4px;">Réservation confirmée !</div>
+      <div style="font-size:13px;color:var(--gray-500);">Voulez-vous ajouter cette séance à votre agenda ?</div>
+    </div>
+    <div style="background:var(--black);padding:16px 22px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">
+        <div>
+          <div style="font-size:15px;font-weight:500;color:#fff;" id="retour-film"></div>
+          <div style="font-size:12px;color:rgba(255,255,255,0.5);margin-top:2px;" id="retour-cinema"></div>
+        </div>
+        <span style="font-size:10px;background:rgba(255,255,255,0.15);color:#fff;border-radius:20px;padding:3px 9px;white-space:nowrap;">Billet souvenir</span>
+      </div>
+      <div style="border-top:1px dashed rgba(255,255,255,0.2);margin-bottom:12px;"></div>
+      <div style="display:flex;gap:20px;">
+        <div>
+          <div style="font-size:10px;color:rgba(255,255,255,0.45);text-transform:uppercase;letter-spacing:0.4px;">Séance</div>
+          <div style="font-size:13px;font-weight:500;color:#fff;" id="retour-heure"></div>
+        </div>
+        <div>
+          <div style="font-size:10px;color:rgba(255,255,255,0.45);text-transform:uppercase;letter-spacing:0.4px;">Date</div>
+          <div style="font-size:13px;font-weight:500;color:#fff;">Aujourd'hui</div>
+        </div>
+      </div>
+    </div>
+    <div style="padding:14px 22px;display:flex;flex-direction:column;gap:8px;">
+      <button class="btn btn-primary" id="btn-add-agenda" style="width:100%;justify-content:center;" onclick="addToAgenda()">
+        <i class="ti ti-calendar-plus"></i> Ajouter à mon agenda
+      </button>
+      <button class="btn btn-secondary" style="width:100%;justify-content:center;" onclick="closeRetourOverlay()">Fermer</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/data.js"></script>
+<script>
+  // ── Lire les paramètres URL ──
+  const params = new URLSearchParams(window.location.search);
+  let searchQuery = params.get('q') || '';
+  let searchMode  = params.get('mode') || 'lieu';
+
+  // ── Init barre ──
+  document.getElementById('main-search').value = searchQuery;
+
+  function setMode(mode) {
+    searchMode = mode;
+    document.getElementById('btn-mode-lieu').classList.toggle('active', mode === 'lieu');
+    document.getElementById('btn-mode-film').classList.toggle('active', mode === 'film');
+    document.getElementById('view-lieu').classList.toggle('active', mode === 'lieu');
+    document.getElementById('view-film').classList.toggle('active', mode === 'film');
+    document.getElementById('bar-icon').className = mode === 'film' ? 'ti ti-movie' : 'ti ti-map-pin';
+    document.getElementById('btn-locate').style.display = mode === 'film' ? 'none' : 'flex';
+    renderResults();
+  }
+
+  function renderResults() {
+    if (searchMode === 'lieu') renderLieu();
+    else renderFilm();
+  }
+
+  // ── MODE LIEU ──
+  function renderLieu() {
+    const list = document.getElementById('cinemas-list');
+    document.getElementById('results-info').innerHTML =
+      `<i class="ti ti-building"></i> ${CINEMAS.length} cinémas autour de « ${searchQuery} »`;
+    list.innerHTML = CINEMAS.map((c, ci) => {
+      const filmThumbs = c.filmIds.map(fid => {
+        const f = getFilmById(fid);
+        if (!f) return '';
+        return `<div class="film-thumb" onclick="openFilmPopup(${f.id})">
+          <div class="film-thumb-poster" style="background:${POSTER_COLORS[f.color]};">
+            <i class="ti ti-photo"></i>
+          </div>
+          <div class="film-thumb-title">${f.titre}</div>
+        </div>`;
+      }).join('');
+
+      return `<div class="cinema-item">
+        <div class="cinema-item-top">
+          <div class="cinema-item-left">
+            <div class="cinema-rank-name">
+              <span class="cinema-rank">${ci + 1}.</span>
+              <span class="cinema-item-name">${c.nom}</span>
+            </div>
+            <div class="cinema-item-addr">
+              <i class="ti ti-map-pin"></i>${c.adresse}
+            </div>
+            <div class="cinema-chips">
+              <span class="chip chip-dist"><i class="ti ti-walk"></i>${c.dist.toFixed(1)} km</span>
+              <span class="chip ${c.ouvert ? 'chip-open' : 'chip-closed'}">${c.ouvert ? 'Ouvert' : 'Fermé'}</span>
+              ${c.equips.map(e => `<span class="chip chip-equip">${e}</span>`).join('')}
+            </div>
+          </div>
+          <div class="cinema-item-actions">
+            <button class="btn-nav" onclick="openWaze('${c.nom}')">
+              <i class="ti ti-map-2"></i> Waze
+            </button>
+            <button class="btn-nav btn-nav-primary" onclick="openItineraire('${c.nom}')">
+              <i class="ti ti-navigation"></i> Y aller
+            </button>
+          </div>
+        </div>
+        <div class="cinema-films-label">Films à l'affiche</div>
+        <div class="cinema-films">${filmThumbs}</div>
+      </div>`;
+    }).join('');
+  }
+
+  // ── MODE FILM ──
+  function renderFilm() {
+    // Chercher le film correspondant à la requête
+    const q = searchQuery.toLowerCase();
+    const film = FILMS.find(f => f.titre.toLowerCase().includes(q) && f.cinemas.length > 0)
+                 || FILMS.find(f => f.cinemas.length > 0);
+
+    if (!film) {
+      document.getElementById('results-info').innerHTML = '<i class="ti ti-mood-sad"></i> Aucun film trouvé';
+      document.getElementById('film-banner').innerHTML = '<p style="color:var(--gray-400);font-size:14px;">Aucun résultat pour cette recherche.</p>';
+      document.getElementById('film-cinemas-list').innerHTML = '';
+      return;
+    }
+
+    document.getElementById('results-info').innerHTML =
+      `<i class="ti ti-building"></i> ${film.cinemas.length} cinéma${film.cinemas.length > 1 ? 's passent' : ' passe'} ce film près de vous`;
+
+    // Bannière film
+    document.getElementById('film-banner').innerHTML = `
+      <div class="film-banner-poster" style="background:${POSTER_COLORS[film.color]};">
+        <i class="ti ti-photo"></i>
+      </div>
+      <div class="film-banner-info">
+        <div class="film-banner-title">${film.titre}</div>
+        <div class="film-banner-meta">
+          <span><i class="ti ti-user"></i>${film.real}</span>
+          <span><i class="ti ti-clock"></i>${film.duree}</span>
+          <span><i class="ti ti-tag"></i>${film.genre}</span>
+        </div>
+      </div>
+      <button class="btn-synopsis" onclick="openSynopsis(${film.id})">Synopsis</button>
+    `;
+
+    // Liste cinémas + séances
+    document.getElementById('film-cinemas-list').innerHTML = film.cinemas.map((c, ci) => {
+      const seancesHTML = Object.entries(c.seances).map(([jour, horaires]) => `
+        <div class="seances-day-row">
+          <span class="seances-day-label">${jour}</span>
+          <div class="seances-pills">
+            ${horaires.map(h => `
+              <button class="seance-pill" onclick="openReservation('${film.titre}','${c.nom}','${h}')">${h}</button>
+            `).join('')}
+          </div>
+        </div>
+      `).join('');
+
+      return `<div class="film-cinema-row">
+        <div class="film-cinema-top">
+          <div class="film-cinema-left">
+            <div class="film-cinema-name">${ci + 1}. ${c.nom}</div>
+            <div class="film-cinema-addr"><i class="ti ti-map-pin"></i>${c.dist} de vous</div>
+          </div>
+          <div style="display:flex;gap:6px;flex-shrink:0;">
+            <button class="btn-nav" onclick="openWaze('${c.nom}')"><i class="ti ti-map-2"></i> Waze</button>
+            <button class="btn-nav btn-nav-primary" onclick="openItineraire('${c.nom}')">
+              <i class="ti ti-navigation"></i> Y aller
+            </button>
+          </div>
+        </div>
+        <div class="seances-wrap">${seancesHTML}</div>
+      </div>`;
+    }).join('');
+  }
+
+  // ── Synopsis popup ──
+  function openSynopsis(filmId) {
+    const f = getFilmById(filmId);
+    if (!f) return;
+    document.getElementById('syn-title').textContent = f.titre;
+    document.getElementById('syn-meta').textContent = `${f.real} · ${f.genre} · ${f.duree}`;
+    document.getElementById('syn-text').textContent = f.synopsis;
+    document.getElementById('synopsis-overlay').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeSynopsis(e) {
+    if (e.target === document.getElementById('synopsis-overlay')) {
+      document.getElementById('synopsis-overlay').classList.remove('open');
+      document.body.style.overflow = '';
+    }
+  }
+
+  // ── Navigation ──
+  function openWaze(nom) {
+    const q = encodeURIComponent(nom + ' Paris');
+    window.open('https://waze.com/ul?q=' + q, '_blank');
+  }
+
+  function clearSearch() {
+    document.getElementById('main-search').value = '';
+    document.getElementById('main-search').focus();
+  }
+
+  function searchEnter(e) {
+    if (e.key === 'Enter') {
+      searchQuery = document.getElementById('main-search').value.trim();
+      if (!searchQuery) return;
+      // Détecter automatiquement si c'est un film
+      const isFilm = FILMS.some(f => f.titre.toLowerCase().includes(searchQuery.toLowerCase()) && f.cinemas.length > 0);
+      if (isFilm) setMode('film');
+      else setMode('lieu');
+    }
+  }
+
+  function geolocate() {
+    if (!navigator.geolocation) return;
+    const btn = document.getElementById('btn-locate');
+    btn.innerHTML = '<i class="ti ti-loader"></i> Localisation…';
+    btn.disabled = true;
+    navigator.geolocation.getCurrentPosition(
+      () => {
+        searchQuery = 'Ma position';
+        document.getElementById('main-search').value = searchQuery;
+        btn.innerHTML = '<i class="ti ti-current-location"></i> Ma position';
+        btn.disabled = false;
+        renderResults();
+      },
+      () => {
+        btn.innerHTML = '<i class="ti ti-current-location"></i> Ma position';
+        btn.disabled = false;
+      }
+    );
+  }
+
+  // ── Init ──
+  setMode(searchMode);
+</script>
+</body>
+</html>
