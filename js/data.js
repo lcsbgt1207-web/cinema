@@ -234,6 +234,62 @@ const FILMS = [
     color: 'p2', badge: null,
     lb: 4.4, imdb: 8.5, sc: 8.0, annee: 2019, imdbID: "tt6751668", cinemas: []
   },
+  {
+    id: 33, titre: "Gladiator", original: "Gladiator", genre: "Action", duree: "2h35",
+    real: "Ridley Scott", acteurs: "Russell Crowe, Joaquin Phoenix, Connie Nielsen",
+    synopsis: "Un général romain trahi devient gladiateur et cherche à venger sa famille face à l’empereur corrompu.",
+    color: 'p3', badge: null,
+    lb: 4.2, imdb: 8.5, sc: 8.2, annee: 2000, imdbID: "tt0172495", cinemas: []
+  },
+  {
+    id: 34, titre: "Les Infiltrés", original: "The Departed", genre: "Policier", duree: "2h31",
+    real: "Martin Scorsese", acteurs: "Leonardo DiCaprio, Matt Damon, Jack Nicholson",
+    synopsis: "Un policier infiltré et une taupe de la mafia tentent chacun de découvrir l’identité de l’autre.",
+    color: 'p4', badge: null,
+    lb: 4.2, imdb: 8.5, sc: 8.1, annee: 2006, imdbID: "tt0407887", cinemas: []
+  },
+  {
+    id: 35, titre: "Whiplash", original: "Whiplash", genre: "Drame", duree: "1h47",
+    real: "Damien Chazelle", acteurs: "Miles Teller, J.K. Simmons, Melissa Benoist",
+    synopsis: "Un jeune batteur ambitieux subit l’entraînement brutal d’un professeur obsédé par l’excellence.",
+    color: 'p5', badge: null,
+    lb: 4.3, imdb: 8.5, sc: 8.2, annee: 2014, imdbID: "tt2582802", cinemas: []
+  },
+  {
+    id: 36, titre: "Le Prestige", original: "The Prestige", genre: "Thriller", duree: "2h10",
+    real: "Christopher Nolan", acteurs: "Christian Bale, Hugh Jackman, Scarlett Johansson",
+    synopsis: "Deux magiciens rivaux se livrent une guerre d’illusions qui tourne à l’obsession destructrice.",
+    color: 'p6', badge: null,
+    lb: 4.2, imdb: 8.5, sc: 8.2, annee: 2006, imdbID: "tt0482571", cinemas: []
+  },
+  {
+    id: 37, titre: "Les Intouchables", original: "Intouchables", genre: "Comédie", duree: "1h52",
+    real: "Olivier Nakache, Éric Toledano", acteurs: "François Cluzet, Omar Sy, Anne Le Ny",
+    synopsis: "Un aristocrate tétraplégique engage un aide à domicile issu d’un milieu opposé, et une amitié inattendue naît.",
+    color: 'p1', badge: null,
+    lb: 4.0, imdb: 8.5, sc: 8.0, annee: 2011, imdbID: "tt1675434", cinemas: []
+  },
+  {
+    id: 38, titre: "Harakiri", original: "Harakiri", genre: "Drame", duree: "2h13",
+    real: "Masaki Kobayashi", acteurs: "Tatsuya Nakadai, Akira Ishihama",
+    synopsis: "Un rônin demande à se donner la mort dans la demeure d’un clan, révélant peu à peu une terrible injustice.",
+    color: 'p2', badge: null,
+    lb: 4.6, imdb: 8.6, sc: 8.7, annee: 1962, imdbID: "tt0056058", cinemas: []
+  },
+  {
+    id: 39, titre: "Il était une fois dans l’Ouest", original: "Once Upon a Time in the West", genre: "Western", duree: "2h46",
+    real: "Sergio Leone", acteurs: "Henry Fonda, Charles Bronson, Claudia Cardinale",
+    synopsis: "Dans l’Ouest américain, plusieurs destins se croisent autour d’une terre convoitée et d’une vengeance silencieuse.",
+    color: 'p3', badge: null,
+    lb: 4.4, imdb: 8.5, sc: 8.5, annee: 1968, imdbID: "tt0064116", cinemas: []
+  },
+  {
+    id: 40, titre: "Usual Suspects", original: "The Usual Suspects", genre: "Policier", duree: "1h46",
+    real: "Bryan Singer", acteurs: "Kevin Spacey, Gabriel Byrne, Chazz Palminteri",
+    synopsis: "Un survivant raconte l’étrange histoire d’un groupe de criminels lié au mystérieux Keyser Söze.",
+    color: 'p4', badge: null,
+    lb: 4.1, imdb: 8.5, sc: 8.2, annee: 1995, imdbID: "tt0114814", cinemas: []
+  },
 ];
 
 // ── Cinémas ──
