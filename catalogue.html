@@ -7,11 +7,11 @@
   <link rel="stylesheet" href="css/style.css" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css" />
   <style>
-    .page-content { padding: 0 0 48px; }
+    .page-content { max-width: 1320px; padding: 0 32px 56px; }
 
     /* TABLE */
-    .table-wrap { overflow-x: auto; border: 0.5px solid var(--gray-200); border-radius: var(--radius-lg); margin-top: 8px; }
-    table { width: 100%; border-collapse: collapse; min-width: 620px; }
+    .table-wrap { overflow-x: auto; border: 0.5px solid var(--gray-200); border-radius: var(--radius-lg); margin-top: 10px; }
+    table { width: 100%; border-collapse: collapse; min-width: 1080px; table-layout: fixed; }
     thead tr { background: var(--gray-50); border-bottom: 0.5px solid var(--gray-200); }
     th {
       font-size: 11px;
@@ -19,7 +19,7 @@
       color: var(--gray-400);
       text-transform: uppercase;
       letter-spacing: 0.4px;
-      padding: 10px 12px;
+      padding: 12px 16px;
       text-align: left;
       white-space: nowrap;
       cursor: pointer;
@@ -38,11 +38,12 @@
     tbody tr:last-child { border-bottom: none; }
     tbody tr:hover { background: var(--gray-50); }
 
-    td { padding: 10px 12px; font-size: 13px; color: var(--black); vertical-align: middle; }
-    .td-title { max-width: 200px; }
-    .film-name { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .film-original { font-size: 11px; color: var(--gray-400); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .td-real { color: var(--gray-500); white-space: nowrap; font-size: 12px; }
+    td { padding: 14px 16px; font-size: 14px; color: var(--black); vertical-align: middle; }
+    .td-title { width: 360px; max-width: 360px; }
+    .td-title .film-cell > div { min-width: 0; }
+    .film-name { font-weight: 600; font-size: 15px; line-height: 1.25; white-space: normal; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+    .film-original { font-size: 12px; color: var(--gray-400); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .td-real { color: var(--gray-500); white-space: nowrap; font-size: 13px; }
     .td-note { text-align: center; }
     .td-year { color: var(--gray-500); font-size: 12px; white-space: nowrap; }
     .sep-left { border-left: 0.5px solid var(--gray-200); }
@@ -75,8 +76,8 @@
 
     .table-footer { display:none; }
 
-    .film-cell { display: flex; align-items: center; gap: 12px; min-width: 220px; }
-    .film-thumb { width: 44px; height: 62px; border-radius: 6px; background: var(--gray-100); overflow: hidden; flex: 0 0 auto; display:flex; align-items:center; justify-content:center; color:var(--gray-300); }
+    .film-cell { display: flex; align-items: center; gap: 14px; min-width: 0; }
+    .film-thumb { width: 64px; height: 92px; border-radius: 6px; background: var(--gray-100); overflow: hidden; flex: 0 0 auto; display:flex; align-items:center; justify-content:center; color:var(--gray-300); }
     .film-thumb img { width: 100%; height: 100%; object-fit: cover; display:block; }
     .catalogue-bottom { margin-top: 18px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
     .page-state { font-size: 13px; color: var(--gray-500); width: 100%; }
@@ -86,6 +87,15 @@
     .page-btn.active { background: var(--black); color: var(--white); border-color: var(--black); }
     .page-btn:disabled { opacity: .35; cursor: not-allowed; border-color: var(--gray-200); }
     .page-size-select { height: 38px; border: 0.5px solid var(--gray-200); border-radius: 8px; padding: 0 34px 0 12px; background: var(--white); color: var(--gray-600); font-size: 13px; }
+    table th:nth-child(1), table td:nth-child(1) { width: 42px; }
+    table th:nth-child(2), table td:nth-child(2) { width: 380px; }
+    table th:nth-child(3), table td:nth-child(3) { width: 230px; }
+    table th:nth-child(4), table td:nth-child(4) { width: 160px; }
+    table th:nth-child(5), table td:nth-child(5),
+    table th:nth-child(6), table td:nth-child(6),
+    table th:nth-child(7), table td:nth-child(7) { width: 145px; }
+    table th:nth-child(8), table td:nth-child(8) { width: 100px; }
+
   </style>
 </head>
 <body>
