@@ -215,6 +215,7 @@
 <script src="js/config.js"></script>
 <script src="js/tmdb.js"></script>
 <script src="js/places.js"></script>
+<script src="js/pagination.js"></script>
 <script>
   const params      = new URLSearchParams(window.location.search);
   let searchQuery   = params.get('q') || '';
@@ -289,10 +290,9 @@
       // Films à afficher sous chaque cinéma (films en salle)
       const filmsToShow = nowPlayingFilms.slice(0, 5);
 
-      list.innerHTML = cinemas.map((c, ci) => {
+      function renderCinemaCard(c, ci) {
         const ouvertClass = c.ouvert === true ? 'chip-open' : c.ouvert === false ? 'chip-closed' : 'chip-unknown';
         const ouvertLabel = c.ouvert === true ? 'Ouvert' : c.ouvert === false ? 'Fermé' : 'Horaires inconnus';
-
         const filmThumbs = filmsToShow.map(f => {
           const poster = TMDB.posterUrl(f.poster_path, 'w92');
           return `<div class="film-thumb" onclick="openFilmPopup(${f.id}, ${JSON.stringify(c).replace(/"/g,'&quot;')})">
@@ -302,7 +302,6 @@
             <div class="film-thumb-title">${f.title}</div>
           </div>`;
         }).join('');
-
         return `<div class="cinema-item" style="animation-delay:${ci * 0.06}s">
           <div class="cinema-item-top">
             <div class="cinema-item-left">
@@ -328,7 +327,17 @@
           <div class="cinema-films-label">Films à l'affiche</div>
           <div class="cinema-films">${filmThumbs}</div>
         </div>`;
-      }).join('');
+      }
+
+      PAGINATION.create({
+        items: cinemas,
+        perPage: 5,
+        containerId: 'cinemas-list',
+        scrollTo: 'cinemas-list',
+        renderFn: (pageCinemas, pagerHtml) => {
+          list.innerHTML = pageCinemas.map((c, ci) => renderCinemaCard(c, ci)).join('') + pagerHtml;
+        }
+      });
 
     } catch(e) {
       list.innerHTML = `<div class="state-box"><i class="ti ti-alert-circle"></i><p>Erreur : ${e.message}</p></div>`;
