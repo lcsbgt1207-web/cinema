@@ -228,14 +228,15 @@ img { max-width: 100%; display: block; }
 ══════════════════════════════ */
 .popup-top {
   display: grid;
-  grid-template-columns: 190px 1fr;
-  align-items: stretch;
+  grid-template-columns: 230px 1fr;
+  align-items: start;
   flex-shrink: 0;
 }
 .popup-poster {
-  width: 190px;
-  min-height: 285px;
-  max-height: 300px;
+  width: 230px;
+  height: 345px;
+  min-height: 0;
+  max-height: none;
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -450,7 +451,7 @@ img { max-width: 100%; display: block; }
   .nav { display: none; }
   .popup { max-width: 100%; max-height: 92vh; }
   .popup-top { grid-template-columns: 1fr; }
-  .popup-poster { width: 100%; min-height: 220px; max-height: 260px; }
+  .popup-poster { width: 100%; height: 320px; min-height: 0; max-height: none; }
   .popup-main-content { border-left: none; border-top: 0.5px solid var(--gray-200); }
   .footer-stats { grid-template-columns: repeat(2, 1fr); }
 }

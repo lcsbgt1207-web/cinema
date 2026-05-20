@@ -3,7 +3,29 @@
    Récupère les vraies notes IMDb + affiches + synopsis courts OMDb
    ═══════════════════════════════════════ */
 
-const OMDB_CACHE_KEY = 'cinepro_omdb_cache_imdb_short_v2';
+const OMDB_CACHE_KEY = 'cinepro_omdb_cache_imdb_fr_v4';
+
+
+const OMDB_PLOTS_FR = {
+  'tt0068646': "Le patriarche vieillissant d'une dynastie criminelle new-yorkaise transmet peu à peu son empire clandestin à son fils réticent.",
+  'tt0050083': "Un juré tente de convaincre les onze autres qu'un adolescent accusé de meurtre n'est peut-être pas coupable.",
+  'tt0816692': "Une équipe d'explorateurs traverse un trou de ver dans l'espace pour tenter d'assurer la survie de l'humanité.",
+  'tt6751668': "Une famille pauvre s'infiltre dans le quotidien d'une famille aisée, déclenchant une série d'événements imprévisibles.",
+  'tt0047396': "Un photographe immobilisé observe ses voisins depuis sa fenêtre et soupçonne l'un d'eux d'avoir commis un meurtre.",
+  'tt3612616': "Une mère veuve tente d'élever seule son fils impulsif, jusqu'à l'arrivée d'une voisine qui bouleverse leur équilibre.",
+  'tt8613070': "Une peintre est chargée de réaliser le portrait de mariage d'une jeune femme, sans que celle-ci ne pose officiellement.",
+  'tt3891064': "Une jeune pilote voyage accidentellement dans le temps et tente de prévenir une catastrophe, mais personne ne la croit.",
+  'tt0465538': "Un ingénieur se retrouve piégé dans une guerre psychologique lorsqu'un procureur tente de le faire condamner pour tentative de meurtre.",
+  'tt10617124': "Des assistantes sociales accueillent des femmes sans-abri et cherchent des solutions quand leur centre risque de fermer.",
+  'tt0093409': "Dans les années 1950, une femme au foyer découvre une passion interdite qui remet en question toute sa vie.",
+  'tt0109830': "Un homme simple traverse plusieurs décennies d'histoire américaine sans jamais perdre son innocence ni sa sincérité.",
+  'tt1375666': "Un voleur capable d'entrer dans les rêves reçoit une mission impossible : implanter une idée dans l'esprit d'une cible."
+};
+
+function getFrenchPlot(film, omdb) {
+  if (omdb?.imdbID && OMDB_PLOTS_FR[omdb.imdbID]) return OMDB_PLOTS_FR[omdb.imdbID];
+  return film.synopsis || omdb?.plot || '';
+}
 
 function readOmdbCache() {
   try {
@@ -107,7 +129,8 @@ function applyOmdbDataToFilm(film, omdb) {
   if (omdb.year) film.annee = omdb.year;
   if (omdb.director) film.real = omdb.director;
   if (omdb.actors) film.acteurs = omdb.actors;
-  if (omdb.plot) film.synopsis = omdb.plot;
+  const synopsisFr = getFrenchPlot(film, omdb);
+  if (synopsisFr) film.synopsis = synopsisFr;
 
   return film;
 }
