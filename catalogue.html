@@ -238,7 +238,8 @@
   </div>
 </div>
 
-<script src="js/config.js"></script>
+<script src="js/config.js">// update: pagination starts at 8 per page
+</script>
 <script src="js/data.js"></script>
 <script src="js/omdb.js"></script>
 <script>
@@ -247,7 +248,7 @@
   const favs = new Set(JSON.parse(localStorage.getItem('cinepro_favs') || '[]'));
   let sortKey = 'imdb', sortDir = -1;
   let currentPage = 1;
-  let pageSize = 4;
+  let pageSize = 8;
   let lastFilteredData = [];
   const MAX_PAGES = 10;
 
@@ -339,7 +340,6 @@
         <button class="page-btn" ${currentPage === totalPages ? 'disabled' : ''} onclick="changePage(${currentPage + 1})"><i class="ti ti-chevron-right"></i></button>
       </div>
       <select class="page-size-select" onchange="changePageSize(this.value)">
-        <option value="4" ${pageSize === 4 ? 'selected' : ''}>4 par page</option>
         <option value="8" ${pageSize === 8 ? 'selected' : ''}>8 par page</option>
         <option value="12" ${pageSize === 12 ? 'selected' : ''}>12 par page</option>
         <option value="25" ${pageSize === 25 ? 'selected' : ''}>25 par page</option>
@@ -353,7 +353,7 @@
   }
 
   function changePageSize(value) {
-    pageSize = Number(value) || 4;
+    pageSize = Number(value) || 8;
     currentPage = 1;
     filterTable();
   }
