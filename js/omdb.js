@@ -3,8 +3,8 @@
    OMDb = vraie note IMDb du tableau, récupérée avec l'ID IMDb quand possible
 */
 
-const OMDB_CACHE_KEY = 'cinepro_omdb_cache_v5';
-const TMDB_CACHE_KEY = 'cinepro_tmdb_cache_v5';
+const OMDB_CACHE_KEY = 'cinepro_omdb_cache_v7_fr_synopsis';
+const TMDB_CACHE_KEY = 'cinepro_tmdb_cache_v7_fr_synopsis';
 
 function readCache(key) {
   try {
@@ -116,7 +116,9 @@ async function fetchTmdbFilm(film) {
       imdbID: detail.external_ids?.imdb_id || null,
       titre: detail.title || film.titre,
       original: detail.original_title || film.original,
-      synopsis: detail.overview || film.synopsis,
+      // On garde les synopsis français écrits dans data.js.
+      // TMDB reste utilisé pour les affiches et les infos techniques.
+      synopsis: film.synopsis || detail.overview || '',
       poster: detail.poster_path ? `${CONFIG.TMDB_IMG_BASE}${detail.poster_path}` : null,
       annee: detail.release_date ? Number.parseInt(detail.release_date.slice(0, 4), 10) : film.annee,
       duree: detail.runtime ? formatDuration(detail.runtime) : film.duree,
@@ -159,8 +161,7 @@ async function fetchOmdbById(imdbID) {
 
     const result = {
       imdbID: data.imdbID || imdbID,
-      imdbRating: normalizeRating(data.imdbRating),
-      plot: data.Plot && data.Plot !== 'N/A' ? data.Plot : null
+      imdbRating: normalizeRating(data.imdbRating)
     };
 
     cache[cacheKey] = result;
@@ -198,8 +199,7 @@ async function fetchOmdbByTitle(film) {
 
     const result = {
       imdbID: data.imdbID || null,
-      imdbRating: normalizeRating(data.imdbRating),
-      plot: data.Plot && data.Plot !== 'N/A' ? data.Plot : null
+      imdbRating: normalizeRating(data.imdbRating)
     };
 
     cache[cacheKey] = result;
@@ -219,7 +219,8 @@ function applyDataToFilm(film, tmdb, omdb) {
     film.imdbID = tmdb.imdbID || film.imdbID;
     film.titre = tmdb.titre || film.titre;
     film.original = tmdb.original || film.original;
-    // On garde TMDB pour les affiches et infos techniques, mais pas pour le synopsis.
+    // Ne pas remplacer nos synopsis français par ceux de TMDB.
+    film.synopsis = film.synopsis || tmdb.synopsis;
     film.poster = tmdb.poster || film.poster;
     film.annee = tmdb.annee || film.annee;
     film.duree = tmdb.duree || film.duree;
@@ -231,7 +232,6 @@ function applyDataToFilm(film, tmdb, omdb) {
   if (omdb && Number.isFinite(omdb.imdbRating)) {
     film.imdbID = omdb.imdbID || film.imdbID;
     film.imdb = omdb.imdbRating;
-    if (omdb.plot) film.synopsis = omdb.plot;
   } else {
     film.imdb = null;
   }
@@ -263,3 +263,5 @@ async function enrichFilmsWithOmdb(films, onProgress) {
 
   return films;
 }
+
+// Update générée : synopsis français conservés + affiches TMDB conservées.
