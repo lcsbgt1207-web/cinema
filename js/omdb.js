@@ -1,9 +1,9 @@
 /* ═══════════════════════════════════════
    CinéProche — Intégration OMDb
-   Récupère les vraies notes IMDb + affiches
+   Récupère les vraies notes IMDb + affiches + synopsis courts OMDb
    ═══════════════════════════════════════ */
 
-const OMDB_CACHE_KEY = 'cinepro_omdb_cache_v1';
+const OMDB_CACHE_KEY = 'cinepro_omdb_cache_imdb_short_v2';
 
 function readOmdbCache() {
   try {
@@ -48,7 +48,7 @@ async function fetchOmdbFilm(film) {
   const params = new URLSearchParams({
     apikey: CONFIG.OMDB_API_KEY,
     t: searchTitle,
-    plot: 'full',
+    plot: 'short',
     r: 'json'
   });
 

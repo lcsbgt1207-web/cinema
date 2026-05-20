@@ -166,13 +166,15 @@ function buildPopupHTML(film) {
   const posterHTML = film.poster
     ? `<img src="${film.poster}" alt="Affiche du film ${film.titre}" loading="lazy">`
     : '<i class="ti ti-photo"></i>';
+
   const seancesEmptyHTML = `
     <div class="popup-cinemas popup-cinemas-empty">
-      <div class="popup-cinemas-label">Séances proches</div>
+      <div class="popup-cinemas-label">Séances</div>
       <div class="empty-seances">
-        Les cinémas et horaires seront branchés ici quand on ajoutera le scraping des cinémas indépendants.
+        Aucune séance réelle n’est encore branchée pour ce film. Cette zone sera connectée plus tard au scraping des cinémas indépendants, avec le cinéma, l’horaire, la VF/VO et le lien de réservation.
       </div>
     </div>`;
+
   const cinemasHTML = film.cinemas.length === 0 ? seancesEmptyHTML : `
     <div class="popup-cinemas">
       <div class="popup-cinemas-label">Cinémas les plus proches</div>
@@ -210,27 +212,29 @@ function buildPopupHTML(film) {
     </div>`;
 
   return `
-    <div class="popup-top">
+    <div class="popup-top popup-top-with-poster">
       <div class="popup-poster" style="background:${bg};">
         ${posterHTML}
       </div>
-      <div class="popup-header">
-        ${film.badge ? `<span class="popup-badge">${film.badge}</span>` : ''}
-        <div class="popup-title">${film.titre}</div>
-        <div class="popup-tags">
-          <span class="popup-tag">${film.genre}</span>
-          <span class="popup-tag">${film.duree}</span>
-          ${film.annee ? `<span class="popup-tag">${film.annee}</span>` : ''}
+      <div class="popup-main-content">
+        <div class="popup-header">
+          ${film.badge ? `<span class="popup-badge">${film.badge}</span>` : ''}
+          <div class="popup-title">${film.titre}</div>
+          <div class="popup-tags">
+            <span class="popup-tag">${film.genre}</span>
+            <span class="popup-tag">${film.duree}</span>
+            ${film.annee ? `<span class="popup-tag">${film.annee}</span>` : ''}
+          </div>
+          <div class="popup-crew">
+            <div class="popup-crew-row"><strong>Réalisateur ·</strong> ${film.real}</div>
+            <div class="popup-crew-row"><strong>Avec ·</strong> ${film.acteurs}</div>
+          </div>
         </div>
-        <div class="popup-crew">
-          <div class="popup-crew-row"><strong>Réalisateur ·</strong> ${film.real}</div>
-          <div class="popup-crew-row"><strong>Avec ·</strong> ${film.acteurs}</div>
+        <div class="popup-synopsis-block">
+          <div class="section-label">Synopsis</div>
+          <div class="popup-synopsis">${film.synopsis}</div>
         </div>
       </div>
-    </div>
-    <div class="popup-synopsis-block">
-      <div class="section-label">Synopsis</div>
-      <div class="popup-synopsis">${film.synopsis}</div>
     </div>
     ${cinemasHTML}
     <button class="popup-close-btn" onclick="closeFilmPopup()">Fermer</button>
