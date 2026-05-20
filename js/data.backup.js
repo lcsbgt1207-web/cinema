@@ -163,17 +163,7 @@ function getFilmById(id) { return FILMS.find(f => f.id === id); }
 
 function buildPopupHTML(film) {
   const bg = POSTER_COLORS[film.color] || '#ccc';
-  const posterHTML = film.poster
-    ? `<img src="${film.poster}" alt="Affiche du film ${film.titre}" loading="lazy">`
-    : '<i class="ti ti-photo"></i>';
-  const seancesEmptyHTML = `
-    <div class="popup-cinemas popup-cinemas-empty">
-      <div class="popup-cinemas-label">Séances proches</div>
-      <div class="empty-seances">
-        Les cinémas et horaires seront branchés ici quand on ajoutera le scraping des cinémas indépendants.
-      </div>
-    </div>`;
-  const cinemasHTML = film.cinemas.length === 0 ? seancesEmptyHTML : `
+  const cinemasHTML = film.cinemas.length === 0 ? '' : `
     <div class="popup-cinemas">
       <div class="popup-cinemas-label">Cinémas les plus proches</div>
       ${film.cinemas.map((c, ci) => `
@@ -212,7 +202,7 @@ function buildPopupHTML(film) {
   return `
     <div class="popup-top">
       <div class="popup-poster" style="background:${bg};">
-        ${posterHTML}
+        <i class="ti ti-photo"></i>
       </div>
       <div class="popup-header">
         ${film.badge ? `<span class="popup-badge">${film.badge}</span>` : ''}

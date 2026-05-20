@@ -1,4 +1,4 @@
-/* CinéProche — Service Google Places v4 */
+/* CinéProche — Service Google Places */
 
 const PLACES = {
   map: null, placesService: null, geocoder: null, userLocation: null,
@@ -15,113 +15,37 @@ const PLACES = {
   geolocate() {
     return new Promise((resolve, reject) => {
       if (!navigator.geolocation) { reject(new Error('Géolocalisation non disponible')); return; }
-      navigator.geolocation.getCurrentPosition(
-        pos => { this.userLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude }; resolve(this.userLocation); },
-        err => reject(err), { timeout: 10000, maximumAge: 300000 }
-      );
+      navigator.geolocation.getCurrentPosition(pos => { this.userLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude }; resolve(this.userLocation); }, err => reject(err), { timeout: 10000, maximumAge: 300000 });
     });
   },
 
   geocodeAddress(address) {
     return new Promise((resolve, reject) => {
       this.geocoder.geocode({ address: address, region: 'fr' }, (results, status) => {
-        if (status === 'OK' && results[0]) {
-          const loc = results[0].geometry.location;
-          this.userLocation = { lat: loc.lat(), lng: loc.lng() };
-          resolve({ location: this.userLocation, formattedAddress: results[0].formatted_address });
-        } else { reject(new Error('Adresse introuvable : ' + status)); }
+        if (status === 'OK' && results[0]) { const loc = results[0].geometry.location; this.userLocation = { lat: loc.lat(), lng: loc.lng() }; resolve({ location: this.userLocation, formattedAddress: results[0].formatted_address }); }
+        else { reject(new Error('Adresse introuvable : ' + status)); }
       });
     });
   },
 
-  // Recherche sur un rayon donné — retourne une Promise
-  _searchRadius(location, radius) {
-    return new Promise((resolve) => {
-      if (!this.placesService) { resolve([]); return; }
-      const request = {
-        location: new google.maps.LatLng(location.lat, location.lng),
-        radius: radius,
-        type: 'movie_theater',
-        language: 'fr'
-      };
-      let allResults = [];
-      const handlePage = (results, status, pagination) => {
+  findNearbycinemas(location, radius = CONFIG.SEARCH_RADIUS) {
+    return new Promise((resolve, reject) => {
+      if (!this.placesService) { reject(new Error('Service Places non initialisé')); return; }
+      const request = { location: new google.maps.LatLng(location.lat, location.lng), radius: radius, type: 'movie_theater', language: 'fr' };
+      this.placesService.nearbySearch(request, (results, status) => {
         if (status === google.maps.places.PlacesServiceStatus.OK) {
-          allResults = allResults.concat(results);
-          if (pagination && pagination.hasNextPage && allResults.length < 60) {
-            setTimeout(() => pagination.nextPage(), 300);
-          } else { resolve(allResults); }
-        } else { resolve(allResults); }
-      };
-      this.placesService.nearbySearch(request, handlePage);
+          const EXCLUDE = ['drive', 'restaurant', 'hotel', 'hôtel', 'supermarché', 'boutique', 'magasin', 'coiffeur', 'pharmacie', 'boulangerie', 'tabac', 'thai', 'pizza', 'burger', 'sushi', 'kebab'];
+          const filtered = results.filter(p => {
+            const name = p.name.toLowerCase();
+            return !EXCLUDE.some(k => name.includes(k));
+          });
+          const cinemas = filtered.map(place => ({ id: place.place_id, nom: place.name, adresse: place.vicinity, location: { lat: place.geometry.location.lat(), lng: place.geometry.location.lng() }, ouvert: place.opening_hours ? place.opening_hours.open_now : null, rating: place.rating, dist: this.calcDistance(location, { lat: place.geometry.location.lat(), lng: place.geometry.location.lng() }) }));
+          cinemas.sort((a, b) => a.dist - b.dist);
+          resolve(cinemas);
+        } else if (status === google.maps.places.PlacesServiceStatus.ZERO_RESULTS) { resolve([]); }
+        else { reject(new Error('Erreur Places API : ' + status)); }
+      });
     });
-  },
-
-  async findNearbycinemas(location, radius = 15000) {
-    // Toujours chercher sur 5km en priorité + sur le rayon choisi
-    // Fusionner les résultats pour garantir les plus proches
-    const CLOSE_RADIUS = Math.min(5000, radius);
-    
-    let results;
-    if (radius <= 5000) {
-      results = await this._searchRadius(location, radius);
-    } else {
-      // Deux recherches en parallèle
-      const [closeResults, farResults] = await Promise.all([
-        this._searchRadius(location, CLOSE_RADIUS),
-        this._searchRadius(location, radius)
-      ]);
-      // Fusionner en dédupliquant par place_id
-      const seen = new Set();
-      results = [];
-      for (const r of [...closeResults, ...farResults]) {
-        if (!seen.has(r.place_id)) { seen.add(r.place_id); results.push(r); }
-      }
-    }
-
-    // Filtres
-    const EXCLUDE = [
-      'carrefour','leclerc','fnac','cultura','super u','intermarché',
-      'spectacles','billetterie','ticket',
-      'drive','drive-in','plein air','plein-air','open air','itinérant','itinerant','toiles','cinétoile',
-      'restaurant','brasserie','bistrot','thai','pizza','burger','sushi','kebab','traiteur',
-      'hotel','hôtel','auberge','supermarché','supermarche','boutique','magasin',
-      'coiffeur','pharmacie','boulangerie','tabac',
-      'karting','bowling','escape','laser','paintball',
-      'festival','temporaire','éphémère','estival','association',
-      'hallucinecran','halluciné'
-    ];
-    const REQUIRE = [
-      'ciné','cine','cinema','cinéma','ugc','pathé','pathe',
-      'gaumont','mk2','rex','megarama','kinépolis','kinepolis',
-      'multiplexe','imax','odéon','odeon','lumière','lumiere',
-      'majestic','palace','louxor','champo','balzac','wepler',
-      'studio','utopia','ariel','espace','forum','méga','mega',
-      'conti','beaumont','brady','select'
-    ];
-
-    const filtered = results.filter(place => {
-      const name = place.name.toLowerCase();
-      const types = place.types || [];
-      if (EXCLUDE.some(k => name.includes(k))) return false;
-      if (REQUIRE.some(k => name.includes(k))) return true;
-      const suspectTypes = ['supermarket','store','food','restaurant','lodging','bar'];
-      if (suspectTypes.some(t => types.includes(t))) return false;
-      return types.includes('movie_theater');
-    });
-
-    const cinemas = filtered.map(place => ({
-      id: place.place_id,
-      nom: place.name,
-      adresse: place.vicinity,
-      location: { lat: place.geometry.location.lat(), lng: place.geometry.location.lng() },
-      ouvert: place.opening_hours ? place.opening_hours.open_now : null,
-      rating: place.rating,
-      dist: this.calcDistance(location, { lat: place.geometry.location.lat(), lng: place.geometry.location.lng() })
-    }));
-
-    cinemas.sort((a, b) => a.dist - b.dist);
-    return cinemas;
   },
 
   calcDistance(from, to) {
