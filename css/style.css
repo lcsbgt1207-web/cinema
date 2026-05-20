@@ -446,12 +446,12 @@ img { max-width: 100%; display: block; }
    POPUP FILM — nouvelle mise en page catalogue
    ══════════════════════════════ */
 #film-popup.popup {
-  max-width: 720px;
+  max-width: 690px;
 }
 
 .film-popup-layout {
   display: grid;
-  grid-template-columns: 230px 1fr;
+  grid-template-columns: 255px 1fr;
   grid-template-rows: auto auto;
   background: var(--white);
 }
@@ -459,10 +459,10 @@ img { max-width: 100%; display: block; }
 .film-popup-poster {
   grid-column: 1;
   grid-row: 1;
-  width: 230px;
-  height: 310px;
-  min-height: 310px;
-  margin: 18px 0 18px 18px;
+  width: 215px;
+  height: 315px;
+  min-height: 315px;
+  margin: 22px 0 22px 22px;
   border: none;
   border-radius: 6px;
   display: flex;
@@ -476,6 +476,7 @@ img { max-width: 100%; display: block; }
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center;
   display: block;
 }
 
@@ -496,36 +497,48 @@ img { max-width: 100%; display: block; }
 .film-popup-meta-zone,
 .film-popup-crew-zone,
 .film-popup-synopsis-zone {
-  padding: 12px 18px;
+  padding: 14px 22px;
   border-bottom: 0.5px solid var(--gray-200);
 }
 
 .film-popup-title-zone {
-  padding-top: 18px;
+  padding-top: 24px;
+  padding-bottom: 22px;
+}
+
+.film-popup-title-zone h2 {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.25;
 }
 
 .film-popup-meta-zone {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
 .film-popup-crew-zone {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 6px;
 }
 
 .film-popup-synopsis-zone {
+  min-height: 110px;
   border-bottom: 0.5px solid var(--gray-200);
+}
+
+.film-popup-synopsis-zone p {
+  line-height: 1.55;
 }
 
 .film-popup-seances-zone {
   grid-column: 1 / -1;
   grid-row: 2;
-  min-height: 170px;
-  padding: 18px;
+  min-height: 140px;
+  padding: 20px 22px;
   border-bottom: 0.5px solid var(--gray-200);
 }
 
@@ -537,15 +550,19 @@ img { max-width: 100%; display: block; }
 }
 
 @media (max-width: 640px) {
+  #film-popup.popup {
+    max-width: calc(100vw - 20px);
+  }
+
   .film-popup-layout {
-    grid-template-columns: 130px 1fr;
+    grid-template-columns: 145px 1fr;
   }
 
   .film-popup-poster {
-    width: 130px;
-    height: 190px;
-    min-height: 190px;
-    margin: 12px 0 12px 12px;
+    width: 120px;
+    height: 180px;
+    min-height: 180px;
+    margin: 14px 0 14px 14px;
   }
 
   .film-popup-title-zone,
@@ -557,4 +574,5 @@ img { max-width: 100%; display: block; }
   }
 }
 
-/* cinema-update: popup-poster-proportions-20260520-unique */
+/* cinema-update: popup-layout-like-reference-20260520-2207 */
+
