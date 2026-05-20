@@ -1,5 +1,3 @@
-/* CinéProche — Service Google Places */
-
 const PLACES = {
   map: null, placesService: null, geocoder: null, userLocation: null,
 
@@ -34,18 +32,56 @@ const PLACES = {
       const request = { location: new google.maps.LatLng(location.lat, location.lng), radius: radius, type: 'movie_theater', language: 'fr' };
       this.placesService.nearbySearch(request, (results, status) => {
         if (status === google.maps.places.PlacesServiceStatus.OK) {
-          const EXCLUDE = ['drive', 'drive-in', 'plein air', 'open air', 'restaurant', 'brasserie', 'thai', 'pizza', 'burger', 'sushi', 'kebab', 'hotel', 'hôtel', 'supermarché', 'boutique', 'magasin', 'coiffeur', 'pharmacie', 'boulangerie', 'tabac', 'karting', 'bowling', 'escape', 'festival', 'temporaire', 'éphémère', 'association'];
-          const REQUIRE = ['ciné', 'cine', 'cinema', 'cinéma', 'ugc', 'pathé', 'pathe', 'gaumont', 'mk2', 'rex', 'megarama', 'kinépolis', 'kinepolis', 'multiplexe', 'imax', 'odéon', 'odeon', 'lumière', 'lumiere', 'majestic', 'palace', 'louxor', 'champo', 'balzac', 'wepler'];
+
+          // Exclusions — billetteries, cinémas itinérants, plein air, non-cinémas
+          const EXCLUDE = [
+            'carrefour', 'leclerc', 'fnac', 'cultura', 'super u', 'intermarché',
+            'spectacles', 'billetterie', 'ticket',
+            'drive', 'drive-in', 'plein air', 'plein-air', 'open air', 'itinérant', 'itinerant', 'toiles', 'cinétoile',
+            'restaurant', 'brasserie', 'bistrot', 'thai', 'pizza', 'burger', 'sushi', 'kebab', 'traiteur',
+            'hotel', 'hôtel', 'auberge',
+            'supermarché', 'supermarche', 'boutique', 'magasin',
+            'coiffeur', 'pharmacie', 'boulangerie', 'tabac',
+            'karting', 'bowling', 'escape', 'laser', 'paintball',
+            'festival', 'temporaire', 'éphémère', 'estival', 'estivale',
+            'association', 'hallucinecran', 'halluciné'
+          ];
+
+          // Mots qui garantissent un vrai cinéma physique
+          const REQUIRE = [
+            'ciné', 'cine', 'cinema', 'cinéma', 'ugc', 'pathé', 'pathe',
+            'gaumont', 'mk2', 'rex', 'megarama', 'kinépolis', 'kinepolis',
+            'multiplexe', 'imax', 'odéon', 'odeon',
+            'lumière', 'lumiere', 'majestic', 'palace', 'louxor',
+            'champo', 'balzac', 'wepler', 'grand écran', 'images',
+            'studio 28', 'brady', 'select', 'familia'
+          ];
+
           const filtered = results.filter(place => {
             const name = place.name.toLowerCase();
             const types = place.types || [];
+            // Exclure si contient un mot interdit
             if (EXCLUDE.some(k => name.includes(k))) return false;
+            // Accepter si contient un mot de cinéma connu
             if (REQUIRE.some(k => name.includes(k))) return true;
+            // Accepter seulement si Google confirme movie_theater ET pas d'autres types suspects
+            const suspectTypes = ['supermarket', 'store', 'food', 'restaurant', 'lodging', 'bar'];
+            if (suspectTypes.some(t => types.includes(t))) return false;
             return types.includes('movie_theater');
           });
-          const cinemas = filtered.map(place => ({ id: place.place_id, nom: place.name, adresse: place.vicinity, location: { lat: place.geometry.location.lat(), lng: place.geometry.location.lng() }, ouvert: place.opening_hours ? place.opening_hours.open_now : null, rating: place.rating, dist: this.calcDistance(location, { lat: place.geometry.location.lat(), lng: place.geometry.location.lng() }) }));
+
+          const cinemas = filtered.map(place => ({
+            id: place.place_id,
+            nom: place.name,
+            adresse: place.vicinity,
+            location: { lat: place.geometry.location.lat(), lng: place.geometry.location.lng() },
+            ouvert: place.opening_hours ? place.opening_hours.open_now : null,
+            rating: place.rating,
+            dist: this.calcDistance(location, { lat: place.geometry.location.lat(), lng: place.geometry.location.lng() })
+          }));
           cinemas.sort((a, b) => a.dist - b.dist);
           resolve(cinemas);
+
         } else if (status === google.maps.places.PlacesServiceStatus.ZERO_RESULTS) {
           resolve([]);
         } else {
