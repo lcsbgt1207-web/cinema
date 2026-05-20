@@ -234,12 +234,13 @@
   }
 
   function formatImdbNote(film) {
+    if (film.isMock) return '—';
     if (film.omdbLoaded && film.imdb === null) return '—';
     return Number.isFinite(film.imdb) ? film.imdb.toFixed(1) : '…';
   }
 
   function getSortValue(film, key) {
-    if (key === 'imdb' && !Number.isFinite(film.imdb)) return null;
+    if (key === 'imdb' && (film.isMock || !Number.isFinite(film.imdb))) return null;
     return film[key] ?? null;
   }
 

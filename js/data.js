@@ -14,7 +14,7 @@ const FILMS = [
     id: 0, titre: 'Le Dernier Voyage', original: '', genre: 'Drame', duree: '1h58',
     real: 'Claire Moreau', acteurs: 'Léa Seydoux, Vincent Lindon',
     synopsis: "Un homme retrouve les carnets de voyage de son père disparu et décide de refaire son itinéraire à travers l'Europe pour comprendre qui il était vraiment.",
-    color: 'p1', badge: 'Nouveau',
+    color: 'p1', badge: 'Nouveau', isMock: true,
     lb: 4.2, imdb: 7.8, sc: 7.4,
     cinemas: [
       { nom: 'Cinéma du Panthéon', dist: '0,2 km', seances: { "Aujourd'hui": ['14h00','17h15','20h30'], 'Demain': ['15h00','20h00'] } },
@@ -26,7 +26,7 @@ const FILMS = [
     id: 1, titre: 'Fracture', original: '', genre: 'Thriller', duree: '2h10',
     real: 'David Szabo', acteurs: 'Tahar Rahim, Adèle Exarchopoulos',
     synopsis: "Une procureure découvre que l'affaire qu'elle instruit depuis des mois pourrait impliquer des membres de sa propre famille.",
-    color: 'p2', badge: 'Nouveau',
+    color: 'p2', badge: 'Nouveau', isMock: true,
     lb: 4.1, imdb: 7.6, sc: 7.2,
     cinemas: [
       { nom: 'Pathé Wepler', dist: '1,2 km', seances: { "Aujourd'hui": ['15h30','19h00','21h45'], 'Demain': ['14h30','18h45'] } },
@@ -38,7 +38,7 @@ const FILMS = [
     id: 2, titre: "Lumière d'Août", original: '', genre: 'Romance', duree: '1h45',
     real: 'Sofia Andreani', acteurs: 'Timothée Chalamet, Zendaya',
     synopsis: "Deux artistes se croisent dans un village du sud de la France durant l'été. Entre eux naît une relation aussi intense qu'éphémère.",
-    color: 'p3', badge: 'Nouveau',
+    color: 'p3', badge: 'Nouveau', isMock: true,
     lb: 4.3, imdb: 8.0, sc: 7.8,
     cinemas: [
       { nom: 'Cinéma du Panthéon', dist: '0,2 km', seances: { "Aujourd'hui": ['14h45','18h00'], 'Demain': ['15h30','19h00'] } },
@@ -46,11 +46,11 @@ const FILMS = [
     ]
   },
   {
-    id: 3, titre: 'Nova', original: '', genre: 'Science-fiction', duree: '2h22',
-    real: 'James Okafor', acteurs: 'Oscar Isaac, Lupita Nyong\'o',
-    synopsis: "En 2087, une astronome reçoit un signal qui ne peut venir que d'une civilisation disparue il y a 10 000 ans. Sa découverte va bouleverser l'histoire de l'humanité.",
+    id: 3, titre: 'Capitaine Nova', original: 'Captain Nova', genre: 'Science-fiction', duree: '1h26',
+    real: 'Maurice Trouwborst', acteurs: 'Kika van de Vijver, Marouane Meftah, Anniek Pheifer',
+    synopsis: "Une pilote de chasse voyage dans le temps pour sauver le monde futur d'un désastre environnemental, mais un effet secondaire la rajeunit et personne ne la prend au sérieux.",
     color: 'p4', badge: 'Bientôt',
-    lb: 4.4, imdb: 8.2, sc: 8.0,
+    lb: 4.4, imdb: 5.5, sc: 8.0, annee: 2021,
     cinemas: [
       { nom: 'UGC Ciné Cité Bercy', dist: '1,5 km', seances: { "Aujourd'hui": ['14h00','17h30','21h15'], 'Demain': ['13h45','17h00','20h30'] } },
       { nom: 'Pathé La Villette', dist: '3,2 km', seances: { "Aujourd'hui": ['15h15','19h45'], 'Demain': ['14h30','20h00'] } }
@@ -60,7 +60,7 @@ const FILMS = [
     id: 4, titre: 'Les Invisibles', original: '', genre: 'Comédie', duree: '1h35',
     real: 'Éric Toledano', acteurs: 'Omar Sy, Pio Marmaï',
     synopsis: "Deux frères que tout oppose héritent d'une boulangerie familiale en faillite. Pour la sauver, ils vont devoir apprendre à travailler ensemble malgré eux.",
-    color: 'p5', badge: 'Nouveau',
+    color: 'p5', badge: 'Nouveau', isMock: true,
     lb: 3.9, imdb: 7.3, sc: 7.0,
     cinemas: [
       { nom: 'Gaumont Opéra', dist: '0,9 km', seances: { "Aujourd'hui": ['13h00','15h00','17h00','19h00','21h00'], 'Demain': ['13h30','15h30','17h30','19h30'] } },
@@ -71,7 +71,7 @@ const FILMS = [
     id: 5, titre: 'Le Bruit du Monde', original: '', genre: 'Documentaire', duree: '1h50',
     real: 'Marie-Hélène Dupont', acteurs: '—',
     synopsis: "Un voyage sonore et visuel à travers cinq continents, à la rencontre de communautés qui résistent au silence imposé par la modernité.",
-    color: 'p6', badge: 'Bientôt',
+    color: 'p6', badge: 'Bientôt', isMock: true,
     lb: 4.0, imdb: 7.5, sc: 7.6,
     cinemas: [
       { nom: 'Forum des Images', dist: '1,1 km', seances: { "Aujourd'hui": ['14h00','17h30','20h00'], 'Demain': ['15h00','19h00'] } },
@@ -161,78 +161,58 @@ const CINEMAS = [
 // ── Utilitaires ──
 function getFilmById(id) { return FILMS.find(f => f.id === id); }
 
+function escapeHTML(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+
 function buildPopupHTML(film) {
   const bg = POSTER_COLORS[film.color] || '#ccc';
   const posterHTML = film.poster
-    ? `<img src="${film.poster}" alt="Affiche du film ${film.titre}" loading="lazy">`
+    ? `<img src="${escapeHTML(film.poster)}" alt="Affiche du film ${escapeHTML(film.titre)}" loading="lazy">`
     : '<i class="ti ti-photo"></i>';
-  const seancesEmptyHTML = `
-    <div class="popup-cinemas popup-cinemas-empty">
-      <div class="popup-cinemas-label">Séances proches</div>
-      <div class="empty-seances">
-        Les cinémas et horaires seront branchés ici quand on ajoutera le scraping des cinémas indépendants.
-      </div>
-    </div>`;
-  const cinemasHTML = film.cinemas.length === 0 ? seancesEmptyHTML : `
-    <div class="popup-cinemas">
-      <div class="popup-cinemas-label">Cinémas les plus proches</div>
-      ${film.cinemas.map((c, ci) => `
-        <div class="cinema-block" id="cb-${film.id}-${ci}">
-          <div class="cinema-block-header" onclick="toggleCinemaBlock('cb-${film.id}-${ci}')">
-            <div class="cinema-block-left">
-              <i class="ti ti-building"></i>
-              <div>
-                <div class="cinema-block-name">${c.nom}</div>
-                <div class="cinema-block-dist">${c.dist}</div>
-              </div>
-            </div>
-            <div class="cinema-block-right">
-              <button class="btn-itineraire" onclick="event.stopPropagation(); openItineraire('${c.nom}')">
-                <i class="ti ti-navigation"></i> Y aller
-              </button>
-              <i class="ti ti-chevron-down chevron"></i>
-            </div>
-          </div>
-          <div class="seances-panel">
-            ${Object.entries(c.seances).map(([jour, horaires]) => `
-              <div class="seances-day">
-                <div class="day-label">${jour}</div>
-                <div class="horaires">
-                  ${horaires.map(h => `
-                    <button class="horaire-btn" onclick="openReservation('${film.titre}', '${c.nom}', '${h}')">${h}</button>
-                  `).join('')}
-                </div>
-              </div>
-            `).join('')}
-          </div>
-        </div>
-      `).join('')}
-    </div>`;
 
   return `
-    <div class="popup-top">
-      <div class="popup-poster" style="background:${bg};">
+    <div class="film-popup-layout">
+      <div class="film-popup-poster" style="background:${bg};">
         ${posterHTML}
       </div>
-      <div class="popup-header">
-        ${film.badge ? `<span class="popup-badge">${film.badge}</span>` : ''}
-        <div class="popup-title">${film.titre}</div>
-        <div class="popup-tags">
-          <span class="popup-tag">${film.genre}</span>
-          <span class="popup-tag">${film.duree}</span>
-          ${film.annee ? `<span class="popup-tag">${film.annee}</span>` : ''}
+
+      <div class="film-popup-main">
+        <div class="film-popup-title-zone">
+          ${film.badge ? `<span class="popup-badge">${escapeHTML(film.badge)}</span>` : ''}
+          <div class="popup-title">${escapeHTML(film.titre)}</div>
         </div>
-        <div class="popup-crew">
-          <div class="popup-crew-row"><strong>Réalisateur ·</strong> ${film.real}</div>
-          <div class="popup-crew-row"><strong>Avec ·</strong> ${film.acteurs}</div>
+
+        <div class="film-popup-meta-zone">
+          <span class="popup-tag">${escapeHTML(film.genre || 'Genre inconnu')}</span>
+          <span class="popup-tag">${escapeHTML(film.duree || 'Durée inconnue')}</span>
+          ${film.annee ? `<span class="popup-tag">${escapeHTML(film.annee)}</span>` : ''}
+        </div>
+
+        <div class="film-popup-crew-zone">
+          <div class="popup-crew-row"><strong>Réalisateur ·</strong> ${escapeHTML(film.real || 'Non renseigné')}</div>
+          <div class="popup-crew-row"><strong>Avec ·</strong> ${escapeHTML(film.acteurs || 'Non renseigné')}</div>
+        </div>
+
+        <div class="film-popup-synopsis-zone">
+          <div class="section-label">Synopsis</div>
+          <div class="popup-synopsis">${escapeHTML(film.synopsis || 'Synopsis indisponible pour le moment.')}</div>
+        </div>
+      </div>
+
+      <div class="film-popup-seances-zone">
+        <div class="section-label">Séances</div>
+        <div class="empty-seances">
+          Aucune séance réelle n’est encore branchée pour ce film. Cette zone sera connectée plus tard au scraping des cinémas indépendants, avec le cinéma, l’horaire, la VF/VO et le lien de réservation.
         </div>
       </div>
     </div>
-    <div class="popup-synopsis-block">
-      <div class="section-label">Synopsis</div>
-      <div class="popup-synopsis">${film.synopsis}</div>
-    </div>
-    ${cinemasHTML}
+
     <button class="popup-close-btn" onclick="closeFilmPopup()">Fermer</button>
   `;
 }
