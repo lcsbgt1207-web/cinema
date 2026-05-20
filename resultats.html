@@ -143,6 +143,7 @@
   <!-- Vue LIEU -->
   <div class="view" id="view-lieu">
     <div id="cinemas-list"></div>
+    <div id="cinemas-pager"></div>
   </div>
 
   <!-- Vue FILM -->
@@ -335,7 +336,8 @@
         containerId: 'cinemas-list',
         scrollTo: 'cinemas-list',
         renderFn: (pageCinemas, pagerHtml) => {
-          list.innerHTML = pageCinemas.map((c, ci) => renderCinemaCard(c, ci)).join('') + pagerHtml;
+          list.innerHTML = pageCinemas.map((c, ci) => renderCinemaCard(c, ci)).join('');
+          document.getElementById('cinemas-pager').innerHTML = pagerHtml;
         }
       });
 

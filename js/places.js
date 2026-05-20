@@ -1,3 +1,5 @@
+/* CinéProche — Service Google Places */
+
 const PLACES = {
   map: null, placesService: null, geocoder: null, userLocation: null,
 
@@ -13,15 +15,22 @@ const PLACES = {
   geolocate() {
     return new Promise((resolve, reject) => {
       if (!navigator.geolocation) { reject(new Error('Géolocalisation non disponible')); return; }
-      navigator.geolocation.getCurrentPosition(pos => { this.userLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude }; resolve(this.userLocation); }, err => reject(err), { timeout: 10000, maximumAge: 300000 });
+      navigator.geolocation.getCurrentPosition(
+        pos => { this.userLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude }; resolve(this.userLocation); },
+        err => reject(err),
+        { timeout: 10000, maximumAge: 300000 }
+      );
     });
   },
 
   geocodeAddress(address) {
     return new Promise((resolve, reject) => {
       this.geocoder.geocode({ address: address, region: 'fr' }, (results, status) => {
-        if (status === 'OK' && results[0]) { const loc = results[0].geometry.location; this.userLocation = { lat: loc.lat(), lng: loc.lng() }; resolve({ location: this.userLocation, formattedAddress: results[0].formatted_address }); }
-        else { reject(new Error('Adresse introuvable : ' + status)); }
+        if (status === 'OK' && results[0]) {
+          const loc = results[0].geometry.location;
+          this.userLocation = { lat: loc.lat(), lng: loc.lng() };
+          resolve({ location: this.userLocation, formattedAddress: results[0].formatted_address });
+        } else { reject(new Error('Adresse introuvable : ' + status)); }
       });
     });
   },
@@ -29,65 +38,85 @@ const PLACES = {
   findNearbycinemas(location, radius = CONFIG.SEARCH_RADIUS) {
     return new Promise((resolve, reject) => {
       if (!this.placesService) { reject(new Error('Service Places non initialisé')); return; }
-      const request = { location: new google.maps.LatLng(location.lat, location.lng), radius: radius, type: 'movie_theater', language: 'fr' };
-      this.placesService.nearbySearch(request, (results, status) => {
+
+      const request = {
+        location: new google.maps.LatLng(location.lat, location.lng),
+        radius: radius,
+        type: 'movie_theater',
+        language: 'fr'
+      };
+
+      let allResults = [];
+
+      // Filtres
+      const EXCLUDE = [
+        'carrefour', 'leclerc', 'fnac', 'cultura', 'super u', 'intermarché',
+        'spectacles', 'billetterie', 'ticket',
+        'drive', 'drive-in', 'plein air', 'plein-air', 'open air', 'itinérant', 'itinerant', 'toiles', 'cinétoile',
+        'restaurant', 'brasserie', 'bistrot', 'thai', 'pizza', 'burger', 'sushi', 'kebab', 'traiteur',
+        'hotel', 'hôtel', 'auberge',
+        'supermarché', 'supermarche', 'boutique', 'magasin',
+        'coiffeur', 'pharmacie', 'boulangerie', 'tabac',
+        'karting', 'bowling', 'escape', 'laser', 'paintball',
+        'festival', 'temporaire', 'éphémère', 'estival', 'estivale',
+        'association', 'hallucinecran', 'halluciné'
+      ];
+
+      const REQUIRE = [
+        'ciné', 'cine', 'cinema', 'cinéma', 'ugc', 'pathé', 'pathe',
+        'gaumont', 'mk2', 'rex', 'megarama', 'kinépolis', 'kinepolis',
+        'multiplexe', 'imax', 'odéon', 'odeon',
+        'lumière', 'lumiere', 'majestic', 'palace', 'louxor',
+        'champo', 'balzac', 'wepler', 'grand écran', 'images',
+        'studio 28', 'brady', 'select', 'familia', 'utopia', 'ariel',
+        'espace', 'forum', 'méga', 'mega'
+      ];
+
+      const filterResults = (results) => {
+        return results.filter(place => {
+          const name = place.name.toLowerCase();
+          const types = place.types || [];
+          if (EXCLUDE.some(k => name.includes(k))) return false;
+          if (REQUIRE.some(k => name.includes(k))) return true;
+          const suspectTypes = ['supermarket', 'store', 'food', 'restaurant', 'lodging', 'bar'];
+          if (suspectTypes.some(t => types.includes(t))) return false;
+          return types.includes('movie_theater');
+        });
+      };
+
+      const processAndResolve = () => {
+        const filtered = filterResults(allResults);
+        const cinemas = filtered.map(place => ({
+          id: place.place_id,
+          nom: place.name,
+          adresse: place.vicinity,
+          location: { lat: place.geometry.location.lat(), lng: place.geometry.location.lng() },
+          ouvert: place.opening_hours ? place.opening_hours.open_now : null,
+          rating: place.rating,
+          dist: this.calcDistance(location, { lat: place.geometry.location.lat(), lng: place.geometry.location.lng() })
+        }));
+        cinemas.sort((a, b) => a.dist - b.dist);
+        resolve(cinemas);
+      };
+
+      // Callback récursif pour pagination Google Places
+      const handlePage = (results, status, pagination) => {
         if (status === google.maps.places.PlacesServiceStatus.OK) {
-
-          // Exclusions — billetteries, cinémas itinérants, plein air, non-cinémas
-          const EXCLUDE = [
-            'carrefour', 'leclerc', 'fnac', 'cultura', 'super u', 'intermarché',
-            'spectacles', 'billetterie', 'ticket',
-            'drive', 'drive-in', 'plein air', 'plein-air', 'open air', 'itinérant', 'itinerant', 'toiles', 'cinétoile',
-            'restaurant', 'brasserie', 'bistrot', 'thai', 'pizza', 'burger', 'sushi', 'kebab', 'traiteur',
-            'hotel', 'hôtel', 'auberge',
-            'supermarché', 'supermarche', 'boutique', 'magasin',
-            'coiffeur', 'pharmacie', 'boulangerie', 'tabac',
-            'karting', 'bowling', 'escape', 'laser', 'paintball',
-            'festival', 'temporaire', 'éphémère', 'estival', 'estivale',
-            'association', 'hallucinecran', 'halluciné'
-          ];
-
-          // Mots qui garantissent un vrai cinéma physique
-          const REQUIRE = [
-            'ciné', 'cine', 'cinema', 'cinéma', 'ugc', 'pathé', 'pathe',
-            'gaumont', 'mk2', 'rex', 'megarama', 'kinépolis', 'kinepolis',
-            'multiplexe', 'imax', 'odéon', 'odeon',
-            'lumière', 'lumiere', 'majestic', 'palace', 'louxor',
-            'champo', 'balzac', 'wepler', 'grand écran', 'images',
-            'studio 28', 'brady', 'select', 'familia'
-          ];
-
-          const filtered = results.filter(place => {
-            const name = place.name.toLowerCase();
-            const types = place.types || [];
-            // Exclure si contient un mot interdit
-            if (EXCLUDE.some(k => name.includes(k))) return false;
-            // Accepter si contient un mot de cinéma connu
-            if (REQUIRE.some(k => name.includes(k))) return true;
-            // Accepter seulement si Google confirme movie_theater ET pas d'autres types suspects
-            const suspectTypes = ['supermarket', 'store', 'food', 'restaurant', 'lodging', 'bar'];
-            if (suspectTypes.some(t => types.includes(t))) return false;
-            return types.includes('movie_theater');
-          });
-
-          const cinemas = filtered.map(place => ({
-            id: place.place_id,
-            nom: place.name,
-            adresse: place.vicinity,
-            location: { lat: place.geometry.location.lat(), lng: place.geometry.location.lng() },
-            ouvert: place.opening_hours ? place.opening_hours.open_now : null,
-            rating: place.rating,
-            dist: this.calcDistance(location, { lat: place.geometry.location.lat(), lng: place.geometry.location.lng() })
-          }));
-          cinemas.sort((a, b) => a.dist - b.dist);
-          resolve(cinemas);
-
+          allResults = allResults.concat(results);
+          // Si il y a une page suivante et qu'on n'a pas encore 60 résultats, on continue
+          if (pagination && pagination.hasNextPage && allResults.length < 60) {
+            setTimeout(() => pagination.nextPage(), 300);
+          } else {
+            processAndResolve();
+          }
         } else if (status === google.maps.places.PlacesServiceStatus.ZERO_RESULTS) {
           resolve([]);
         } else {
           reject(new Error('Erreur Places API : ' + status));
         }
-      });
+      };
+
+      this.placesService.nearbySearch(request, handlePage);
     });
   },
 

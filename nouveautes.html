@@ -78,6 +78,7 @@
     <div class="page-count" id="films-count"></div>
   </div>
   <div class="films-grid" id="films-grid"></div>
+  <div id="films-pager"></div>
 </main>
 
 <!-- ── POPUP FILM ── -->
@@ -205,7 +206,8 @@
         scrollTo: 'films-grid',
         renderFn: (pageFilms, pagerHtml) => {
           document.getElementById('films-grid').innerHTML =
-            pageFilms.map((f, i) => renderFilmCard(f, i, tab)).join('') + pagerHtml;
+            pageFilms.map((f, i) => renderFilmCard(f, i, tab)).join('');
+          document.getElementById('films-pager').innerHTML = pagerHtml;
         }
       });
 
