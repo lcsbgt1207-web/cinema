@@ -34,16 +34,23 @@ const PLACES = {
       const request = { location: new google.maps.LatLng(location.lat, location.lng), radius: radius, type: 'movie_theater', language: 'fr' };
       this.placesService.nearbySearch(request, (results, status) => {
         if (status === google.maps.places.PlacesServiceStatus.OK) {
-          const EXCLUDE = ['drive', 'restaurant', 'hotel', 'hôtel', 'supermarché', 'boutique', 'magasin', 'coiffeur', 'pharmacie', 'boulangerie', 'tabac', 'thai', 'pizza', 'burger', 'sushi', 'kebab'];
-          const filtered = results.filter(p => {
-            const name = p.name.toLowerCase();
-            return !EXCLUDE.some(k => name.includes(k));
+          const EXCLUDE = ['drive', 'drive-in', 'plein air', 'open air', 'restaurant', 'brasserie', 'thai', 'pizza', 'burger', 'sushi', 'kebab', 'hotel', 'hôtel', 'supermarché', 'boutique', 'magasin', 'coiffeur', 'pharmacie', 'boulangerie', 'tabac', 'karting', 'bowling', 'escape', 'festival', 'temporaire', 'éphémère', 'association'];
+          const REQUIRE = ['ciné', 'cine', 'cinema', 'cinéma', 'ugc', 'pathé', 'pathe', 'gaumont', 'mk2', 'rex', 'megarama', 'kinépolis', 'kinepolis', 'multiplexe', 'imax', 'odéon', 'odeon', 'lumière', 'lumiere', 'majestic', 'palace', 'louxor', 'champo', 'balzac', 'wepler'];
+          const filtered = results.filter(place => {
+            const name = place.name.toLowerCase();
+            const types = place.types || [];
+            if (EXCLUDE.some(k => name.includes(k))) return false;
+            if (REQUIRE.some(k => name.includes(k))) return true;
+            return types.includes('movie_theater');
           });
           const cinemas = filtered.map(place => ({ id: place.place_id, nom: place.name, adresse: place.vicinity, location: { lat: place.geometry.location.lat(), lng: place.geometry.location.lng() }, ouvert: place.opening_hours ? place.opening_hours.open_now : null, rating: place.rating, dist: this.calcDistance(location, { lat: place.geometry.location.lat(), lng: place.geometry.location.lng() }) }));
           cinemas.sort((a, b) => a.dist - b.dist);
           resolve(cinemas);
-        } else if (status === google.maps.places.PlacesServiceStatus.ZERO_RESULTS) { resolve([]); }
-        else { reject(new Error('Erreur Places API : ' + status)); }
+        } else if (status === google.maps.places.PlacesServiceStatus.ZERO_RESULTS) {
+          resolve([]);
+        } else {
+          reject(new Error('Erreur Places API : ' + status));
+        }
       });
     });
   },
