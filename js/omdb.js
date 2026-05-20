@@ -3,8 +3,8 @@
    OMDb = vraie note IMDb du tableau, récupérée avec l'ID IMDb quand possible
 */
 
-const OMDB_CACHE_KEY = 'cinepro_omdb_cache_v4';
-const TMDB_CACHE_KEY = 'cinepro_tmdb_cache_v4';
+const OMDB_CACHE_KEY = 'cinepro_omdb_cache_v5';
+const TMDB_CACHE_KEY = 'cinepro_tmdb_cache_v5';
 
 function readCache(key) {
   try {
@@ -159,7 +159,8 @@ async function fetchOmdbById(imdbID) {
 
     const result = {
       imdbID: data.imdbID || imdbID,
-      imdbRating: normalizeRating(data.imdbRating)
+      imdbRating: normalizeRating(data.imdbRating),
+      plot: data.Plot && data.Plot !== 'N/A' ? data.Plot : null
     };
 
     cache[cacheKey] = result;
@@ -197,7 +198,8 @@ async function fetchOmdbByTitle(film) {
 
     const result = {
       imdbID: data.imdbID || null,
-      imdbRating: normalizeRating(data.imdbRating)
+      imdbRating: normalizeRating(data.imdbRating),
+      plot: data.Plot && data.Plot !== 'N/A' ? data.Plot : null
     };
 
     cache[cacheKey] = result;
@@ -217,7 +219,7 @@ function applyDataToFilm(film, tmdb, omdb) {
     film.imdbID = tmdb.imdbID || film.imdbID;
     film.titre = tmdb.titre || film.titre;
     film.original = tmdb.original || film.original;
-    film.synopsis = tmdb.synopsis || film.synopsis;
+    // On garde TMDB pour les affiches et infos techniques, mais pas pour le synopsis.
     film.poster = tmdb.poster || film.poster;
     film.annee = tmdb.annee || film.annee;
     film.duree = tmdb.duree || film.duree;
@@ -229,6 +231,7 @@ function applyDataToFilm(film, tmdb, omdb) {
   if (omdb && Number.isFinite(omdb.imdbRating)) {
     film.imdbID = omdb.imdbID || film.imdbID;
     film.imdb = omdb.imdbRating;
+    if (omdb.plot) film.synopsis = omdb.plot;
   } else {
     film.imdb = null;
   }
