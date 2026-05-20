@@ -149,11 +149,11 @@
           <th onclick="sortTable('titre')">Titre <i class="ti ti-selector" id="icon-titre"></i></th>
           <th onclick="sortTable('real')">Réalisateur <i class="ti ti-selector" id="icon-real"></i></th>
           <th onclick="sortTable('genre')">Genre</th>
-          <th class="note-col sep-left sorted" onclick="sortTable('lb')">
-            <div class="source-header"><span class="source-dot dot-lb"></span> Letterboxd <i class="ti ti-chevron-down" id="icon-lb"></i></div>
+          <th class="note-col sep-left" onclick="sortTable('lb')">
+            <div class="source-header"><span class="source-dot dot-lb"></span> Letterboxd <i class="ti ti-selector" id="icon-lb"></i></div>
           </th>
-          <th class="note-col" onclick="sortTable('imdb')">
-            <div class="source-header"><span class="source-dot dot-imdb"></span> IMDb <i class="ti ti-selector" id="icon-imdb"></i></div>
+          <th class="note-col sorted" onclick="sortTable('imdb')">
+            <div class="source-header"><span class="source-dot dot-imdb"></span> IMDb <i class="ti ti-chevron-down" id="icon-imdb"></i></div>
           </th>
           <th class="note-col" onclick="sortTable('sc')">
             <div class="source-header"><span class="source-dot dot-sc"></span> SensCritique <i class="ti ti-selector" id="icon-sc"></i></div>
@@ -166,8 +166,8 @@
   </div>
 
   <div class="table-footer">
-    <span>Notes issues de Letterboxd, IMDb et SensCritique</span>
-    <span id="footer-sort">Trié par Letterboxd ↓</span>
+    <span id="footer-info">Chargement des vraies notes IMDb…</span>
+    <span id="footer-sort">Trié par IMDb ↓</span>
   </div>
 </main>
 
@@ -212,12 +212,14 @@
   </div>
 </div>
 
+<script src="js/config.js"></script>
 <script src="js/data.js"></script>
+<script src="js/omdb.js"></script>
 <script>
   // Catalogue = films avec annee définie + films nouveautés
-  const catalogue = FILMS.filter(f => f.lb && f.imdb && f.sc);
+  const catalogue = FILMS.filter(f => f.lb && f.sc);
   const favs = new Set(JSON.parse(localStorage.getItem('cinepro_favs') || '[]'));
-  let sortKey = 'lb', sortDir = -1;
+  let sortKey = 'imdb', sortDir = -1;
 
   const LABELS = { lb:'Letterboxd', imdb:'IMDb', sc:'SensCritique', annee:'Année', titre:'Titre', real:'Réalisateur', genre:'Genre' };
 
@@ -229,6 +231,28 @@
     if (f === 'Années 1990') return annee >= 1990 && annee < 2000;
     if (f === 'Avant 1990') return annee < 1990;
     return true;
+  }
+
+  function formatImdbNote(film) {
+    if (film.omdbLoaded && film.imdb === null) return '—';
+    return Number.isFinite(film.imdb) ? film.imdb.toFixed(1) : '…';
+  }
+
+  function getSortValue(film, key) {
+    if (key === 'imdb' && !Number.isFinite(film.imdb)) return null;
+    return film[key] ?? null;
+  }
+
+  function compareValues(a, b) {
+    if (a === null && b === null) return 0;
+    if (a === null) return -1;
+    if (b === null) return 1;
+
+    if (typeof a === 'string' || typeof b === 'string') {
+      return String(a).localeCompare(String(b), 'fr', { sensitivity: 'base' });
+    }
+
+    return a > b ? 1 : a < b ? -1 : 0;
   }
 
   function renderTable(data) {
@@ -243,7 +267,7 @@
         <td class="td-real">${f.real}</td>
         <td><span class="genre-pill">${f.genre}</span></td>
         <td class="td-note sep-left"><span class="note note-lb">${f.lb.toFixed(1)} ★</span></td>
-        <td class="td-note"><span class="note note-imdb">${f.imdb.toFixed(1)}</span></td>
+        <td class="td-note"><span class="note note-imdb">${formatImdbNote(f)}</span></td>
         <td class="td-note"><span class="note note-sc">${f.sc.toFixed(1)}</span></td>
         <td class="td-year">${f.annee || '2025'}</td>
       </tr>
@@ -271,8 +295,9 @@
       decadeMatch(f.annee, d)
     );
     data.sort((a, b) => {
-      const va = a[sortKey] ?? -Infinity, vb = b[sortKey] ?? -Infinity;
-      return (va > vb ? 1 : va < vb ? -1 : 0) * sortDir;
+      const va = getSortValue(a, sortKey);
+      const vb = getSortValue(b, sortKey);
+      return compareValues(va, vb) * sortDir;
     });
     renderTable(data);
     updateIcons();
@@ -290,7 +315,21 @@
     localStorage.setItem('cinepro_favs', JSON.stringify([...favs]));
   }
 
-  filterTable();
+  async function initCatalogue() {
+    filterTable();
+
+    await enrichFilmsWithOmdb(catalogue, (current, total) => {
+      const footerInfo = document.getElementById('footer-info');
+      if (footerInfo) footerInfo.textContent = `Chargement IMDb ${current}/${total}…`;
+      filterTable();
+    });
+
+    const footerInfo = document.getElementById('footer-info');
+    if (footerInfo) footerInfo.textContent = 'Notes IMDb récupérées via OMDb';
+    filterTable();
+  }
+
+  initCatalogue();
 </script>
 </body>
 </html>
