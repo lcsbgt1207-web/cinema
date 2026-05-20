@@ -283,6 +283,7 @@ function buildPopupHTML(film) {
     : '<i class="ti ti-photo"></i>';
 
   return `
+    <button class="popup-x-btn" onclick="closeFilmPopup()" aria-label="Fermer">×</button>
     <div class="film-popup-layout">
       <div class="film-popup-poster" style="background:${bg};">
         ${posterHTML}
