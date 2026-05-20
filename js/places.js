@@ -72,7 +72,21 @@ const PLACES = {
       };
       this.placesService.nearbySearch(request, (results, status) => {
         if (status === google.maps.places.PlacesServiceStatus.OK) {
-          const cinemas = results.map(place => ({
+          // Mots-clés qui indiquent un vrai cinéma
+          const CINEMA_KEYWORDS = ['ciné', 'cinema', 'cinéma', 'ugc', 'pathé', 'pathe', 'gaumont', 'mk2', 'grand rex', 'rex', 'megarama', 'kinépolis', 'kinepolis', 'multiplexe', 'imax', 'mega', 'theater', 'théâtre du', 'image', 'film', 'movies', 'odéon', 'odeon', 'lumière', 'lumiere', 'studio', 'palace', 'majestic', 'olympia', 'le select', 'le club', 'the'];
+          // Mots-clés qui excluent clairement les non-cinémas
+          const EXCLUDE_KEYWORDS = ['drive', 'restaurant', 'hotel', 'hôtel', 'supermarché', 'supermarche', 'boutique', 'magasin', 'coiffeur', 'pharmacie', 'boulangerie', 'bar ', 'café ', 'tabac'];
+
+          const filteredResults = results.filter(place => {
+            const name = place.name.toLowerCase();
+            const hasExcluded = EXCLUDE_KEYWORDS.some(k => name.includes(k));
+            if (hasExcluded) return false;
+            const hasCinema = CINEMA_KEYWORDS.some(k => name.includes(k));
+            // Garder si le nom contient un mot-clé cinéma OU si le type est bien movie_theater
+            return hasCinema || (place.types && place.types.includes('movie_theater'));
+          });
+
+          const cinemas = filteredResults.map(place => ({
             id: place.place_id,
             nom: place.name,
             adresse: place.vicinity,
@@ -88,7 +102,6 @@ const PLACES = {
               lng: place.geometry.location.lng()
             })
           }));
-          // Trier par distance
           cinemas.sort((a, b) => a.dist - b.dist);
           resolve(cinemas);
         } else if (status === google.maps.places.PlacesServiceStatus.ZERO_RESULTS) {
