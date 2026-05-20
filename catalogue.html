@@ -73,14 +73,19 @@
     }
     .fav-btn:hover, .fav-btn.active { color: var(--black); }
 
-    .table-footer {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 12px 0;
-      font-size: 12px;
-      color: var(--gray-400);
-    }
+    .table-footer { display:none; }
+
+    .film-cell { display: flex; align-items: center; gap: 12px; min-width: 220px; }
+    .film-thumb { width: 44px; height: 62px; border-radius: 6px; background: var(--gray-100); overflow: hidden; flex: 0 0 auto; display:flex; align-items:center; justify-content:center; color:var(--gray-300); }
+    .film-thumb img { width: 100%; height: 100%; object-fit: cover; display:block; }
+    .catalogue-bottom { margin-top: 18px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+    .page-state { font-size: 13px; color: var(--gray-500); width: 100%; }
+    .pagination-controls { display: flex; align-items: center; gap: 8px; }
+    .page-btn { width: 38px; height: 38px; border: 0.5px solid var(--gray-200); border-radius: 8px; background: var(--white); color: var(--black); cursor:pointer; font-size: 13px; transition: all var(--transition); }
+    .page-btn:hover { border-color: var(--black); }
+    .page-btn.active { background: var(--black); color: var(--white); border-color: var(--black); }
+    .page-btn:disabled { opacity: .35; cursor: not-allowed; border-color: var(--gray-200); }
+    .page-size-select { height: 38px; border: 0.5px solid var(--gray-200); border-radius: 8px; padding: 0 34px 0 12px; background: var(--white); color: var(--gray-600); font-size: 13px; }
   </style>
 </head>
 <body>
@@ -124,8 +129,16 @@
     <select class="filter-select" id="genre-filter" onchange="filterTable()">
       <option value="">Tous les genres</option>
       <option>Drame</option>
+      <option>Action</option>
+      <option>Aventure</option>
       <option>Thriller</option>
       <option>Science-fiction</option>
+      <option>Crime</option>
+      <option>Policier</option>
+      <option>Fantastique</option>
+      <option>Animation</option>
+      <option>Guerre</option>
+      <option>Western</option>
       <option>Romance</option>
       <option>Comédie</option>
       <option>Documentaire</option>
@@ -137,6 +150,12 @@
       <option>Années 2000</option>
       <option>Années 1990</option>
       <option>Avant 1990</option>
+    </select>
+    <select class="filter-select" id="radius-filter">
+      <option>Rayon : 5 km</option>
+      <option selected>Rayon : 15 km</option>
+      <option>Rayon : 30 km</option>
+      <option>Rayon : 50 km</option>
     </select>
     <span class="toolbar-count" id="count-label"></span>
   </div>
@@ -165,10 +184,7 @@
     </table>
   </div>
 
-  <div class="table-footer">
-    <span id="footer-info">Chargement des vraies notes IMDb…</span>
-    <span id="footer-sort">Trié par IMDb ↓</span>
-  </div>
+  <div class="catalogue-bottom" id="catalogue-bottom"></div>
 </main>
 
 <!-- OVERLAYS -->
@@ -220,6 +236,10 @@
   const catalogue = FILMS.filter(f => f.lb && f.sc);
   const favs = new Set(JSON.parse(localStorage.getItem('cinepro_favs') || '[]'));
   let sortKey = 'imdb', sortDir = -1;
+  let currentPage = 1;
+  let pageSize = 8;
+  let lastFilteredData = [];
+  const MAX_PAGES = 4;
 
   const LABELS = { lb:'Letterboxd', imdb:'IMDb', sc:'SensCritique', annee:'Année', titre:'Titre', real:'Réalisateur', genre:'Genre' };
 
@@ -234,12 +254,13 @@
   }
 
   function formatImdbNote(film) {
+    if (film.isMock) return '—';
     if (film.omdbLoaded && film.imdb === null) return '—';
-    return Number.isFinite(film.imdb) ? film.imdb.toFixed(1) : '…';
+    return Number.isFinite(film.imdb) ? `${film.imdb.toFixed(1)} ★` : '…';
   }
 
   function getSortValue(film, key) {
-    if (key === 'imdb' && !Number.isFinite(film.imdb)) return null;
+    if (key === 'imdb' && (film.isMock || !Number.isFinite(film.imdb))) return null;
     return film[key] ?? null;
   }
 
@@ -256,24 +277,74 @@
   }
 
   function renderTable(data) {
-    document.getElementById('table-body').innerHTML = data.map(f => `
+    lastFilteredData = data;
+    const totalPages = Math.max(1, Math.min(MAX_PAGES, Math.ceil(data.length / pageSize)));
+    if (currentPage > totalPages) currentPage = totalPages;
+
+    const start = (currentPage - 1) * pageSize;
+    const pageData = data.slice(start, start + pageSize);
+
+    document.getElementById('table-body').innerHTML = pageData.map(f => {
+      const poster = f.poster
+        ? `<img src="${f.poster}" alt="Affiche ${f.titre}" loading="lazy">`
+        : `<i class="ti ti-photo"></i>`;
+
+      return `
       <tr onclick="openFilmPopup(${f.id})">
         <td><button class="fav-btn ${favs.has(f.id) ? 'active' : ''}" onclick="event.stopPropagation(); toggleFav(${f.id}, this)">
           <i class="ti ti-bookmark"></i></button></td>
         <td class="td-title">
-          <div class="film-name">${f.titre}</div>
-          ${f.original ? `<div class="film-original">${f.original}</div>` : ''}
+          <div class="film-cell">
+            <div class="film-thumb">${poster}</div>
+            <div>
+              <div class="film-name">${f.titre}</div>
+              ${f.original ? `<div class="film-original">${f.original}</div>` : ''}
+            </div>
+          </div>
         </td>
         <td class="td-real">${f.real}</td>
         <td><span class="genre-pill">${f.genre}</span></td>
-        <td class="td-note sep-left"><span class="note note-lb">${f.lb.toFixed(1)} ★</span></td>
+        <td class="td-note sep-left"><span class="note note-lb">${Number.isFinite(f.lb) ? f.lb.toFixed(1) + ' ★' : '—'}</span></td>
         <td class="td-note"><span class="note note-imdb">${formatImdbNote(f)}</span></td>
-        <td class="td-note"><span class="note note-sc">${f.sc.toFixed(1)}</span></td>
-        <td class="td-year">${f.annee || '2025'}</td>
-      </tr>
-    `).join('');
+        <td class="td-note"><span class="note note-sc">${Number.isFinite(f.sc) ? f.sc.toFixed(1) : '—'}</span></td>
+        <td class="td-year">${f.annee || '—'}</td>
+      </tr>`;
+    }).join('');
+
     document.getElementById('count-label').textContent = data.length + ' film' + (data.length > 1 ? 's' : '');
     document.getElementById('film-count').textContent = data.length + ' films';
+    renderPagination(totalPages);
+  }
+
+  function renderPagination(totalPages) {
+    const bottom = document.getElementById('catalogue-bottom');
+    if (!bottom) return;
+
+    const pages = Array.from({ length: totalPages }, (_, index) => index + 1);
+    bottom.innerHTML = `
+      <div class="page-state">Page ${currentPage} sur ${totalPages}</div>
+      <div class="pagination-controls">
+        <button class="page-btn" ${currentPage === 1 ? 'disabled' : ''} onclick="changePage(${currentPage - 1})"><i class="ti ti-chevron-left"></i></button>
+        ${pages.map(page => `<button class="page-btn ${page === currentPage ? 'active' : ''}" onclick="changePage(${page})">${page}</button>`).join('')}
+        <button class="page-btn" ${currentPage === totalPages ? 'disabled' : ''} onclick="changePage(${currentPage + 1})"><i class="ti ti-chevron-right"></i></button>
+      </div>
+      <select class="page-size-select" onchange="changePageSize(this.value)">
+        <option value="8" ${pageSize === 8 ? 'selected' : ''}>8 par page</option>
+        <option value="12" ${pageSize === 12 ? 'selected' : ''}>12 par page</option>
+        <option value="25" ${pageSize === 25 ? 'selected' : ''}>25 par page</option>
+      </select>
+    `;
+  }
+
+  function changePage(page) {
+    currentPage = page;
+    renderTable(lastFilteredData);
+  }
+
+  function changePageSize(value) {
+    pageSize = Number(value) || 8;
+    currentPage = 1;
+    filterTable();
   }
 
   function updateIcons() {
@@ -282,7 +353,6 @@
       if (!el) return;
       el.className = k === sortKey ? (sortDir === -1 ? 'ti ti-chevron-down' : 'ti ti-chevron-up') : 'ti ti-selector';
     });
-    document.getElementById('footer-sort').textContent = 'Trié par ' + LABELS[sortKey] + (sortDir === -1 ? ' ↓' : ' ↑');
   }
 
   function filterTable() {
@@ -306,6 +376,7 @@
   function sortTable(key) {
     if (sortKey === key) sortDir *= -1;
     else { sortKey = key; sortDir = -1; }
+    currentPage = 1;
     filterTable();
   }
 
@@ -319,13 +390,9 @@
     filterTable();
 
     await enrichFilmsWithOmdb(catalogue, (current, total) => {
-      const footerInfo = document.getElementById('footer-info');
-      if (footerInfo) footerInfo.textContent = `Chargement IMDb ${current}/${total}…`;
       filterTable();
     });
 
-    const footerInfo = document.getElementById('footer-info');
-    if (footerInfo) footerInfo.textContent = 'Notes IMDb récupérées via OMDb';
     filterTable();
   }
 

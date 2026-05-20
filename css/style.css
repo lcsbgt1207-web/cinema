@@ -214,7 +214,7 @@ img { max-width: 100%; display: block; }
   border-radius: var(--radius-lg);
   border: 0.5px solid var(--gray-200);
   width: 100%;
-  max-width: 720px;
+  max-width: 580px;
   display: flex;
   flex-direction: column;
   max-height: 88vh;
@@ -226,34 +226,20 @@ img { max-width: 100%; display: block; }
 /* ══════════════════════════════
    POPUP FILM (partagée)
 ══════════════════════════════ */
-.popup-top {
-  display: grid;
-  grid-template-columns: 230px 1fr;
-  align-items: start;
-  flex-shrink: 0;
-}
+.popup-top { display: flex; flex-shrink: 0; }
 .popup-poster {
-  width: 230px;
-  height: 345px;
-  min-height: 0;
-  max-height: none;
+  width: 130px;
   flex-shrink: 0;
+  min-height: 190px;
   display: flex;
   align-items: center;
   justify-content: center;
   background: var(--gray-200);
-  overflow: hidden;
 }
-.popup-poster img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
+.popup-poster img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .popup-poster i { font-size: 32px; color: rgba(255,255,255,0.4); }
-.popup-main-content { min-width: 0; border-left: 0.5px solid var(--gray-200); display: flex; flex-direction: column; }
-.empty-seances { font-size: 13px; color: var(--gray-500); padding: 12px 18px 28px; line-height: 1.65; }
-.popup-header { flex: 0 0 auto; padding: 20px 22px 16px; }
+.empty-seances { font-size: 12px; color: var(--gray-500); padding: 12px 0 2px; line-height: 1.5; }
+.popup-header { flex: 1; padding: 18px; border-left: 0.5px solid var(--gray-200); }
 .popup-badge { font-size: 10px; font-weight: 500; background: var(--black); color: var(--white); padding: 3px 9px; border-radius: var(--radius-full); display: inline-block; margin-bottom: 8px; }
 .popup-title { font-size: 18px; font-weight: 500; color: var(--black); letter-spacing: -0.3px; margin-bottom: 8px; }
 .popup-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
@@ -262,9 +248,9 @@ img { max-width: 100%; display: block; }
 .popup-crew-row { font-size: 12px; color: var(--gray-500); }
 .popup-crew-row strong { color: var(--black); font-weight: 500; }
 
-.popup-synopsis-block { padding: 16px 22px 18px; border-top: 0.5px solid var(--gray-200); flex-shrink: 0; }
+.popup-synopsis-block { padding: 14px 18px; border-top: 0.5px solid var(--gray-200); flex-shrink: 0; }
 .section-label { font-size: 11px; font-weight: 500; color: var(--gray-400); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
-.popup-synopsis { font-size: 13px; color: var(--gray-500); line-height: 1.6; }
+.popup-synopsis { font-size: 13px; color: var(--gray-500); line-height: 1.65; }
 
 .popup-cinemas { border-top: 0.5px solid var(--gray-200); overflow-y: auto; flex: 1; }
 .popup-cinemas-label { padding: 10px 18px 6px; font-size: 11px; font-weight: 500; color: var(--gray-400); text-transform: uppercase; letter-spacing: 0.5px; }
@@ -450,8 +436,115 @@ img { max-width: 100%; display: block; }
 @media (max-width: 768px) {
   .nav { display: none; }
   .popup { max-width: 100%; max-height: 92vh; }
-  .popup-top { grid-template-columns: 1fr; }
-  .popup-poster { width: 100%; height: 320px; min-height: 0; max-height: none; }
-  .popup-main-content { border-left: none; border-top: 0.5px solid var(--gray-200); }
+  .popup-top { flex-direction: column; }
+  .popup-poster { width: 100%; height: 160px; }
+  .popup-header { border-left: none; border-top: 0.5px solid var(--gray-200); }
   .footer-stats { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ══════════════════════════════
+   POPUP FILM — nouvelle mise en page catalogue
+   ══════════════════════════════ */
+#film-popup.popup {
+  max-width: 720px;
+}
+
+.film-popup-layout {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  grid-template-rows: auto auto;
+  background: var(--white);
+}
+
+.film-popup-poster {
+  grid-column: 1;
+  grid-row: 1;
+  min-height: 290px;
+  border-right: 0.5px solid var(--gray-200);
+  border-bottom: 0.5px solid var(--gray-200);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.film-popup-poster img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.film-popup-poster i {
+  font-size: 34px;
+  color: rgba(255,255,255,0.55);
+}
+
+.film-popup-main {
+  grid-column: 2;
+  grid-row: 1;
+  display: grid;
+  grid-template-rows: auto auto auto 1fr;
+  min-width: 0;
+}
+
+.film-popup-title-zone,
+.film-popup-meta-zone,
+.film-popup-crew-zone,
+.film-popup-synopsis-zone {
+  padding: 12px 18px;
+  border-bottom: 0.5px solid var(--gray-200);
+}
+
+.film-popup-title-zone {
+  padding-top: 18px;
+}
+
+.film-popup-meta-zone {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.film-popup-crew-zone {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.film-popup-synopsis-zone {
+  border-bottom: 0.5px solid var(--gray-200);
+}
+
+.film-popup-seances-zone {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  min-height: 170px;
+  padding: 18px;
+  border-bottom: 0.5px solid var(--gray-200);
+}
+
+.empty-seances {
+  font-size: 13px;
+  color: var(--gray-500);
+  line-height: 1.6;
+  padding: 8px 0 0;
+}
+
+@media (max-width: 640px) {
+  .film-popup-layout {
+    grid-template-columns: 120px 1fr;
+  }
+
+  .film-popup-poster {
+    min-height: 210px;
+  }
+
+  .film-popup-title-zone,
+  .film-popup-meta-zone,
+  .film-popup-crew-zone,
+  .film-popup-synopsis-zone,
+  .film-popup-seances-zone {
+    padding: 11px 14px;
+  }
 }
