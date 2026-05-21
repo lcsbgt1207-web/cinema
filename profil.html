@@ -1,4 +1,583 @@
 <!DOCTYPE html>
-<html lang="fr"><head><meta charset="UTF-8"/><title>Profil — CinéProche</title></head>
-<body><script>window.location.href='index.html'</script></body>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mon profil — CinéProche</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --font-main: 'DM Sans', sans-serif;
+      --font-display: 'DM Serif Display', serif;
+      --black: #1a1a1a;
+      --white: #ffffff;
+      --gray-50: #f8f8f7;
+      --gray-100: #f0efed;
+      --gray-200: #e4e3e0;
+      --gray-300: #c8c7c3;
+      --gray-400: #9e9d99;
+      --gray-500: #6e6d69;
+      --green: #2e7d32;
+      --green-bg: #eef6ee;
+      --red: #c0392b;
+      --red-bg: #fdecea;
+      --radius-sm: 6px;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      --radius-full: 999px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 16px; }
+    body {
+      font-family: var(--font-main);
+      font-size: 15px;
+      color: var(--black);
+      background: var(--gray-50);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: inherit; text-decoration: none; }
+    button { font-family: var(--font-main); cursor: pointer; border: none; background: none; }
+
+    /* ── HEADER ── */
+    .site-header {
+      position: sticky; top: 0; z-index: 50;
+      background: rgba(255,255,255,0.95);
+      backdrop-filter: blur(8px);
+      border-bottom: 0.5px solid var(--gray-200);
+    }
+    .header-inner {
+      max-width: 1100px; margin: 0 auto; padding: 0 32px;
+      display: flex; align-items: center; justify-content: space-between; height: 60px;
+    }
+    .logo { display: flex; align-items: center; gap: 9px; font-size: 15px; font-weight: 500; letter-spacing: -0.3px; }
+    .logo-icon { width: 30px; height: 30px; background: var(--black); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; color: white; font-size: 16px; }
+    .logo span { color: var(--gray-400); font-weight: 400; }
+    .nav-links { display: flex; align-items: center; border: 0.5px solid var(--gray-200); border-radius: var(--radius-full); overflow: hidden; }
+    .nav-links a { font-size: 13px; color: var(--gray-500); padding: 7px 16px; border-right: 0.5px solid var(--gray-200); transition: background 0.15s, color 0.15s; }
+    .nav-links a:last-child { border-right: none; }
+    .nav-links a:hover { background: var(--gray-50); color: var(--black); }
+    .nav-links a.active { background: var(--black); color: white; }
+
+    /* ── PAGE LAYOUT ── */
+    .page-wrap { max-width: 1100px; margin: 40px auto; padding: 0 32px 80px; }
+
+    /* ── VUE NON CONNECTÉ ── */
+    #view-auth {
+      max-width: 440px; margin: 0 auto;
+      background: var(--white); border: 0.5px solid var(--gray-200);
+      border-radius: var(--radius-lg); overflow: hidden;
+    }
+    .tabs { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 0.5px solid var(--gray-200); }
+    .tab-btn { padding: 16px; font-size: 14px; font-weight: 500; color: var(--gray-400); background: var(--gray-50); cursor: pointer; transition: color 0.15s, background 0.15s; }
+    .tab-btn.active { color: var(--black); background: var(--white); border-bottom: 2px solid var(--black); }
+    .tab-btn:first-child { border-right: 0.5px solid var(--gray-200); }
+    .tab-panel { display: none; padding: 32px; }
+    .tab-panel.active { display: block; }
+    .form-title { font-family: var(--font-display); font-size: 22px; font-weight: 400; margin-bottom: 4px; }
+    .form-sub { font-size: 13px; color: var(--gray-400); margin-bottom: 28px; }
+    .field { margin-bottom: 16px; }
+    .field label { display: block; font-size: 12px; font-weight: 500; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+    .input-wrap { position: relative; display: flex; align-items: center; }
+    .input-wrap i { position: absolute; left: 12px; color: var(--gray-300); font-size: 17px; pointer-events: none; }
+    .input-wrap input { width: 100%; padding: 11px 12px 11px 38px; border: 0.5px solid var(--gray-200); border-radius: var(--radius-md); font-size: 14px; color: var(--black); background: var(--white); outline: none; transition: border-color 0.15s; font-family: var(--font-main); }
+    .input-wrap input:focus { border-color: var(--black); }
+    .input-wrap input::placeholder { color: var(--gray-300); }
+    .btn-eye { position: absolute; right: 10px; color: var(--gray-300); cursor: pointer; padding: 4px; font-size: 17px; }
+    .btn-primary { width: 100%; padding: 13px; background: var(--black); color: white; border-radius: var(--radius-md); font-size: 14px; font-weight: 500; cursor: pointer; transition: opacity 0.15s; margin-top: 8px; }
+    .btn-primary:hover { opacity: 0.85; }
+    .msg { display: none; padding: 10px 14px; border-radius: var(--radius-md); font-size: 13px; margin-bottom: 16px; align-items: center; gap: 8px; }
+    .msg.error { display: flex; background: var(--red-bg); color: var(--red); }
+    .msg.success { display: flex; background: var(--green-bg); color: var(--green); }
+    .link-small { font-size: 12px; color: var(--gray-400); cursor: pointer; display: block; text-align: right; margin-top: -8px; margin-bottom: 16px; }
+    .link-small:hover { color: var(--black); }
+
+    /* ── VUE PROFIL (sidebar + contenu) ── */
+    #view-profil { display: none; }
+    .profil-wrap {
+      display: flex; gap: 0;
+      background: var(--white);
+      border: 0.5px solid var(--gray-200);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      min-height: 560px;
+    }
+
+    /* Sidebar */
+    .profil-sidebar { width: 220px; flex-shrink: 0; border-right: 0.5px solid var(--gray-200); display: flex; flex-direction: column; }
+    .sidebar-user { padding: 20px 16px; border-bottom: 0.5px solid var(--gray-200); }
+    .sidebar-avatar {
+      width: 44px; height: 44px; border-radius: 50%;
+      background: var(--black); color: white;
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--font-display); font-size: 20px;
+      margin-bottom: 10px;
+    }
+    .sidebar-name { font-size: 14px; font-weight: 500; margin-bottom: 2px; }
+    .sidebar-email { font-size: 12px; color: var(--gray-400); }
+    .sidebar-nav { padding: 8px 0; flex: 1; }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 16px; font-size: 13px; color: var(--gray-500);
+      cursor: pointer; border-left: 2px solid transparent;
+      transition: background 0.15s, color 0.15s;
+    }
+    .nav-item i { font-size: 16px; }
+    .nav-item:hover { background: var(--gray-50); color: var(--black); }
+    .nav-item.active { background: var(--gray-50); color: var(--black); font-weight: 500; border-left-color: var(--black); }
+    .nav-sep { height: 0.5px; background: var(--gray-200); margin: 6px 16px; }
+    .nav-item.danger { color: var(--red); }
+    .nav-item.danger:hover { background: var(--red-bg); }
+
+    /* Contenu */
+    .profil-content { flex: 1; padding: 28px; min-width: 0; }
+    .section { display: none; }
+    .section.active { display: block; }
+    .section-title { font-family: var(--font-display); font-size: 20px; font-weight: 400; margin-bottom: 20px; }
+
+    /* Stats (Historique) */
+    .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 24px; }
+    .stat-card { background: var(--gray-50); border: 0.5px solid var(--gray-200); border-radius: var(--radius-md); padding: 14px 16px; }
+    .stat-num { font-family: var(--font-display); font-size: 26px; font-weight: 400; color: var(--black); line-height: 1; margin-bottom: 4px; }
+    .stat-label { font-size: 12px; color: var(--gray-400); }
+
+    /* Billets */
+    .billets-list { display: flex; flex-direction: column; gap: 10px; }
+    .billet {
+      display: flex; align-items: stretch;
+      border: 0.5px solid var(--gray-200); border-radius: var(--radius-md); overflow: hidden;
+    }
+    .billet-stripe { width: 4px; background: var(--black); flex-shrink: 0; }
+    .billet-body { padding: 14px 16px; flex: 1; display: flex; align-items: center; justify-content: space-between; }
+    .billet-film { font-size: 14px; font-weight: 500; margin-bottom: 4px; }
+    .billet-meta { font-size: 12px; color: var(--gray-400); display: flex; align-items: center; gap: 10px; }
+    .billet-meta i { font-size: 13px; }
+    .billet-date { font-size: 12px; color: var(--gray-400); text-align: right; line-height: 1.5; }
+
+    /* Grille films favoris */
+    .fav-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; }
+    .fav-card {
+      border: 0.5px solid var(--gray-200); border-radius: var(--radius-md);
+      overflow: hidden; cursor: pointer; transition: border-color 0.15s;
+      aspect-ratio: 2/3; background: var(--gray-100);
+      display: flex; flex-direction: column; justify-content: flex-end;
+    }
+    .fav-card:hover { border-color: var(--black); }
+    .fav-card-info { padding: 8px; background: rgba(0,0,0,0.6); color: white; }
+    .fav-card-title { font-size: 11px; font-weight: 500; line-height: 1.3; }
+    .fav-card-year { font-size: 10px; opacity: 0.7; }
+    .fav-add {
+      border: 0.5px dashed var(--gray-300); background: transparent;
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 6px; color: var(--gray-400); font-size: 12px;
+    }
+    .fav-add i { font-size: 22px; }
+    .fav-add:hover { border-color: var(--black); color: var(--black); }
+
+    /* Agenda semaine */
+    .week-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-bottom: 20px; }
+    .day-box {
+      border: 0.5px solid var(--gray-200); border-radius: var(--radius-md);
+      padding: 10px 8px; text-align: center; cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .day-box:hover { border-color: var(--black); }
+    .day-box.today { border-color: var(--black); background: var(--black); color: white; }
+    .day-box.today .day-label { color: white; }
+    .day-box.today .day-num { color: white; }
+    .day-box.has-event::after { content: ''; display: block; width: 4px; height: 4px; background: var(--black); border-radius: 50%; margin: 4px auto 0; }
+    .day-box.today.has-event::after { background: white; }
+    .day-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--gray-400); margin-bottom: 4px; }
+    .day-num { font-size: 16px; font-weight: 500; }
+    .seances-day { display: flex; flex-direction: column; gap: 8px; }
+    .seance-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 14px; border: 0.5px solid var(--gray-200);
+      border-radius: var(--radius-md); font-size: 13px;
+    }
+    .seance-heure { font-weight: 500; font-size: 14px; min-width: 40px; }
+    .seance-film { flex: 1; }
+    .seance-cinema { font-size: 12px; color: var(--gray-400); }
+    .btn-remove { color: var(--gray-300); cursor: pointer; font-size: 16px; padding: 2px; }
+    .btn-remove:hover { color: var(--red); }
+
+    /* État vide */
+    .empty { text-align: center; padding: 48px 20px; color: var(--gray-400); }
+    .empty i { font-size: 32px; display: block; margin-bottom: 10px; color: var(--gray-300); }
+    .empty p { font-size: 13px; }
+    .empty a { color: var(--black); font-weight: 500; display: inline-block; margin-top: 8px; font-size: 13px; }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .page-wrap { padding: 0 16px 60px; margin: 20px auto; }
+      .profil-wrap { flex-direction: column; }
+      .profil-sidebar { width: 100%; border-right: none; border-bottom: 0.5px solid var(--gray-200); }
+      .sidebar-nav { display: flex; flex-direction: row; overflow-x: auto; padding: 4px 8px; }
+      .nav-item { border-left: none; border-bottom: 2px solid transparent; padding: 8px 14px; white-space: nowrap; }
+      .nav-item.active { border-left-color: transparent; border-bottom-color: var(--black); }
+      .nav-sep { display: none; }
+      .stats-row { grid-template-columns: repeat(3, 1fr); }
+      .week-grid { grid-template-columns: repeat(4, 1fr); }
+      .header-inner { padding: 0 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="site-header">
+  <div class="header-inner">
+    <a href="index.html" class="logo">
+      <div class="logo-icon"><i class="ti ti-movie"></i></div>
+      Ciné<span>Proche</span>
+    </a>
+    <nav class="nav-links">
+      <a href="index.html">Accueil</a>
+      <a href="nouveautes.html">Nouveautés</a>
+      <a href="resultats.html">Cinémas</a>
+      <a href="profil.html" class="active">Profil</a>
+    </nav>
+  </div>
+</header>
+
+<div class="page-wrap">
+
+  <!-- ══ VUE NON CONNECTÉ ══ -->
+  <div id="view-auth">
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('connexion')">Se connecter</button>
+      <button class="tab-btn" onclick="switchTab('inscription')">Créer un compte</button>
+    </div>
+
+    <!-- Connexion -->
+    <div class="tab-panel active" id="panel-connexion">
+      <p class="form-title">Bon retour 👋</p>
+      <p class="form-sub">Retrouvez votre historique et vos favoris</p>
+      <div class="msg" id="msg-login"></div>
+      <div class="field">
+        <label>Adresse e-mail</label>
+        <div class="input-wrap">
+          <i class="ti ti-mail"></i>
+          <input type="email" id="login-email" placeholder="vous@exemple.fr" />
+        </div>
+      </div>
+      <div class="field">
+        <label>Mot de passe</label>
+        <div class="input-wrap">
+          <i class="ti ti-lock"></i>
+          <input type="password" id="login-pwd" placeholder="••••••••" />
+          <button class="btn-eye" onclick="togglePwd('login-pwd',this)"><i class="ti ti-eye"></i></button>
+        </div>
+      </div>
+      <span class="link-small" onclick="pwdOublie()">Mot de passe oublié ?</span>
+      <button class="btn-primary" onclick="seConnecter()">Se connecter</button>
+    </div>
+
+    <!-- Inscription -->
+    <div class="tab-panel" id="panel-inscription">
+      <p class="form-title">Créer un compte</p>
+      <p class="form-sub">Gratuit — pour sauvegarder vos cinémas et séances</p>
+      <div class="msg" id="msg-reg"></div>
+      <div class="field">
+        <label>Prénom</label>
+        <div class="input-wrap">
+          <i class="ti ti-user"></i>
+          <input type="text" id="reg-prenom" placeholder="Votre prénom" />
+        </div>
+      </div>
+      <div class="field">
+        <label>Adresse e-mail</label>
+        <div class="input-wrap">
+          <i class="ti ti-mail"></i>
+          <input type="email" id="reg-email" placeholder="vous@exemple.fr" />
+        </div>
+      </div>
+      <div class="field">
+        <label>Mot de passe</label>
+        <div class="input-wrap">
+          <i class="ti ti-lock"></i>
+          <input type="password" id="reg-pwd" placeholder="8 caractères minimum" />
+          <button class="btn-eye" onclick="togglePwd('reg-pwd',this)"><i class="ti ti-eye"></i></button>
+        </div>
+      </div>
+      <button class="btn-primary" onclick="sInscrire()">Créer mon compte</button>
+    </div>
+  </div>
+
+  <!-- ══ VUE PROFIL ══ -->
+  <div id="view-profil">
+    <div class="profil-wrap">
+
+      <!-- Sidebar -->
+      <div class="profil-sidebar">
+        <div class="sidebar-user">
+          <div class="sidebar-avatar" id="sidebar-avatar">?</div>
+          <div class="sidebar-name" id="sidebar-name">—</div>
+          <div class="sidebar-email" id="sidebar-email">—</div>
+        </div>
+        <div class="sidebar-nav">
+          <div class="nav-item active" onclick="showSection('historique', this)">
+            <i class="ti ti-ticket"></i> Historique
+          </div>
+          <div class="nav-item" onclick="showSection('favoris', this)">
+            <i class="ti ti-heart"></i> Favoris
+          </div>
+          <div class="nav-item" onclick="showSection('agenda', this)">
+            <i class="ti ti-calendar"></i> Mon agenda
+          </div>
+          <div class="nav-sep"></div>
+          <div class="nav-item danger" onclick="seDeconnecter()">
+            <i class="ti ti-logout"></i> Déconnexion
+          </div>
+        </div>
+      </div>
+
+      <!-- Contenu -->
+      <div class="profil-content">
+
+        <!-- HISTORIQUE -->
+        <div class="section active" id="section-historique">
+          <p class="section-title">Historique</p>
+          <div class="stats-row">
+            <div class="stat-card"><div class="stat-num" id="stat-films">0</div><div class="stat-label">Films vus</div></div>
+            <div class="stat-card"><div class="stat-num" id="stat-cinemas">0</div><div class="stat-label">Cinémas visités</div></div>
+            <div class="stat-card"><div class="stat-num" id="stat-heures">0h</div><div class="stat-label">Temps de cinéma</div></div>
+          </div>
+          <div class="billets-list" id="billets-list">
+            <div class="empty">
+              <i class="ti ti-ticket"></i>
+              <p>Aucune réservation pour l'instant.</p>
+              <a href="index.html">Trouver un cinéma →</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- FAVORIS -->
+        <div class="section" id="section-favoris">
+          <p class="section-title">Films favoris</p>
+          <div class="fav-grid" id="fav-grid">
+            <div class="fav-card fav-add" onclick="window.location.href='nouveautes.html'">
+              <i class="ti ti-plus"></i>
+              Ajouter un film
+            </div>
+          </div>
+        </div>
+
+        <!-- AGENDA -->
+        <div class="section" id="section-agenda">
+          <p class="section-title">Mon agenda</p>
+          <div class="week-grid" id="week-grid"></div>
+          <div class="seances-day" id="seances-selected">
+            <div class="empty">
+              <i class="ti ti-calendar"></i>
+              <p>Aucune séance prévue cette semaine.</p>
+              <a href="resultats.html">Voir les cinémas →</a>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- fin profil-content -->
+    </div><!-- fin profil-wrap -->
+  </div><!-- fin view-profil -->
+
+</div><!-- fin page-wrap -->
+
+<script>
+  const KEY_SESSION = 'cinepro_user';
+  const KEY_COMPTES = 'cinepro_comptes';
+
+  function getUser() { try { return JSON.parse(localStorage.getItem(KEY_SESSION)); } catch { return null; } }
+  function saveUser(u) { localStorage.setItem(KEY_SESSION, JSON.stringify(u)); }
+  function getComptes() { try { return JSON.parse(localStorage.getItem(KEY_COMPTES)) || {}; } catch { return {}; } }
+  function saveComptes(c) { localStorage.setItem(KEY_COMPTES, JSON.stringify(c)); }
+
+  // ── Onglets connexion/inscription ──
+  function switchTab(tab) {
+    document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.toggle('active', (tab==='connexion'&&i===0)||(tab==='inscription'&&i===1)));
+    document.getElementById('panel-connexion').classList.toggle('active', tab==='connexion');
+    document.getElementById('panel-inscription').classList.toggle('active', tab==='inscription');
+  }
+
+  // ── Messages ──
+  function showMsg(id, txt, type) {
+    const el = document.getElementById(id);
+    el.className = 'msg ' + type;
+    el.innerHTML = '<i class="ti ti-'+(type==='error'?'alert-circle':'circle-check')+'"></i>' + txt;
+  }
+
+  // ── Toggle mot de passe ──
+  function togglePwd(id, btn) {
+    const inp = document.getElementById(id);
+    const ic = btn.querySelector('i');
+    inp.type = inp.type === 'password' ? 'text' : 'password';
+    ic.className = inp.type === 'password' ? 'ti ti-eye' : 'ti ti-eye-off';
+  }
+
+  // ── Connexion ──
+  function seConnecter() {
+    const email = document.getElementById('login-email').value.trim();
+    const pwd   = document.getElementById('login-pwd').value;
+    if (!email || !pwd) { showMsg('msg-login','Remplissez tous les champs.','error'); return; }
+    const comptes = getComptes();
+    const c = comptes[email];
+    if (!c || c.password !== pwd) { showMsg('msg-login','Email ou mot de passe incorrect.','error'); return; }
+    saveUser({ prenom: c.prenom, email, favoris: c.favoris||[], agenda: c.agenda||[], billets: c.billets||[] });
+    afficherProfil();
+  }
+
+  // ── Inscription ──
+  function sInscrire() {
+    const prenom = document.getElementById('reg-prenom').value.trim();
+    const email  = document.getElementById('reg-email').value.trim();
+    const pwd    = document.getElementById('reg-pwd').value;
+    if (!prenom||!email||!pwd) { showMsg('msg-reg','Remplissez tous les champs.','error'); return; }
+    if (!email.includes('@')) { showMsg('msg-reg','Email invalide.','error'); return; }
+    if (pwd.length < 8) { showMsg('msg-reg','Mot de passe trop court (8 caractères min).','error'); return; }
+    const comptes = getComptes();
+    if (comptes[email]) { showMsg('msg-reg','Un compte existe déjà avec cet email.','error'); return; }
+    comptes[email] = { prenom, password: pwd, favoris: [], agenda: [], billets: [] };
+    saveComptes(comptes);
+    saveUser({ prenom, email, favoris: [], agenda: [], billets: [] });
+    showMsg('msg-reg','Compte créé !','success');
+    setTimeout(afficherProfil, 600);
+  }
+
+  // ── Déconnexion ──
+  function seDeconnecter() {
+    localStorage.removeItem(KEY_SESSION);
+    document.getElementById('view-profil').style.display = 'none';
+    document.getElementById('view-auth').style.display = 'block';
+  }
+
+  // ── Navigation entre sections ──
+  function showSection(id, el) {
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    document.getElementById('section-' + id).classList.add('active');
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    if (el) el.classList.add('active');
+  }
+
+  // ── Afficher le profil ──
+  function afficherProfil() {
+    const user = getUser();
+    if (!user) return;
+    document.getElementById('view-auth').style.display = 'none';
+    document.getElementById('view-profil').style.display = 'block';
+    // Sidebar
+    document.getElementById('sidebar-avatar').textContent = user.prenom ? user.prenom[0].toUpperCase() : '?';
+    document.getElementById('sidebar-name').textContent = user.prenom || '—';
+    document.getElementById('sidebar-email').textContent = user.email || '—';
+    // Sections
+    afficherHistorique(user.billets || []);
+    afficherFavoris(user.favoris || []);
+    construireAgenda(user.agenda || []);
+  }
+
+  // ── Historique & billets ──
+  function afficherHistorique(billets) {
+    document.getElementById('stat-films').textContent = billets.length;
+    const cinemas = [...new Set(billets.map(b => b.cinema))].length;
+    document.getElementById('stat-cinemas').textContent = cinemas;
+    const heures = Math.round(billets.length * 1.8);
+    document.getElementById('stat-heures').textContent = heures + 'h';
+    const liste = document.getElementById('billets-list');
+    if (!billets.length) {
+      liste.innerHTML = '<div class="empty"><i class="ti ti-ticket"></i><p>Aucune réservation pour l\'instant.</p><a href="index.html">Trouver un cinéma →</a></div>';
+      return;
+    }
+    liste.innerHTML = billets.slice().reverse().map(b => `
+      <div class="billet">
+        <div class="billet-stripe"></div>
+        <div class="billet-body">
+          <div>
+            <div class="billet-film">${b.film}</div>
+            <div class="billet-meta">
+              <span><i class="ti ti-building-cinema"></i> ${b.cinema}</span>
+              <span><i class="ti ti-clock"></i> ${b.heure}</span>
+            </div>
+          </div>
+          <div class="billet-date">${b.date}<br><span style="font-size:10px;color:var(--gray-300);">Souvenir</span></div>
+        </div>
+      </div>`).join('');
+  }
+
+  // ── Favoris films ──
+  function afficherFavoris(favoris) {
+    const grid = document.getElementById('fav-grid');
+    const cartes = favoris.map((f,i) => `
+      <div class="fav-card" style="background:var(--gray-100);">
+        <div class="fav-card-info">
+          <div class="fav-card-title">${f.titre}</div>
+          <div class="fav-card-year">${f.annee||''}</div>
+        </div>
+      </div>`).join('');
+    grid.innerHTML = cartes + `<div class="fav-card fav-add" onclick="window.location.href='nouveautes.html'"><i class="ti ti-plus"></i>Ajouter</div>`;
+  }
+
+  // ── Agenda semaine ──
+  function construireAgenda(seances) {
+    const grid = document.getElementById('week-grid');
+    const jours = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
+    const today = new Date();
+    // Trouver le lundi de la semaine
+    const lundi = new Date(today);
+    lundi.setDate(today.getDate() - ((today.getDay()+6)%7));
+    grid.innerHTML = '';
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(lundi); d.setDate(lundi.getDate() + i);
+      const isToday = d.toDateString() === today.toDateString();
+      const dateStr = d.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'});
+      const hasEvent = seances.some(s => s.date === dateStr);
+      const box = document.createElement('div');
+      box.className = 'day-box' + (isToday?' today':'') + (hasEvent?' has-event':'');
+      box.innerHTML = `<div class="day-label">${jours[d.getDay()]}</div><div class="day-num">${d.getDate()}</div>`;
+      box.onclick = () => afficherSeancesJour(dateStr, seances, box);
+      grid.appendChild(box);
+      if (isToday) afficherSeancesJour(dateStr, seances, box);
+    }
+  }
+
+  function afficherSeancesJour(dateStr, seances, boxEl) {
+    document.querySelectorAll('.day-box').forEach(b => b.style.outline = 'none');
+    if (boxEl) boxEl.style.outline = '2px solid var(--black)';
+    const du_jour = seances.filter(s => s.date === dateStr);
+    const conteneur = document.getElementById('seances-selected');
+    if (!du_jour.length) {
+      conteneur.innerHTML = '<div class="empty"><i class="ti ti-calendar"></i><p>Aucune séance ce jour.</p><a href="resultats.html">Voir les cinémas →</a></div>';
+      return;
+    }
+    conteneur.innerHTML = du_jour.map((s,i) => `
+      <div class="seance-item">
+        <div class="seance-heure">${s.heure}</div>
+        <div class="seance-film">
+          <div style="font-weight:500;font-size:14px;">${s.film}</div>
+          <div class="seance-cinema">${s.cinema}</div>
+        </div>
+        <button class="btn-remove" onclick="retirerSeance(${i})" title="Retirer"><i class="ti ti-x"></i></button>
+      </div>`).join('');
+  }
+
+  function retirerSeance(index) {
+    const user = getUser(); if (!user) return;
+    user.agenda.splice(index, 1);
+    saveUser(user);
+    const comptes = getComptes();
+    if (comptes[user.email]) { comptes[user.email].agenda = user.agenda; saveComptes(comptes); }
+    construireAgenda(user.agenda);
+  }
+
+  function pwdOublie() {
+    const email = document.getElementById('login-email').value.trim();
+    if (!email) { showMsg('msg-login','Entrez votre email puis cliquez ici.','error'); return; }
+    showMsg('msg-login','Lien de réinitialisation envoyé à ' + email + ' (simulation).','success');
+  }
+
+  // ── Init ──
+  (function() {
+    const user = getUser();
+    if (user) afficherProfil();
+  })();
+</script>
+</body>
 </html>
