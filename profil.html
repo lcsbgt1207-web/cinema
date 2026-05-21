@@ -208,20 +208,6 @@
     .empty p { font-size: 13px; }
     .empty a { color: var(--black); font-weight: 500; display: inline-block; margin-top: 8px; font-size: 13px; }
 
-    .param-group { margin-bottom: 28px; }
-    .param-group-title { font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.8px; color: var(--gray-400); margin-bottom: 12px; }
-    .param-row { display: flex; align-items: center; justify-content: space-between; padding: 14px 0; border-bottom: 0.5px solid var(--gray-100); }
-    .param-row:last-child { border-bottom: none; }
-    .param-label { font-size: 14px; font-weight: 500; margin-bottom: 2px; }
-    .param-sub { font-size: 12px; color: var(--gray-400); }
-    .btn-edit-param { font-size: 12px; color: var(--gray-500); background: none; border: 0.5px solid var(--gray-200); border-radius: var(--radius-md); padding: 6px 12px; cursor: pointer; }
-    .btn-edit-param:hover { border-color: var(--black); color: var(--black); }
-    .toggle { width: 40px; height: 22px; border-radius: 11px; background: var(--gray-200); position: relative; cursor: pointer; transition: background 0.2s; flex-shrink: 0; }
-    .toggle.on { background: var(--black); }
-    .toggle-thumb { width: 16px; height: 16px; border-radius: 50%; background: white; position: absolute; top: 3px; left: 3px; transition: left 0.2s; }
-    .toggle.on .toggle-thumb { left: 21px; }
-    .btn-danger-account { font-size: 13px; color: var(--red); background: none; border: 0.5px solid var(--red); border-radius: var(--radius-md); padding: 10px 16px; cursor: pointer; }
-    .btn-danger-account:hover { background: var(--red-bg); }
     /* Responsive */
     @media (max-width: 768px) {
       .page-wrap { padding: 0 16px 60px; margin: 20px auto; }
@@ -340,9 +326,6 @@
           <div class="nav-item" onclick="showSection('agenda', this)">
             <i class="ti ti-calendar"></i> Mon agenda
           </div>
-          <div class="nav-item" onclick="showSection('parametres', this)">
-            <i class="ti ti-settings"></i> Paramètres
-          </div>
           <div class="nav-sep"></div>
           <div class="nav-item danger" onclick="seDeconnecter()">
             <i class="ti ti-logout"></i> Déconnexion
@@ -391,41 +374,6 @@
               <p>Aucune séance prévue cette semaine.</p>
               <a href="resultats.html">Voir les cinémas →</a>
             </div>
-          </div>
-        </div>
-
-              <!-- PARAMÈTRES -->
-        <div class="section" id="section-parametres">
-          <p class="section-title">Paramètres du compte</p>
-          <div class="param-group">
-            <p class="param-group-title">Informations personnelles</p>
-            <div class="param-row">
-              <div><div class="param-label">Prénom</div><div class="param-sub" id="param-prenom">—</div></div>
-              <button class="btn-edit-param" onclick="editChamp('prenom')">Modifier</button>
-            </div>
-            <div class="param-row">
-              <div><div class="param-label">Adresse e-mail</div><div class="param-sub" id="param-email">—</div></div>
-              <button class="btn-edit-param" onclick="editChamp('email')">Modifier</button>
-            </div>
-            <div class="param-row">
-              <div><div class="param-label">Mot de passe</div><div class="param-sub">••••••••</div></div>
-              <button class="btn-edit-param" onclick="editChamp('password')">Modifier</button>
-            </div>
-          </div>
-          <div class="param-group">
-            <p class="param-group-title">Notifications</p>
-            <div class="param-row">
-              <div><div class="param-label">Nouveaux films à l'affiche</div><div class="param-sub">Recevoir une alerte chaque semaine</div></div>
-              <div class="toggle" onclick="this.classList.toggle('on')"><div class="toggle-thumb"></div></div>
-            </div>
-            <div class="param-row">
-              <div><div class="param-label">Rappel de séance</div><div class="param-sub">1h avant le début</div></div>
-              <div class="toggle on" onclick="this.classList.toggle('on')"><div class="toggle-thumb"></div></div>
-            </div>
-          </div>
-          <div class="param-group">
-            <p class="param-group-title">Danger</p>
-            <button class="btn-danger-account" onclick="supprimerCompte()">Supprimer mon compte</button>
           </div>
         </div>
 
@@ -522,7 +470,6 @@
     document.getElementById('sidebar-email').textContent = user.email || '—';
     // Sections
     afficherHistorique(user.billets || []);
-    remplirParametres();
     afficherFavoris(user.favoris || []);
     construireAgenda(user.agenda || []);
   }
@@ -624,39 +571,6 @@
     const email = document.getElementById('login-email').value.trim();
     if (!email) { showMsg('msg-login','Entrez votre email puis cliquez ici.','error'); return; }
     showMsg('msg-login','Lien de réinitialisation envoyé à ' + email + ' (simulation).','success');
-  }
-
-  function editChamp(champ) {
-    const user = getUser(); if (!user) return;
-    const labels = { prenom: 'Prénom', email: 'Adresse e-mail', password: 'Nouveau mot de passe' };
-    const val = prompt('Modifier ' + labels[champ] + ' :', champ === 'password' ? '' : user[champ] || '');
-    if (val === null || val.trim() === '') return;
-    if (champ === 'password' && val.length < 8) { alert('8 caractères minimum.'); return; }
-    const comptes = getComptes();
-    if (champ === 'password') { comptes[user.email].password = val; }
-    else { user[champ] = val.trim(); comptes[user.email][champ] = val.trim(); }
-    saveUser(user); saveComptes(comptes);
-    if (champ === 'prenom') { document.getElementById('sidebar-name').textContent = val; document.getElementById('sidebar-avatar').textContent = val[0].toUpperCase(); document.getElementById('param-prenom').textContent = val; }
-    else if (champ === 'email') { document.getElementById('sidebar-email').textContent = val; document.getElementById('param-email').textContent = val; }
-    else { alert('Mot de passe mis à jour !'); }
-  }
-
-  function supprimerCompte() {
-    if (!confirm('Supprimer définitivement votre compte ?')) return;
-    const user = getUser(); if (!user) return;
-    const comptes = getComptes();
-    delete comptes[user.email];
-    saveComptes(comptes);
-    localStorage.removeItem(KEY_SESSION);
-    window.location.reload();
-  }
-
-  function remplirParametres() {
-    const user = getUser(); if (!user) return;
-    const e1 = document.getElementById('param-prenom');
-    const e2 = document.getElementById('param-email');
-    if (e1) e1.textContent = user.prenom || '—';
-    if (e2) e2.textContent = user.email || '—';
   }
 
   // ── Init ──
