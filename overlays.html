@@ -1,0 +1,83 @@
+<!-- ═══════════════════════════════════════
+     OVERLAYS PARTAGÉS — à inclure dans chaque page
+     ═══════════════════════════════════════ -->
+
+<!-- Overlay popup film -->
+<div class="overlay" id="film-overlay">
+  <div class="popup" id="film-popup"></div>
+</div>
+
+<!-- Overlay réservation -->
+<div class="overlay" id="resa-overlay">
+  <div class="popup" style="max-width:420px;">
+    <div style="padding:20px 22px 16px; border-bottom:0.5px solid var(--gray-200);">
+      <div style="font-size:16px;font-weight:500;color:var(--black);margin-bottom:4px;" id="resa-film"></div>
+      <div style="font-size:13px;color:var(--gray-500);display:flex;align-items:center;gap:5px;">
+        <i class="ti ti-building" style="font-size:13px;"></i>
+        <span id="resa-cinema"></span>
+      </div>
+    </div>
+    <div style="padding:16px 22px;display:flex;flex-direction:column;gap:10px;border-bottom:0.5px solid var(--gray-200);">
+      <div style="display:flex;align-items:center;gap:12px;font-size:13px;">
+        <i class="ti ti-calendar" style="color:var(--gray-400);width:16px;text-align:center;"></i>
+        <span style="color:var(--gray-500);min-width:80px;">Date</span>
+        <span style="font-weight:500;" id="resa-date"></span>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;font-size:13px;">
+        <i class="ti ti-clock" style="color:var(--gray-400);width:16px;text-align:center;"></i>
+        <span style="color:var(--gray-500);min-width:80px;">Séance</span>
+        <span style="font-weight:500;" id="resa-heure"></span>
+      </div>
+    </div>
+    <div style="padding:14px 22px;display:flex;flex-direction:column;gap:8px;">
+      <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="confirmReservation()">
+        <i class="ti ti-external-link"></i> Réserver sur AlloCiné
+      </button>
+      <div style="font-size:11px;color:var(--gray-400);text-align:center;display:flex;align-items:center;gap:4px;justify-content:center;">
+        <i class="ti ti-info-circle" style="font-size:12px;"></i>
+        Vous serez redirigé vers le site officiel. À votre retour, ajoutez la séance à votre agenda.
+      </div>
+      <button class="btn btn-secondary" style="width:100%;justify-content:center;" onclick="closeResaOverlay()">Annuler</button>
+    </div>
+  </div>
+</div>
+
+<!-- Overlay retour après réservation -->
+<div class="overlay" id="retour-overlay">
+  <div class="popup" style="max-width:420px;">
+    <div style="padding:24px 22px 16px;text-align:center;border-bottom:0.5px solid var(--gray-200);">
+      <div style="width:48px;height:48px;background:var(--green-bg);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;">
+        <i class="ti ti-check" style="font-size:22px;color:var(--green);"></i>
+      </div>
+      <div style="font-size:16px;font-weight:500;color:var(--black);margin-bottom:4px;">Réservation confirmée !</div>
+      <div style="font-size:13px;color:var(--gray-500);">Voulez-vous ajouter cette séance à votre agenda ?</div>
+    </div>
+    <!-- Billet souvenir -->
+    <div style="margin:0;background:var(--black);padding:16px 22px;">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:12px;">
+        <div>
+          <div style="font-size:15px;font-weight:500;color:#fff;" id="retour-film"></div>
+          <div style="font-size:12px;color:rgba(255,255,255,0.55);margin-top:2px;" id="retour-cinema"></div>
+        </div>
+        <span style="font-size:10px;font-weight:500;background:rgba(255,255,255,0.15);color:#fff;border-radius:20px;padding:3px 9px;white-space:nowrap;">Billet souvenir</span>
+      </div>
+      <div style="border-top:1px dashed rgba(255,255,255,0.2);margin-bottom:12px;"></div>
+      <div style="display:flex;gap:20px;">
+        <div>
+          <div style="font-size:10px;color:rgba(255,255,255,0.45);text-transform:uppercase;letter-spacing:0.4px;">Séance</div>
+          <div style="font-size:13px;font-weight:500;color:#fff;" id="retour-heure"></div>
+        </div>
+        <div>
+          <div style="font-size:10px;color:rgba(255,255,255,0.45);text-transform:uppercase;letter-spacing:0.4px;">Date</div>
+          <div style="font-size:13px;font-weight:500;color:#fff;">Aujourd'hui</div>
+        </div>
+      </div>
+    </div>
+    <div style="padding:14px 22px;display:flex;flex-direction:column;gap:8px;">
+      <button class="btn btn-primary" id="btn-add-agenda" style="width:100%;justify-content:center;" onclick="addToAgenda()">
+        <i class="ti ti-calendar-plus"></i> Ajouter à mon agenda
+      </button>
+      <button class="btn btn-secondary" style="width:100%;justify-content:center;" onclick="closeRetourOverlay()">Fermer</button>
+    </div>
+  </div>
+</div>
