@@ -8,13 +8,14 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css" />
   <style>
     .hero {
-      min-height: calc(100vh - 60px - 90px);
+      /* Réglage accueil : contenu plus compact pour voir les statistiques dès l'arrivée */
+      min-height: clamp(520px, calc(100vh - 250px), 620px);
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 60px 32px 48px;
-      gap: 28px;
+      padding: 42px 32px 30px;
+      gap: 24px;
       text-align: center;
     }
     .hero-eyebrow { font-size: 12px; font-weight: 500; color: var(--gray-400); letter-spacing: 1px; text-transform: uppercase; }
@@ -22,7 +23,7 @@
     .hero h1 em { font-style: italic; color: var(--gray-400); }
     .hero-sub { font-size: 15px; color: var(--gray-500); max-width: 440px; line-height: 1.6; }
 
-    .search-block { display: flex; flex-direction: column; align-items: center; gap: 14px; width: 100%; max-width: 560px; }
+    .search-block { display: flex; flex-direction: column; align-items: center; gap: 13px; width: 100%; max-width: 560px; }
 
     .search-toggle { display: flex; background: var(--gray-100); border: 0.5px solid var(--gray-200); border-radius: var(--radius-full); padding: 3px; gap: 2px; }
     .toggle-btn { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; padding: 8px 20px; border-radius: var(--radius-full); cursor: pointer; border: none; background: none; color: var(--gray-500); transition: background var(--transition), color var(--transition); }
