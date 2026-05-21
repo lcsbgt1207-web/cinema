@@ -1,0 +1,217 @@
+{
+  "source": "fallback-local",
+  "scrapedAt": "2026-05-21T09:26:13.938Z",
+  "count": 30,
+  "films": [
+    {
+      "rank": 1,
+      "title": "The Shawshank Redemption",
+      "letterboxdSlug": "the-shawshank-redemption",
+      "letterboxdUrl": null,
+      "sourceType": "fallback"
+    },
+    {
+      "rank": 2,
+      "title": "The Godfather",
+      "letterboxdSlug": "the-godfather",
+      "letterboxdUrl": null,
+      "sourceType": "fallback"
+    },
+    {
+      "rank": 3,
+      "title": "The Dark Knight",
+      "letterboxdSlug": "the-dark-knight",
+      "letterboxdUrl": null,
+      "sourceType": "fallback"
+    },
+    {
+      "rank": 4,
+      "title": "The Godfather Part II",
+      "letterboxdSlug": "the-godfather-part-ii",
+      "letterboxdUrl": null,
+      "sourceType": "fallback"
+    },
+    {
+      "rank": 5,
+      "title": "12 Angry Men",
+      "letterboxdSlug": "12-angry-men",
+      "letterboxdUrl": null,
+      "sourceType": "fallback"
+    },
+    {
+      "rank": 6,
+      "title": "The Lord of the Rings: The Return of the King",
+      "letterboxdSlug": "the-lord-of-the-rings-the-return-of-the-king",
+      "letterboxdUrl": null,
+      "sourceType": "fallback"
+    },
+    {
+      "rank": 7,
+      "title": "Schindler's List",
+      "letterboxdSlug": "schindler-s-list",
+      "letterboxdUrl": null,
+      "sourceType": "fallback"
+    },
+    {
+      "rank": 8,
+      "title": "Pulp Fiction",
+      "letterboxdSlug": "pulp-fiction",
+      "letterboxdUrl": null,
+      "sourceType": "fallback"
+    },
+    {
+      "rank": 9,
+      "title": "Parasite",
+      "letterboxdSlug": "parasite",
+      "letterboxdUrl": null,
+      "sourceType": "fallback"
+    },
+    {
+      "rank": 10,
+      "title": "Interstellar",
+      "letterboxdSlug": "interstellar",
+      "letterboxdUrl": null,
+      "sourceType": "fallback"
+    },
+    {
+      "rank": 11,
+      "title": "Whiplash",
+      "letterboxdSlug": "whiplash",
+      "letterboxdUrl": null,
+      "sourceType": "fallback"
+    },
+    {
+      "rank": 12,
+      "title": "Fight Club",
+      "letterboxdSlug": "fight-club",
+      "letterboxdUrl": null,
+      "sourceType": "fallback"
+    },
+    {
+      "rank": 13,
+      "title": "Inception",
+      "letterboxdSlug": "inception",
+      "letterboxdUrl": null,
+      "sourceType": "fallback"
+    },
+    {
+      "rank": 14,
+      "title": "Goodfellas",
+      "letterboxdSlug": "goodfellas",
+      "letterboxdUrl": null,
+      "sourceType": "fallback"
+    },
+    {
+      "rank": 15,
+      "title": "Spirited Away",
+      "letterboxdSlug": "spirited-away",
+      "letterboxdUrl": null,
+      "sourceType": "fallback"
+    },
+    {
+      "rank": 16,
+      "title": "Seven Samurai",
+      "letterboxdSlug": "seven-samurai",
+      "letterboxdUrl": null,
+      "sourceType": "fallback"
+    },
+    {
+      "rank": 17,
+      "title": "City of God",
+      "letterboxdSlug": "city-of-god",
+      "letterboxdUrl": null,
+      "sourceType": "fallback"
+    },
+    {
+      "rank": 18,
+      "title": "Se7en",
+      "letterboxdSlug": "se7en",
+      "letterboxdUrl": null,
+      "sourceType": "fallback"
+    },
+    {
+      "rank": 19,
+      "title": "The Matrix",
+      "letterboxdSlug": "the-matrix",
+      "letterboxdUrl": null,
+      "sourceType": "fallback"
+    },
+    {
+      "rank": 20,
+      "title": "The Silence of the Lambs",
+      "letterboxdSlug": "the-silence-of-the-lambs",
+      "letterboxdUrl": null,
+      "sourceType": "fallback"
+    },
+    {
+      "rank": 21,
+      "title": "The Green Mile",
+      "letterboxdSlug": "the-green-mile",
+      "letterboxdUrl": null,
+      "sourceType": "fallback"
+    },
+    {
+      "rank": 22,
+      "title": "Star Wars",
+      "letterboxdSlug": "star-wars",
+      "letterboxdUrl": null,
+      "sourceType": "fallback"
+    },
+    {
+      "rank": 23,
+      "title": "Back to the Future",
+      "letterboxdSlug": "back-to-the-future",
+      "letterboxdUrl": null,
+      "sourceType": "fallback"
+    },
+    {
+      "rank": 24,
+      "title": "Gladiator",
+      "letterboxdSlug": "gladiator",
+      "letterboxdUrl": null,
+      "sourceType": "fallback"
+    },
+    {
+      "rank": 25,
+      "title": "The Prestige",
+      "letterboxdSlug": "the-prestige",
+      "letterboxdUrl": null,
+      "sourceType": "fallback"
+    },
+    {
+      "rank": 26,
+      "title": "The Departed",
+      "letterboxdSlug": "the-departed",
+      "letterboxdUrl": null,
+      "sourceType": "fallback"
+    },
+    {
+      "rank": 27,
+      "title": "Alien",
+      "letterboxdSlug": "alien",
+      "letterboxdUrl": null,
+      "sourceType": "fallback"
+    },
+    {
+      "rank": 28,
+      "title": "Apocalypse Now",
+      "letterboxdSlug": "apocalypse-now",
+      "letterboxdUrl": null,
+      "sourceType": "fallback"
+    },
+    {
+      "rank": 29,
+      "title": "Cinema Paradiso",
+      "letterboxdSlug": "cinema-paradiso",
+      "letterboxdUrl": null,
+      "sourceType": "fallback"
+    },
+    {
+      "rank": 30,
+      "title": "Oldboy",
+      "letterboxdSlug": "oldboy",
+      "letterboxdUrl": null,
+      "sourceType": "fallback"
+    }
+  ]
+}
