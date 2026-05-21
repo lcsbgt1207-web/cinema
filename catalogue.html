@@ -245,7 +245,8 @@
 <script>
   // Catalogue = films avec annee définie + films nouveautés
   let catalogue = FILMS.filter(f => f.lb && f.sc);
-  let catalogueSource = 'local';
+  const STATIC_CATALOGUE = [...catalogue];
+  const LETTERBOXD_API_URL = 'http://localhost:3000/api/films-letterboxd';
   const favs = new Set(JSON.parse(localStorage.getItem('cinepro_favs') || '[]'));
   let sortKey = 'imdb', sortDir = -1;
   let currentPage = 1;
@@ -273,6 +274,7 @@
 
   function getSortValue(film, key) {
     if (key === 'imdb' && (film.isMock || !Number.isFinite(film.imdb))) return null;
+    if (key === 'lbRank') return film.lbRank ?? null;
     return film[key] ?? null;
   }
 
@@ -302,21 +304,21 @@
         : `<i class="ti ti-photo"></i>`;
 
       return `
-      <tr onclick="${f.apiOnly ? '' : `openFilmPopup(${f.id})`}" class="${f.apiOnly ? 'api-row' : ''}">
+      <tr onclick="openCatalogueFilmPopup(${f.id})">
         <td><button class="fav-btn ${favs.has(f.id) ? 'active' : ''}" onclick="event.stopPropagation(); toggleFav(${f.id}, this)">
           <i class="ti ti-bookmark"></i></button></td>
         <td class="td-title">
           <div class="film-cell">
             <div class="film-thumb">${poster}</div>
             <div>
-              <div class="film-name">${f.titre}</div>
+              <div class="film-name">${f.lbRank ? '#' + f.lbRank + ' · ' : ''}${f.titre}</div>
               ${f.original ? `<div class="film-original">${f.original}</div>` : ''}
             </div>
           </div>
         </td>
         <td class="td-real">${f.real}</td>
         <td><span class="genre-pill">${f.genre}</span></td>
-        <td class="td-note sep-left"><span class="note note-lb">${f.letterboxdRank ? '#' + f.letterboxdRank : (Number.isFinite(f.lb) ? f.lb.toFixed(1) + ' ★' : '—')}</span></td>
+        <td class="td-note sep-left"><span class="note note-lb">${Number.isFinite(f.lb) ? f.lb.toFixed(1) + ' ★' : '—'}</span></td>
         <td class="td-note"><span class="note note-imdb">${formatImdbNote(f)}</span></td>
         <td class="td-note"><span class="note note-sc">${Number.isFinite(f.sc) ? f.sc.toFixed(1) : '—'}</span></td>
         <td class="td-year">${f.annee || '—'}</td>
@@ -372,7 +374,7 @@
     const g = document.getElementById('genre-filter').value;
     const d = document.getElementById('decade-filter').value;
     let data = catalogue.filter(f =>
-      (!q || String(f.titre || '').toLowerCase().includes(q) || String(f.real || '').toLowerCase().includes(q) || (f.original && String(f.original).toLowerCase().includes(q))) &&
+      (!q || String(f.titre || '').toLowerCase().includes(q) || String(f.real || '').toLowerCase().includes(q) || String(f.original || '').toLowerCase().includes(q)) &&
       (!g || f.genre === g) &&
       decadeMatch(f.annee, d)
     );
@@ -398,57 +400,99 @@
     localStorage.setItem('cinepro_favs', JSON.stringify([...favs]));
   }
 
-  function normalizeApiFilm(film, index) {
-    const rank = Number(film.rank || index + 1);
-    const title = film.title || film.titre || 'Film sans titre';
+
+
+  function slugToTitle(slug) {
+    return String(slug || '')
+      .split('-')
+      .filter(Boolean)
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  }
+
+  function makeLetterboxdFilm(film, index) {
+    const title = film.title || film.titre || slugToTitle(film.letterboxdSlug) || 'Film Letterboxd';
     return {
-      id: 'lb-' + rank,
-      apiOnly: true,
+      id: 900000 + (Number(film.rank) || index + 1),
       titre: title,
-      original: film.original || '',
-      genre: film.genre || 'Cinéma',
-      duree: film.duree || '',
-      real: film.real || '—',
-      acteurs: film.acteurs || '—',
-      synopsis: film.synopsis || 'Données importées depuis l’API Letterboxd locale.',
-      poster: film.poster || null,
-      annee: film.annee || null,
-      lb: Number.isFinite(Number(film.lb)) ? Number(film.lb) : null,
-      imdb: Number.isFinite(Number(film.imdb)) ? Number(film.imdb) : null,
-      sc: Number.isFinite(Number(film.sc)) ? Number(film.sc) : null,
-      letterboxdRank: rank,
-      letterboxdSlug: film.letterboxdSlug || '',
-      letterboxdUrl: film.letterboxdUrl || null,
-      sourceType: film.sourceType || 'api'
+      original: '',
+      genre: 'Letterboxd',
+      duree: '—',
+      real: 'Non renseigné',
+      acteurs: 'Non renseigné',
+      synopsis: `Film importé depuis l’API Letterboxd locale. Rang Letterboxd : #${film.rank || index + 1}.`,
+      color: ['p1','p2','p3','p4','p5','p6'][index % 6],
+      badge: 'Letterboxd',
+      lbRank: Number(film.rank) || index + 1,
+      lb: Number.isFinite(Number(film.letterboxdRating)) ? Number(film.letterboxdRating) : null,
+      imdb: null,
+      sc: null,
+      annee: null,
+      cinemas: [],
+      letterboxdUrl: film.letterboxdUrl || (film.letterboxdSlug ? `https://letterboxd.com/film/${film.letterboxdSlug}/` : null),
+      sourceType: film.sourceType || 'api-letterboxd',
+      isApiFilm: true,
+      isMock: false
     };
   }
 
   async function loadLetterboxdCatalogue() {
-    const apiUrl = 'http://localhost:3000/api/films-letterboxd';
+    const countLabel = document.getElementById('film-count');
+    if (countLabel) countLabel.textContent = 'Chargement Letterboxd…';
+
     try {
-      const response = await fetch(apiUrl, { cache: 'no-store' });
+      const response = await fetch(LETTERBOXD_API_URL, { cache: 'no-store' });
       if (!response.ok) throw new Error('API indisponible');
-      const data = await response.json();
-      if (Array.isArray(data.films) && data.films.length > 0) {
-        catalogue = data.films.map(normalizeApiFilm);
-        catalogueSource = 'letterboxd-api';
+
+      const payload = await response.json();
+      const apiFilms = Array.isArray(payload.films) ? payload.films : [];
+      if (!apiFilms.length) throw new Error('Aucun film renvoyé');
+
+      catalogue = apiFilms.map(makeLetterboxdFilm);
+
+      // On ajoute aussi ces films dans FILMS pour que les popups existantes fonctionnent.
+      for (const film of catalogue) {
+        if (!FILMS.some(existing => existing.id === film.id)) FILMS.push(film);
       }
+
+      sortKey = 'lbRank';
+      sortDir = 1;
+      currentPage = 1;
+      return true;
     } catch (error) {
-      console.warn('API Letterboxd indisponible, catalogue local utilisé :', error.message);
-      catalogueSource = 'local';
+      console.warn('API Letterboxd non disponible, catalogue statique utilisé :', error.message);
+      catalogue = STATIC_CATALOGUE;
+      return false;
     }
   }
 
-  async function initCatalogue() {
-    document.getElementById('table-body').innerHTML = `<tr><td colspan="8" style="padding:28px;text-align:center;color:var(--gray-500);">Chargement du catalogue Letterboxd…</td></tr>`;
+  function openCatalogueFilmPopup(id) {
+    const film = FILMS.find(f => f.id === id) || catalogue.find(f => f.id === id);
+    if (!film) return;
 
+    if (typeof buildPopupHTML === 'function') {
+      const popup = document.getElementById('film-popup');
+      const overlay = document.getElementById('film-overlay');
+      if (!popup || !overlay) return;
+      popup.innerHTML = buildPopupHTML(film);
+      overlay.classList.add('open');
+      document.body.style.overflow = 'hidden';
+      return;
+    }
+
+    openFilmPopup(id);
+  }
+
+
+  async function initCatalogue() {
     await loadLetterboxdCatalogue();
     filterTable();
 
-    if (catalogueSource === 'local' && typeof enrichFilmsWithOmdb === 'function') {
-      await enrichFilmsWithOmdb(catalogue, () => filterTable());
+    await enrichFilmsWithOmdb(catalogue.filter(f => !f.isApiFilm), (current, total) => {
       filterTable();
-    }
+    });
+
+    filterTable();
   }
 
   initCatalogue();
