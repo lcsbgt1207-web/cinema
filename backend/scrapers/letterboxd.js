@@ -1,102 +1,136 @@
 import axios from 'axios';
-import * as cheerio from 'cheerio';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+const PROJECT_DIR = path.join(__dirname, '..', '..');
 const OUTPUT_DIR = path.join(__dirname, '..', 'data');
 const OUTPUT_FILE = path.join(OUTPUT_DIR, 'letterboxd-films.json');
-const SOURCE_URL = 'https://letterboxd.com/films/popular/';
+const LOCAL_DATA_FILE = path.join(PROJECT_DIR, 'js', 'data.js');
 const BASE_URL = 'https://letterboxd.com';
 
+const REQUEST_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36',
+  'Accept-Language': 'en-US,en;q=0.9,fr-FR;q=0.8',
+  Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+};
 
-const FALLBACK_RATINGS = {
-  'The Shawshank Redemption': 4.6,
-  'The Godfather': 4.6,
-  'The Dark Knight': 4.5,
-  'The Godfather Part II': 4.6,
-  '12 Angry Men': 4.6,
-  'The Lord of the Rings: The Return of the King': 4.4,
-  'Schindler’s List': 4.5,
-  'Schindler\'s List': 4.5,
-  'Pulp Fiction': 4.4,
-  'Parasite': 4.6,
-  'Interstellar': 4.4,
-  'Whiplash': 4.3,
-  'Fight Club': 4.4,
-  'Inception': 4.3,
-  'Goodfellas': 4.4,
-  'Spirited Away': 4.5,
-  'Seven Samurai': 4.5,
-  'City of God': 4.5,
-  'The Matrix': 4.3,
-  'Se7en': 4.3,
-  'Seven': 4.3,
-  'The Silence of the Lambs': 4.3,
-  'Back to the Future': 4.2,
-  'The Green Mile': 4.2,
-  'Saving Private Ryan': 4.3,
-  'The Prestige': 4.2,
-  'Gladiator': 4.2,
-  'The Departed': 4.2,
-  'Django Unchained': 4.1,
-  'Alien': 4.3,
-  'Blade Runner 2049': 4.1,
+// Slugs exacts pour les films dont le titre français ou IMDb ne correspond pas parfaitement à Letterboxd.
+const SLUG_OVERRIDES = {
+  'The Shawshank Redemption': 'the-shawshank-redemption',
+  'The Godfather': 'the-godfather',
+  'The Dark Knight': 'the-dark-knight',
+  'The Godfather Part II': 'the-godfather-part-ii',
+  '12 Angry Men': '12-angry-men',
+  'The Lord of the Rings: The Return of the King': 'the-lord-of-the-rings-the-return-of-the-king',
+  'Schindler’s List': 'schindlers-list',
+  "Schindler's List": 'schindlers-list',
+  'The Lord of the Rings: The Fellowship of the Ring': 'the-lord-of-the-rings-the-fellowship-of-the-ring',
+  'The Good, the Bad and the Ugly': 'the-good-the-bad-and-the-ugly',
+  'One Flew Over the Cuckoo’s Nest': 'one-flew-over-the-cuckoos-nest',
+  "One Flew Over the Cuckoo's Nest": 'one-flew-over-the-cuckoos-nest',
+  'City of God': 'city-of-god',
+  'Terminator 2: Judgment Day': 'terminator-2-judgment-day',
+  'Back to the Future': 'back-to-the-future',
+  'Spirited Away': 'spirited-away',
+  'The Departed': 'the-departed',
+  'The Prestige': 'the-prestige',
+  'Intouchables': 'the-intouchables',
+  'The Intouchables': 'the-intouchables',
+  'Harakiri': 'harakiri',
+  'Once Upon a Time in the West': 'once-upon-a-time-in-the-west',
+  'The Usual Suspects': 'the-usual-suspects'
+};
+
+// Notes locales conservées si Letterboxd bloque ou change son HTML.
+// Ce fallback ne doit jamais écraser les affiches, synopsis ou notes IMDb.
+const VERIFIED_LOCAL_RATINGS = {
+  'The Prestige': 4.3,
   'Intouchables': 4.2,
   'The Intouchables': 4.2
 };
 
 function safeRating(value) {
-  const rating = Number.parseFloat(value);
-  return Number.isFinite(rating) && rating >= 0.5 ? Math.round(rating * 10) / 10 : null;
+  const rating = Number.parseFloat(String(value).replace(',', '.'));
+  return Number.isFinite(rating) && rating >= 0.5 && rating <= 5 ? Math.round(rating * 10) / 10 : null;
 }
-
-const FALLBACK_FILMS = [
-  'The Shawshank Redemption','The Godfather','The Dark Knight','The Godfather Part II','12 Angry Men','The Lord of the Rings: The Return of the King','Schindler’s List','Pulp Fiction','Parasite','Interstellar','Whiplash','Fight Club','Inception','Goodfellas','Spirited Away','Seven Samurai','City of God','The Matrix','Seven','The Silence of the Lambs','Se7en','Back to the Future','The Green Mile','Saving Private Ryan','The Prestige','Gladiator','The Departed','Django Unchained','Alien','Blade Runner 2049'
-];
 
 function slugify(title) {
-  return String(title || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  return String(title || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/&/g, 'and')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
 }
 
-function normalizeSlug(slug) {
-  return String(slug || '').replace(/^\/film\//, '').replace(/\/$/, '');
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function extractFilmBlocksFromLocalData() {
+  if (!fs.existsSync(LOCAL_DATA_FILE)) return [];
+
+  const source = fs.readFileSync(LOCAL_DATA_FILE, 'utf-8');
+  const blocks = source.match(/\{[\s\S]*?titre:\s*"[^"]+"[\s\S]*?cinemas:\s*\[[^\]]*\][\s\S]*?\}/g) || [];
+
+  return blocks.map((block, index) => {
+    const titre = block.match(/titre:\s*"([^"]+)"/)?.[1];
+    const original = block.match(/original:\s*"([^"]+)"/)?.[1];
+    const lb = safeRating(block.match(/lb:\s*([0-9.]+)/)?.[1]);
+    const imdb = safeRating(block.match(/imdb:\s*([0-9.]+)/)?.[1]);
+    const imdbID = block.match(/imdbID:\s*"([^"]+)"/)?.[1];
+    const displayTitle = original || titre;
+    const slug = SLUG_OVERRIDES[displayTitle] || SLUG_OVERRIDES[titre] || slugify(displayTitle);
+
+    return {
+      rank: index + 1,
+      title: displayTitle,
+      titre,
+      original,
+      letterboxdSlug: slug,
+      letterboxdUrl: `${BASE_URL}/film/${slug}/`,
+      letterboxdRating: VERIFIED_LOCAL_RATINGS[displayTitle] ?? VERIFIED_LOCAL_RATINGS[titre] ?? lb,
+      imdb,
+      imdbID,
+      sourceType: 'local-preserved'
+    };
+  }).filter(film => film.title && film.letterboxdSlug);
 }
 
 function extractRating(html) {
   const patterns = [
     /"ratingValue"\s*:\s*"?([0-5](?:\.\d+)?)"?/i,
     /"averageRating"\s*:\s*"?([0-5](?:\.\d+)?)"?/i,
-    /averageRating[^0-9]+([0-5](?:\.\d+)?)/i
+    /aggregateRating[\s\S]{0,600}?ratingValue["'\s:]+([0-5](?:\.\d+)?)/i,
+    /averageRating["'\s:]+([0-5](?:\.\d+)?)/i,
+    /data-average-rating=["']([0-5](?:\.\d+)?)["']/i,
+    /class=["'][^"']*average-rating[^"']*["'][^>]*>\s*([0-5](?:\.\d+)?)/i
   ];
 
   for (const pattern of patterns) {
     const match = html.match(pattern);
-    if (match) {
-      const rating = Number.parseFloat(match[1]);
-      const clean = safeRating(rating);
-      if (clean !== null) return clean;
-    }
+    const rating = match ? safeRating(match[1]) : null;
+    if (rating !== null) return rating;
   }
+
   return null;
 }
 
 async function fetchFilmRating(film) {
-  if (!film.letterboxdUrl) return null;
-
   try {
     const response = await axios.get(film.letterboxdUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36',
-        'Accept-Language': 'en-US,en;q=0.9,fr-FR;q=0.8'
-      },
-      timeout: 15000
+      headers: REQUEST_HEADERS,
+      timeout: 15000,
+      validateStatus: status => status >= 200 && status < 400
     });
     return extractRating(response.data);
   } catch (error) {
-    console.log(`Note ignorée pour ${film.title} : ${error.message}`);
+    console.log(`Letterboxd indisponible pour ${film.title} : ${error.message}`);
     return null;
   }
 }
@@ -107,69 +141,38 @@ function savePayload(payload) {
   console.log(`${payload.count} films sauvegardés dans backend/data/letterboxd-films.json`);
 }
 
-function fallbackPayload(reason) {
-  return {
-    source: 'fallback-local',
-    reason,
-    scrapedAt: new Date().toISOString(),
-    count: FALLBACK_FILMS.length,
-    films: FALLBACK_FILMS.map((title, index) => ({
-      rank: index + 1,
-      title,
-      letterboxdSlug: slugify(title),
-      letterboxdUrl: `https://letterboxd.com/film/${slugify(title)}/`,
-      letterboxdRating: FALLBACK_RATINGS[title] ?? null,
-      sourceType: 'fallback-local-safe'
-    }))
-  };
-}
-
 async function scrapeLetterboxd() {
-  console.log('Scraping Letterboxd...');
-  console.log('URL :', SOURCE_URL);
+  console.log('Mise à jour des notes Letterboxd film par film...');
 
-  try {
-    const response = await axios.get(SOURCE_URL, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36',
-        'Accept-Language': 'fr-FR,fr;q=0.9,en;q=0.8'
-      },
-      timeout: 15000
-    });
-
-    const $ = cheerio.load(response.data);
-    const films = [];
-    $('.film-poster').each((_, el) => {
-      const poster = $(el);
-      const title = poster.attr('data-film-name') || poster.find('img').attr('alt');
-      const rawSlug = poster.attr('data-film-slug') || poster.attr('data-target-link') || slugify(title || '');
-      const slug = normalizeSlug(rawSlug);
-      if (title && slug && !films.some(f => f.letterboxdSlug === slug)) {
-        films.push({
-          rank: films.length + 1,
-          title,
-          letterboxdSlug: slug,
-          letterboxdUrl: `${BASE_URL}/film/${slug}/`,
-          letterboxdRating: FALLBACK_RATINGS[title] ?? null,
-          sourceType: 'letterboxd-html'
-        });
-      }
-    });
-
-    if (films.length === 0) {
-      savePayload(fallbackPayload('Letterboxd ne renvoie pas de films exploitables.'));
-      return;
-    }
-
-    for (const film of films.slice(0, 30)) {
-      film.letterboxdRating = await fetchFilmRating(film) ?? film.letterboxdRating ?? FALLBACK_RATINGS[film.title] ?? null;
-    }
-
-    savePayload({ source: SOURCE_URL, scrapedAt: new Date().toISOString(), count: films.length, films });
-  } catch (error) {
-    console.log(`Tentative échouée : ${error.message}`);
-    savePayload(fallbackPayload(error.message));
+  const films = extractFilmBlocksFromLocalData();
+  if (!films.length) {
+    console.log('Aucun film trouvé dans js/data.js : conservation du fichier existant.');
+    return;
   }
+
+  let liveCount = 0;
+  for (const film of films) {
+    const liveRating = await fetchFilmRating(film);
+    if (liveRating !== null) {
+      film.letterboxdRating = liveRating;
+      film.sourceType = 'letterboxd-film-page';
+      liveCount++;
+    } else {
+      film.sourceType = 'local-preserved';
+    }
+    await sleep(350);
+  }
+
+  savePayload({
+    source: liveCount > 0 ? 'letterboxd-film-pages-with-local-preserve' : 'local-preserved-no-live-rating',
+    scrapedAt: new Date().toISOString(),
+    count: films.length,
+    liveCount,
+    films
+  });
 }
 
-scrapeLetterboxd();
+scrapeLetterboxd().catch(error => {
+  console.error('Scraping Letterboxd échoué :', error.message);
+  process.exitCode = 0;
+});

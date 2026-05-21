@@ -260,7 +260,7 @@ const FILMS = [
     real: "Christopher Nolan", acteurs: "Christian Bale, Hugh Jackman, Scarlett Johansson",
     synopsis: "Deux magiciens rivaux se livrent une guerre d’illusions qui tourne à l’obsession destructrice.",
     color: 'p6', badge: null,
-    lb: 4.2, imdb: 8.5, sc: 8.2, annee: 2006, imdbID: "tt0482571", cinemas: []
+    lb: 4.3, imdb: 8.5, sc: 8.2, annee: 2006, imdbID: "tt0482571", cinemas: []
   },
   {
     id: 37, titre: "Les Intouchables", original: "Intouchables", genre: "Comédie", duree: "1h52",
