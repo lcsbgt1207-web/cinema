@@ -1,7 +1,7 @@
 {
   "source": "fallback-local",
   "reason": "Letterboxd ne renvoie pas de films exploitables.",
-  "scrapedAt": "2026-05-21T20:11:32.124Z",
+  "scrapedAt": "2026-05-21T20:15:06.060Z",
   "count": 30,
   "films": [
     {
