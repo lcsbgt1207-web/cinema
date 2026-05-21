@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css" />
   <style>
     .page-content { padding: 0 0 48px; }
+    #map-hidden { width:1px; height:1px; position:absolute; top:-9999px; }
 
     .films-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; padding: 24px 0; }
     @media (max-width: 1000px) { .films-grid { grid-template-columns: repeat(3, 1fr); } }
@@ -16,21 +17,17 @@
 
     .film-card { border: 0.5px solid var(--gray-200); border-radius: var(--radius-lg); overflow: hidden; cursor: pointer; transition: border-color 0.2s, transform 0.18s, box-shadow 0.18s; background: var(--white); opacity: 0; animation: fadeUp 0.4s ease forwards; }
     .film-card:hover { border-color: var(--gray-300); transform: translateY(-3px); box-shadow: var(--shadow-md); }
-
     .film-poster { width: 100%; aspect-ratio: 2/3; position: relative; overflow: hidden; background: var(--gray-100); }
     .film-poster img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.3s; }
     .film-card:hover .film-poster img { transform: scale(1.03); }
-    .film-poster-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: var(--gray-100); }
+    .film-poster-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
     .film-poster-placeholder i { font-size: 40px; color: var(--gray-300); }
     .film-poster-badge { position: absolute; top: 10px; left: 10px; }
-
-    .film-note-overlay { position: absolute; bottom: 8px; right: 8px; background: rgba(0,0,0,0.7); color: #fff; font-size: 11px; font-weight: 500; padding: 3px 7px; border-radius: 5px; display: flex; align-items: center; gap: 3px; }
-
+    .film-note-overlay { position: absolute; bottom: 8px; right: 8px; background: rgba(0,0,0,0.7); color: #fff; font-size: 11px; font-weight: 500; padding: 3px 7px; border-radius: 5px; }
     .film-card-info { padding: 13px 15px 15px; border-top: 0.5px solid var(--gray-200); }
     .film-card-title { font-size: 14px; font-weight: 500; color: var(--black); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .film-card-meta { font-size: 12px; color: var(--gray-500); display: flex; align-items: center; gap: 8px; }
+    .film-card-meta { font-size: 12px; color: var(--gray-500); }
 
-    /* Skeleton loading */
     .skeleton { background: linear-gradient(90deg, var(--gray-100) 25%, var(--gray-50) 50%, var(--gray-100) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: var(--radius-md); }
     @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
     .skeleton-card { border: 0.5px solid var(--gray-200); border-radius: var(--radius-lg); overflow: hidden; }
@@ -39,15 +36,15 @@
     .skeleton-title { height: 16px; margin-bottom: 8px; border-radius: 4px; }
     .skeleton-meta { height: 12px; width: 60%; border-radius: 4px; }
 
-    /* Tabs */
-    .tabs { display: flex; gap: 0; border: 0.5px solid var(--gray-200); border-radius: var(--radius-md); overflow: hidden; margin-top: 8px; }
+    .tabs { display: flex; border: 0.5px solid var(--gray-200); border-radius: var(--radius-md); overflow: hidden; margin-top: 10px; }
     .tab { font-size: 13px; padding: 8px 18px; cursor: pointer; border: none; background: none; color: var(--gray-500); border-right: 0.5px solid var(--gray-200); font-family: var(--font-main); transition: background var(--transition); }
     .tab:last-child { border-right: none; }
     .tab.active { background: var(--black); color: var(--white); }
-    .tab:hover:not(.active) { background: var(--gray-50); }
   </style>
 </head>
 <body>
+
+<div id="map-hidden"></div>
 
 <header class="site-header">
   <div class="container">
@@ -73,34 +70,23 @@
   <div class="page-header">
     <div>
       <div class="page-title">Nouveautés</div>
-      <div class="tabs" style="margin-top:10px;">
-        <button class="tab active" id="tab-now" onclick="switchTab('now')">À l'affiche</button>
-        <button class="tab" id="tab-soon" onclick="switchTab('soon')">Prochainement</button>
+      <div class="tabs">
+        <button class="tab active" id="tab-now"  onclick="switchTab('now')">À l'affiche</button>
+        <button class="tab"        id="tab-soon" onclick="switchTab('soon')">Prochainement</button>
       </div>
     </div>
     <div class="page-count" id="films-count"></div>
   </div>
-
-  <div class="films-grid" id="films-grid">
-    <!-- Skeletons pendant le chargement -->
-    ${Array(8).fill(`
-      <div class="skeleton-card">
-        <div class="skeleton skeleton-poster"></div>
-        <div class="skeleton-info">
-          <div class="skeleton skeleton-title"></div>
-          <div class="skeleton skeleton-meta"></div>
-        </div>
-      </div>
-    `).join('')}
-  </div>
+  <div class="films-grid" id="films-grid"></div>
+  <div id="films-pager"></div>
 </main>
 
-<!-- OVERLAY POPUP FILM -->
+<!-- ── POPUP FILM ── -->
 <div class="overlay" id="film-overlay" onclick="closeOnBg(event)">
   <div class="popup" id="film-popup"></div>
 </div>
 
-<!-- OVERLAY RÉSERVATION -->
+<!-- ── POPUP RÉSERVATION ── -->
 <div class="overlay" id="resa-overlay">
   <div class="popup" style="max-width:420px;">
     <div style="padding:20px 22px 16px;border-bottom:0.5px solid var(--gray-200);">
@@ -119,7 +105,7 @@
   </div>
 </div>
 
-<!-- OVERLAY RETOUR -->
+<!-- ── POPUP RETOUR ── -->
 <div class="overlay" id="retour-overlay">
   <div class="popup" style="max-width:420px;">
     <div style="padding:24px 22px 16px;text-align:center;border-bottom:0.5px solid var(--gray-200);">
@@ -145,15 +131,33 @@
 
 <script src="js/config.js"></script>
 <script src="js/tmdb.js"></script>
+<script src="js/places.js"></script>
+<script src="js/pagination.js"></script>
 <script>
   let currentTab = 'now';
-  let allFilms = [];
   let pendingReservation = null;
+  let nearbyCinemas = [];
+  let mapsReady = false;
 
-  async function loadFilms(tab) {
-    const grid = document.getElementById('films-grid');
-    // Skeletons
-    grid.innerHTML = Array(8).fill(`
+  // ── Callback Google Maps ──
+  function initGoogleMaps() {
+    mapsReady = true;
+    PLACES.init();
+    // Tenter géoloc silencieuse
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          PLACES.userLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          PLACES.findNearbycinemas(PLACES.userLocation).then(c => { nearbyCinemas = c; }).catch(()=>{});
+        },
+        () => {}
+      );
+    }
+  }
+
+  // ── Skeletons ──
+  function showSkeletons() {
+    document.getElementById('films-grid').innerHTML = Array(8).fill(`
       <div class="skeleton-card">
         <div class="skeleton skeleton-poster"></div>
         <div class="skeleton-info">
@@ -161,46 +165,54 @@
           <div class="skeleton skeleton-meta"></div>
         </div>
       </div>`).join('');
+  }
 
+  // ── Charger films ──
+  function renderFilmCard(f, i, tab) {
+    const poster = TMDB.posterUrl(f.poster_path);
+    const genre  = TMDB.getGenres(f.genre_ids);
+    const note   = f.vote_average ? (f.vote_average / 2).toFixed(1) : null;
+    const badge  = tab === 'now' ? 'À l\'affiche' : 'Bientôt';
+    const bClass = tab === 'now' ? 'badge-new' : 'badge-soon';
+    return `
+      <div class="film-card" onclick="openFilmPopup(${f.id},'${f.title.replace(/'/g,"\\'")}')" style="animation-delay:${i*0.05}s">
+        <div class="film-poster">
+          ${poster ? `<img src="${poster}" alt="${f.title}" loading="lazy" />` : `<div class="film-poster-placeholder"><i class="ti ti-photo"></i></div>`}
+          <span class="film-poster-badge badge ${bClass}">${badge}</span>
+          ${note ? `<div class="film-note-overlay">★ ${note}</div>` : ''}
+        </div>
+        <div class="film-card-info">
+          <div class="film-card-title">${f.title}</div>
+          <div class="film-card-meta">${genre}</div>
+        </div>
+      </div>`;
+  }
+
+  async function loadFilms(tab) {
+    showSkeletons();
     try {
-      const films = tab === 'now'
-        ? await TMDB.getNowPlaying()
-        : await TMDB.getUpcoming();
-
-      allFilms = films;
+      // Charger 2 pages TMDB pour avoir plus de films
+      const [page1, page2] = await Promise.all([
+        tab === 'now' ? TMDB.getNowPlaying(1) : TMDB.getUpcoming(1),
+        tab === 'now' ? TMDB.getNowPlaying(2) : TMDB.getUpcoming(2)
+      ]);
+      const films = [...page1, ...page2];
       document.getElementById('films-count').textContent = films.length + ' films';
 
-      grid.innerHTML = films.map((f, i) => {
-        const poster = TMDB.posterUrl(f.poster_path);
-        const genre = TMDB.getGenres(f.genre_ids);
-        const note = f.vote_average ? (f.vote_average / 2).toFixed(1) : null;
-        const badge = tab === 'now' ? 'À l\'affiche' : 'Bientôt';
-        const badgeClass = tab === 'now' ? 'badge-new' : 'badge-soon';
-
-        return `
-          <div class="film-card" onclick="openFilmPopup(${f.id})" style="animation-delay:${i * 0.05}s">
-            <div class="film-poster">
-              ${poster
-                ? `<img src="${poster}" alt="${f.title}" loading="lazy" />`
-                : `<div class="film-poster-placeholder"><i class="ti ti-photo"></i></div>`
-              }
-              <span class="film-poster-badge badge ${badgeClass}">${badge}</span>
-              ${note ? `<div class="film-note-overlay">★ ${note}</div>` : ''}
-            </div>
-            <div class="film-card-info">
-              <div class="film-card-title">${f.title}</div>
-              <div class="film-card-meta">
-                <span>${genre}</span>
-              </div>
-            </div>
-          </div>`;
-      }).join('');
+      PAGINATION.create({
+        items: films,
+        perPage: 12,
+        containerId: 'films-grid',
+        scrollTo: 'films-grid',
+        renderFn: (pageFilms, pagerHtml) => {
+          document.getElementById('films-grid').innerHTML =
+            pageFilms.map((f, i) => renderFilmCard(f, i, tab)).join('');
+          document.getElementById('films-pager').innerHTML = pagerHtml;
+        }
+      });
 
     } catch(e) {
-      grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--gray-400);">
-        <i class="ti ti-alert-circle" style="font-size:32px;display:block;margin-bottom:10px;"></i>
-        Impossible de charger les films. Vérifiez votre connexion.
-      </div>`;
+      document.getElementById('films-grid').innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--gray-400);"><i class="ti ti-alert-circle" style="font-size:32px;display:block;margin-bottom:10px;"></i>Impossible de charger les films.</div>`;
     }
   }
 
@@ -211,49 +223,74 @@
     loadFilms(tab);
   }
 
-  // Popup film avec vraies données TMDB
-  async function openFilmPopup(tmdbId) {
+  // ── Popup film avec cinémas dépliables ──
+  async function openFilmPopup(tmdbId, titre) {
     const overlay = document.getElementById('film-overlay');
     const popup   = document.getElementById('film-popup');
-
-    // Afficher un loading
-    popup.innerHTML = `<div style="padding:60px;text-align:center;color:var(--gray-400);">
-      <i class="ti ti-loader" style="font-size:28px;display:block;margin-bottom:10px;"></i>
-      Chargement…
-    </div>`;
+    popup.innerHTML = `<div style="padding:60px;text-align:center;color:var(--gray-400);"><i class="ti ti-loader" style="font-size:28px;display:block;margin-bottom:10px;"></i>Chargement…</div>`;
     overlay.classList.add('open');
     document.body.style.overflow = 'hidden';
 
     try {
-      const film = await TMDB.getMovie(tmdbId);
-      const poster = TMDB.posterUrl(film.poster_path, 'w342');
+      const film     = await TMDB.getMovie(tmdbId);
+      const poster   = TMDB.posterUrl(film.poster_path, 'w342');
       const director = film.credits?.crew?.find(c => c.job === 'Director');
-      const actors = film.credits?.cast?.slice(0, 3).map(a => a.name).join(', ') || '—';
-      const duree = TMDB.formatDuration(film.runtime);
-      const note = film.vote_average ? (film.vote_average / 2).toFixed(1) : '—';
-      const genres = film.genres?.map(g => g.name).join(', ') || '';
+      const actors   = film.credits?.cast?.slice(0,3).map(a=>a.name).join(', ') || '—';
+      const duree    = TMDB.formatDuration(film.runtime);
+      const note     = film.vote_average ? (film.vote_average/2).toFixed(1) : '—';
+      const genres   = film.genres?.map(g=>g.name).join(', ') || '';
 
-      // Séances factices (seront remplacées par vraies données cinémas)
-      const seances = {
-        "Aujourd'hui": ['14h00', '16h30', '19h15', '21h45'],
-        'Demain':      ['13h30', '16h00', '18h45', '21h30']
+      // Séances générées (AlloCiné pour les vraies)
+      const SEANCES = {
+        "Aujourd'hui": ['13h30','16h00','18h45','21h15'],
+        'Demain':      ['14h00','16h30','19h00','21h30']
       };
+
+      // Cinémas proches — vrais si dispo, exemples sinon
+      const cinemas = nearbyCinemas.length > 0 ? nearbyCinemas.slice(0,4) : [
+        { id:'ex1', nom:'Cinéma local', adresse:'Activez votre position pour voir les vrais cinémas', dist:0, location:{lat:0,lng:0} }
+      ];
+
+      const cinemasHtml = cinemas.map((c, ci) => {
+        const mapsUrl = nearbyCinemas.length > 0 ? PLACES.getMapsUrl(c) : '#';
+        const seancesHtml = Object.entries(SEANCES).map(([jour, horaires]) => `
+          <div class="seances-day">
+            <div class="day-label">${jour}</div>
+            <div class="horaires">
+              ${horaires.map(h => `<button class="horaire-btn" onclick="openReservation('${film.title.replace(/'/g,"\\'")}','${c.nom.replace(/'/g,"\\'")}','${h}')">${h}</button>`).join('')}
+            </div>
+          </div>`).join('');
+
+        return `
+          <div class="cinema-block" id="cb-${ci}">
+            <div class="cinema-block-header" onclick="document.getElementById('cb-${ci}').classList.toggle('open')">
+              <div class="cinema-block-left">
+                <i class="ti ti-building"></i>
+                <div>
+                  <div class="cinema-block-name">${c.nom}</div>
+                  <div class="cinema-block-dist">${nearbyCinemas.length > 0 ? PLACES.formatDist(c.dist) : c.adresse}</div>
+                </div>
+              </div>
+              <div class="cinema-block-right">
+                ${nearbyCinemas.length > 0 ? `<button class="btn-itineraire" onclick="event.stopPropagation();window.open('${mapsUrl}','_blank')"><i class="ti ti-navigation"></i> Y aller</button>` : ''}
+                <i class="ti ti-chevron-down chevron"></i>
+              </div>
+            </div>
+            <div class="seances-panel">${seancesHtml}</div>
+          </div>`;
+      }).join('');
 
       popup.innerHTML = `
         <div class="popup-top">
-          <div class="popup-poster" style="${poster ? '' : 'background:var(--gray-200);'}">
-            ${poster
-              ? `<img src="${poster}" alt="${film.title}" style="width:100%;height:100%;object-fit:cover;" />`
-              : `<i class="ti ti-photo"></i>`
-            }
+          <div class="popup-poster" style="${poster ? 'padding:0;overflow:hidden;' : 'background:var(--gray-200);'}">
+            ${poster ? `<img src="${poster}" alt="${film.title}" style="width:100%;height:100%;object-fit:cover;" />` : `<i class="ti ti-photo"></i>`}
           </div>
           <div class="popup-header">
             <span class="popup-badge">À l'affiche</span>
             <div class="popup-title">${film.title}</div>
-            ${film.original_title && film.original_title !== film.title
-              ? `<div style="font-size:12px;color:var(--gray-400);margin-bottom:6px;">${film.original_title}</div>` : ''}
+            ${film.original_title && film.original_title !== film.title ? `<div style="font-size:12px;color:var(--gray-400);margin-bottom:6px;">${film.original_title}</div>` : ''}
             <div class="popup-tags">
-              ${genres.split(', ').slice(0,2).map(g => `<span class="popup-tag">${g}</span>`).join('')}
+              ${genres.split(', ').slice(0,2).map(g=>`<span class="popup-tag">${g}</span>`).join('')}
               ${duree ? `<span class="popup-tag">${duree}</span>` : ''}
               <span class="popup-tag">★ ${note}/5</span>
             </div>
@@ -268,81 +305,65 @@
           <div class="popup-synopsis">${film.overview || 'Synopsis non disponible.'}</div>
         </div>
         <div class="popup-cinemas">
-          <div class="popup-cinemas-label">Séances — Cinémas proches</div>
-          <div style="padding:10px 18px 14px;font-size:13px;color:var(--gray-500);">
-            <i class="ti ti-info-circle" style="vertical-align:-2px;margin-right:5px;"></i>
-            Activez votre position sur la <a href="index.html" style="color:var(--black);font-weight:500;">page d'accueil</a> pour voir les cinémas proches et leurs séances.
-          </div>
-          <div style="padding:0 18px 14px;">
-            <div class="section-label">Réserver sur AlloCiné</div>
-            <a href="https://www.allocine.fr/recherche/?q=${encodeURIComponent(film.title)}" target="_blank"
-               style="display:inline-flex;align-items:center;gap:6px;background:var(--black);color:#fff;padding:9px 16px;border-radius:var(--radius-md);font-size:13px;font-weight:500;text-decoration:none;margin-top:6px;">
-              <i class="ti ti-external-link"></i> Voir les séances sur AlloCiné
-            </a>
-          </div>
+          <div class="popup-cinemas-label">Cinémas les plus proches</div>
+          ${!nearbyCinemas.length ? `<div style="padding:10px 18px 6px;font-size:12px;color:var(--gray-500);display:flex;align-items:center;gap:6px;"><i class="ti ti-info-circle"></i> Activez votre position sur la <a href="index.html" style="color:var(--black);font-weight:500;margin:0 3px;">page d'accueil</a> pour voir les vrais cinémas proches.</div>` : ''}
+          ${cinemasHtml}
         </div>
-        <button class="popup-close-btn" onclick="closeFilmPopup()">Fermer</button>
-      `;
+        <button class="popup-close-btn" onclick="closeFilmPopup()">Fermer</button>`;
 
     } catch(e) {
-      popup.innerHTML = `<div style="padding:40px;text-align:center;color:var(--gray-400);">
-        Impossible de charger ce film.
-        <button class="popup-close-btn" onclick="closeFilmPopup()" style="display:block;margin:16px auto 0;">Fermer</button>
-      </div>`;
+      popup.innerHTML = `<div style="padding:40px;text-align:center;color:var(--gray-400);">Impossible de charger ce film.<button class="popup-close-btn" onclick="closeFilmPopup()" style="display:block;margin:16px auto 0;">Fermer</button></div>`;
     }
   }
 
-  function closeFilmPopup() {
+  function closeFilmPopup() { document.getElementById('film-overlay').classList.remove('open'); document.body.style.overflow=''; }
+  function closeOnBg(e) { if(e.target===document.getElementById('film-overlay')) closeFilmPopup(); }
+
+  function openReservation(film, cinema, heure) {
+    pendingReservation = { film, cinema, heure };
+    document.getElementById('resa-film').textContent   = film;
+    document.getElementById('resa-cinema').textContent = cinema;
+    document.getElementById('resa-heure').textContent  = heure;
+    document.getElementById('resa-date').textContent   = new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
     document.getElementById('film-overlay').classList.remove('open');
-    document.body.style.overflow = '';
+    document.getElementById('resa-overlay').classList.add('open');
   }
 
-  function closeOnBg(e) {
-    if (e.target === document.getElementById('film-overlay')) closeFilmPopup();
-  }
-
-  function closeResaOverlay() {
-    document.getElementById('resa-overlay').classList.remove('open');
-    document.body.style.overflow = '';
-  }
-
-  function closeRetourOverlay() {
-    document.getElementById('retour-overlay').classList.remove('open');
-    document.body.style.overflow = '';
-    pendingReservation = null;
-  }
+  function closeResaOverlay() { document.getElementById('resa-overlay').classList.remove('open'); document.body.style.overflow=''; }
 
   function confirmReservation() {
-    if (!pendingReservation) return;
-    const q = encodeURIComponent(pendingReservation.film);
-    window.open('https://www.allocine.fr/recherche/?q=' + q, '_blank');
+    if(!pendingReservation) return;
+    window.open('https://www.allocine.fr/recherche/?q='+encodeURIComponent(pendingReservation.film),'_blank');
     closeResaOverlay();
-    setTimeout(() => showRetourPopup(), 800);
+    setTimeout(()=>{
+      document.getElementById('retour-film').textContent   = pendingReservation.film;
+      document.getElementById('retour-cinema').textContent = pendingReservation.cinema;
+      document.getElementById('retour-heure').textContent  = pendingReservation.heure;
+      document.getElementById('retour-overlay').classList.add('open');
+      document.body.style.overflow = 'hidden';
+    }, 800);
   }
 
-  function showRetourPopup() {
-    if (!pendingReservation) return;
-    document.getElementById('retour-film').textContent    = pendingReservation.film;
-    document.getElementById('retour-cinema').textContent  = pendingReservation.cinema || '';
-    document.getElementById('retour-heure').textContent   = pendingReservation.heure || '';
-    document.getElementById('retour-overlay').classList.add('open');
-    document.body.style.overflow = 'hidden';
-  }
+  function closeRetourOverlay() { document.getElementById('retour-overlay').classList.remove('open'); document.body.style.overflow=''; pendingReservation=null; }
 
   function addToAgenda() {
     const btn = document.getElementById('btn-add-agenda');
-    btn.innerHTML = '<i class="ti ti-check"></i> Ajouté à votre agenda !';
-    btn.style.cssText = 'background:var(--green-bg);color:var(--green);border:0.5px solid #c8e6c9;width:100%;justify-content:center;';
-    btn.onclick = null;
-    if (pendingReservation) {
-      const billets = JSON.parse(localStorage.getItem('cinepro_billets') || '[]');
-      billets.unshift({ ...pendingReservation, date: new Date().toLocaleDateString('fr-FR') });
-      localStorage.setItem('cinepro_billets', JSON.stringify(billets));
+    btn.innerHTML='<i class="ti ti-check"></i> Ajouté à votre agenda !';
+    btn.style.cssText='background:var(--green-bg);color:var(--green);border:0.5px solid #c8e6c9;width:100%;justify-content:center;';
+    btn.onclick=null;
+    if(pendingReservation){
+      const billets=JSON.parse(localStorage.getItem('cinepro_billets')||'[]');
+      billets.unshift({...pendingReservation,date:new Date().toLocaleDateString('fr-FR')});
+      localStorage.setItem('cinepro_billets',JSON.stringify(billets));
     }
   }
 
   // Init
   loadFilms('now');
+</script>
+
+<script async defer
+  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAx4ILK4VPFvYxaZX-HwpUPMEOpkQLJEmE&libraries=places&language=fr&callback=initGoogleMaps">
 </script>
 </body>
 </html>

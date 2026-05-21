@@ -11,123 +11,285 @@ const POSTER_COLORS = {
 // ── Films ──
 const FILMS = [
   {
-    id: 0, titre: 'Le Dernier Voyage', original: '', genre: 'Drame', duree: '1h58',
-    real: 'Claire Moreau', acteurs: 'Léa Seydoux, Vincent Lindon',
-    synopsis: "Un homme retrouve les carnets de voyage de son père disparu et décide de refaire son itinéraire à travers l'Europe pour comprendre qui il était vraiment.",
-    color: 'p1', badge: 'Nouveau',
-    lb: 4.2, imdb: 7.8, sc: 7.4,
-    cinemas: [
-      { nom: 'Cinéma du Panthéon', dist: '0,2 km', seances: { "Aujourd'hui": ['14h00','17h15','20h30'], 'Demain': ['15h00','20h00'] } },
-      { nom: 'MK2 Odéon', dist: '0,8 km', seances: { "Aujourd'hui": ['15h30','21h00'], 'Demain': ['14h00','19h30'] } },
-      { nom: 'Le Champo', dist: '1,1 km', seances: { "Aujourd'hui": ['16h00','20h15'], 'Demain': ['15h30'] } }
-    ]
-  },
-  {
-    id: 1, titre: 'Fracture', original: '', genre: 'Thriller', duree: '2h10',
-    real: 'David Szabo', acteurs: 'Tahar Rahim, Adèle Exarchopoulos',
-    synopsis: "Une procureure découvre que l'affaire qu'elle instruit depuis des mois pourrait impliquer des membres de sa propre famille.",
-    color: 'p2', badge: 'Nouveau',
-    lb: 4.1, imdb: 7.6, sc: 7.2,
-    cinemas: [
-      { nom: 'Pathé Wepler', dist: '1,2 km', seances: { "Aujourd'hui": ['15h30','19h00','21h45'], 'Demain': ['14h30','18h45'] } },
-      { nom: 'UGC Odéon', dist: '1,7 km', seances: { "Aujourd'hui": ['17h00','20h15'], 'Demain': ['16h00','20h30'] } },
-      { nom: 'Le Grand Rex', dist: '2,5 km', seances: { 'Demain': ['14h00','19h30','22h00'] } }
-    ]
-  },
-  {
-    id: 2, titre: "Lumière d'Août", original: '', genre: 'Romance', duree: '1h45',
-    real: 'Sofia Andreani', acteurs: 'Timothée Chalamet, Zendaya',
-    synopsis: "Deux artistes se croisent dans un village du sud de la France durant l'été. Entre eux naît une relation aussi intense qu'éphémère.",
-    color: 'p3', badge: 'Nouveau',
-    lb: 4.3, imdb: 8.0, sc: 7.8,
-    cinemas: [
-      { nom: 'Cinéma du Panthéon', dist: '0,2 km', seances: { "Aujourd'hui": ['14h45','18h00'], 'Demain': ['15h30','19h00'] } },
-      { nom: 'Le Champo', dist: '1,1 km', seances: { "Aujourd'hui": ['15h45','20h00'], 'Demain': ['14h30','18h30'] } }
-    ]
-  },
-  {
-    id: 3, titre: 'Nova', original: '', genre: 'Science-fiction', duree: '2h22',
-    real: 'James Okafor', acteurs: 'Oscar Isaac, Lupita Nyong\'o',
-    synopsis: "En 2087, une astronome reçoit un signal qui ne peut venir que d'une civilisation disparue il y a 10 000 ans. Sa découverte va bouleverser l'histoire de l'humanité.",
-    color: 'p4', badge: 'Bientôt',
-    lb: 4.4, imdb: 8.2, sc: 8.0,
-    cinemas: [
-      { nom: 'UGC Ciné Cité Bercy', dist: '1,5 km', seances: { "Aujourd'hui": ['14h00','17h30','21h15'], 'Demain': ['13h45','17h00','20h30'] } },
-      { nom: 'Pathé La Villette', dist: '3,2 km', seances: { "Aujourd'hui": ['15h15','19h45'], 'Demain': ['14h30','20h00'] } }
-    ]
-  },
-  {
-    id: 4, titre: 'Les Invisibles', original: '', genre: 'Comédie', duree: '1h35',
-    real: 'Éric Toledano', acteurs: 'Omar Sy, Pio Marmaï',
-    synopsis: "Deux frères que tout oppose héritent d'une boulangerie familiale en faillite. Pour la sauver, ils vont devoir apprendre à travailler ensemble malgré eux.",
-    color: 'p5', badge: 'Nouveau',
-    lb: 3.9, imdb: 7.3, sc: 7.0,
-    cinemas: [
-      { nom: 'Gaumont Opéra', dist: '0,9 km', seances: { "Aujourd'hui": ['13h00','15h00','17h00','19h00','21h00'], 'Demain': ['13h30','15h30','17h30','19h30'] } },
-      { nom: 'UGC Normandie', dist: '1,6 km', seances: { "Aujourd'hui": ['14h30','17h00','20h15'], 'Demain': ['14h00','16h30','20h00'] } }
-    ]
-  },
-  {
-    id: 5, titre: 'Le Bruit du Monde', original: '', genre: 'Documentaire', duree: '1h50',
-    real: 'Marie-Hélène Dupont', acteurs: '—',
-    synopsis: "Un voyage sonore et visuel à travers cinq continents, à la rencontre de communautés qui résistent au silence imposé par la modernité.",
-    color: 'p6', badge: 'Bientôt',
-    lb: 4.0, imdb: 7.5, sc: 7.6,
-    cinemas: [
-      { nom: 'Forum des Images', dist: '1,1 km', seances: { "Aujourd'hui": ['14h00','17h30','20h00'], 'Demain': ['15h00','19h00'] } },
-      { nom: 'Le Louxor', dist: '2,8 km', seances: { "Aujourd'hui": ['15h30','19h00'], 'Demain': ['14h30','18h30'] } }
-    ]
-  },
-  // Films catalogue supplémentaires
-  {
-    id: 6, titre: 'Le Parrain', original: 'The Godfather', genre: 'Drame', duree: '2h55',
-    real: 'Francis Ford Coppola', acteurs: 'Marlon Brando, Al Pacino',
-    synopsis: "La saga de la famille Corleone, l'une des plus puissantes familles de la mafia américaine.",
+    id: 1, titre: "Les Évadés", original: "The Shawshank Redemption", genre: "Drame", duree: "2h22",
+    real: "Frank Darabont", acteurs: "Tim Robbins, Morgan Freeman",
+    synopsis: "Deux hommes emprisonnés tissent une amitié profonde et trouvent chacun une manière de survivre derrière les murs de Shawshank.",
     color: 'p1', badge: null,
-    lb: 4.6, imdb: 9.2, sc: 8.4, annee: 1972, cinemas: []
+    lb: 4.7, imdb: 9.3, sc: 9.3, annee: 1994, imdbID: "tt0111161", cinemas: []
   },
   {
-    id: 7, titre: '12 hommes en colère', original: '12 Angry Men', genre: 'Drame', duree: '1h36',
-    real: 'Sidney Lumet', acteurs: 'Henry Fonda, Lee J. Cobb',
-    synopsis: "Douze jurés doivent décider du sort d'un jeune accusé de meurtre. Un seul d'entre eux émet un doute.",
+    id: 2, titre: "Le Parrain", original: "The Godfather", genre: "Drame", duree: "2h55",
+    real: "Francis Ford Coppola", acteurs: "Marlon Brando, Al Pacino, James Caan",
+    synopsis: "Le patriarche vieillissant d’une dynastie criminelle new-yorkaise transmet peu à peu son empire clandestin à son fils réticent.",
     color: 'p2', badge: null,
-    lb: 4.6, imdb: 9.0, sc: 8.7, annee: 1957, cinemas: []
+    lb: 4.6, imdb: 9.2, sc: 8.4, annee: 1972, imdbID: "tt0068646", cinemas: []
   },
   {
-    id: 8, titre: 'Interstellar', original: '', genre: 'Science-fiction', duree: '2h49',
-    real: 'Christopher Nolan', acteurs: 'Matthew McConaughey, Anne Hathaway',
-    synopsis: "Des explorateurs utilisent un trou de ver pour dépasser les limites des voyages spatiaux interstellaires.",
+    id: 3, titre: "The Dark Knight : Le Chevalier noir", original: "The Dark Knight", genre: "Action", duree: "2h32",
+    real: "Christopher Nolan", acteurs: "Christian Bale, Heath Ledger, Aaron Eckhart",
+    synopsis: "Batman affronte le Joker, un criminel imprévisible qui plonge Gotham dans le chaos.",
     color: 'p3', badge: null,
-    lb: 4.4, imdb: 8.7, sc: 7.9, annee: 2014, cinemas: []
+    lb: 4.5, imdb: 9.0, sc: 9.0, annee: 2008, imdbID: "tt0468569", cinemas: []
   },
   {
-    id: 9, titre: 'Parasite', original: 'Gisaengchung', genre: 'Thriller', duree: '2h12',
-    real: 'Bong Joon-ho', acteurs: 'Song Kang-ho, Lee Sun-kyun',
-    synopsis: "Toute la famille Ki-taek est au chômage et s'intéresse fortement à la richesse de la famille Park.",
+    id: 4, titre: "Le Parrain, 2e partie", original: "The Godfather Part II", genre: "Drame", duree: "3h22",
+    real: "Francis Ford Coppola", acteurs: "Al Pacino, Robert De Niro, Robert Duvall",
+    synopsis: "La jeunesse de Vito Corleone et l’ascension tourmentée de Michael à la tête de la famille se répondent à travers deux époques.",
     color: 'p4', badge: null,
-    lb: 4.4, imdb: 8.5, sc: 8.0, annee: 2019, cinemas: []
+    lb: 4.6, imdb: 9.0, sc: 8.9, annee: 1974, imdbID: "tt0071562", cinemas: []
   },
   {
-    id: 10, titre: 'Fenêtre sur cour', original: 'Rear Window', genre: 'Thriller', duree: '1h52',
-    real: 'Alfred Hitchcock', acteurs: 'James Stewart, Grace Kelly',
-    synopsis: "Un photographe immobilisé par une jambe cassée observe ses voisins et croit avoir été témoin d'un meurtre.",
+    id: 5, titre: "12 hommes en colère", original: "12 Angry Men", genre: "Drame", duree: "1h36",
+    real: "Sidney Lumet", acteurs: "Henry Fonda, Lee J. Cobb",
+    synopsis: "Dans une salle de délibération, douze jurés débattent du destin d’un jeune homme accusé de meurtre.",
     color: 'p5', badge: null,
-    lb: 4.4, imdb: 8.4, sc: 8.1, annee: 1954, cinemas: []
+    lb: 4.6, imdb: 9.0, sc: 8.7, annee: 1957, imdbID: "tt0050083", cinemas: []
   },
   {
-    id: 11, titre: 'Mommy', original: '', genre: 'Drame', duree: '2h19',
-    real: 'Xavier Dolan', acteurs: 'Anne Dorval, Antoine-Olivier Pilon',
-    synopsis: "Une veuve se retrouve seule pour gérer son fils turbulent. Une voisine mystérieuse va changer leur vie.",
+    id: 6, titre: "Le Seigneur des anneaux : Le Retour du roi", original: "The Lord of the Rings: The Return of the King", genre: "Aventure", duree: "3h21",
+    real: "Peter Jackson", acteurs: "Elijah Wood, Viggo Mortensen, Ian McKellen",
+    synopsis: "Tandis que la bataille finale approche, Frodon poursuit sa marche vers le Mordor pour détruire l’Anneau.",
     color: 'p6', badge: null,
-    lb: 4.3, imdb: 8.0, sc: 7.9, annee: 2014, cinemas: []
+    lb: 4.4, imdb: 9.0, sc: 8.9, annee: 2003, imdbID: "tt0167260", cinemas: []
   },
   {
-    id: 12, titre: 'Portrait de la jeune fille en feu', original: '', genre: 'Romance', duree: '2h01',
-    real: 'Céline Sciamma', acteurs: 'Noémie Merlant, Adèle Haenel',
-    synopsis: "En Bretagne, à la fin du XVIIIe siècle, une peintre est chargée de réaliser le portrait nuptial d'une jeune femme.",
+    id: 7, titre: "La Liste de Schindler", original: "Schindler's List", genre: "Drame", duree: "3h15",
+    real: "Steven Spielberg", acteurs: "Liam Neeson, Ben Kingsley, Ralph Fiennes",
+    synopsis: "Oskar Schindler, industriel allemand, sauve plus d’un millier de Juifs pendant la Seconde Guerre mondiale.",
     color: 'p1', badge: null,
-    lb: 4.3, imdb: 8.1, sc: 7.6, annee: 2019, cinemas: []
-  }
+    lb: 4.5, imdb: 9.0, sc: 8.8, annee: 1993, imdbID: "tt0108052", cinemas: []
+  },
+  {
+    id: 8, titre: "Le Seigneur des anneaux : La Communauté de l’anneau", original: "The Lord of the Rings: The Fellowship of the Ring", genre: "Aventure", duree: "2h58",
+    real: "Peter Jackson", acteurs: "Elijah Wood, Ian McKellen, Viggo Mortensen",
+    synopsis: "Un jeune Hobbit quitte la Comté pour entreprendre une quête qui décidera du sort de la Terre du Milieu.",
+    color: 'p2', badge: null,
+    lb: 4.4, imdb: 8.9, sc: 8.7, annee: 2001, imdbID: "tt0120737", cinemas: []
+  },
+  {
+    id: 9, titre: "Pulp Fiction", original: "Pulp Fiction", genre: "Policier", duree: "2h34",
+    real: "Quentin Tarantino", acteurs: "John Travolta, Uma Thurman, Samuel L. Jackson",
+    synopsis: "À Los Angeles, des criminels, un boxeur et plusieurs destins se croisent dans un récit éclaté et nerveux.",
+    color: 'p3', badge: null,
+    lb: 4.4, imdb: 8.9, sc: 8.8, annee: 1994, imdbID: "tt0110912", cinemas: []
+  },
+  {
+    id: 10, titre: "Le Bon, la Brute et le Truand", original: "The Good, the Bad and the Ugly", genre: "Western", duree: "2h58",
+    real: "Sergio Leone", acteurs: "Clint Eastwood, Eli Wallach, Lee Van Cleef",
+    synopsis: "Trois hommes sans foi ni loi cherchent un trésor caché pendant la guerre de Sécession.",
+    color: 'p4', badge: null,
+    lb: 4.5, imdb: 8.8, sc: 8.7, annee: 1966, imdbID: "tt0060196", cinemas: []
+  },
+  {
+    id: 11, titre: "Forrest Gump", original: "Forrest Gump", genre: "Drame", duree: "2h22",
+    real: "Robert Zemeckis", acteurs: "Tom Hanks, Robin Wright, Gary Sinise",
+    synopsis: "Un homme au cœur simple traverse plusieurs décennies d’histoire américaine sans jamais perdre son innocence.",
+    color: 'p5', badge: null,
+    lb: 4.3, imdb: 8.8, sc: 8.8, annee: 1994, imdbID: "tt0109830", cinemas: []
+  },
+  {
+    id: 12, titre: "Le Seigneur des anneaux : Les Deux Tours", original: "The Lord of the Rings: The Two Towers", genre: "Aventure", duree: "2h59",
+    real: "Peter Jackson", acteurs: "Elijah Wood, Viggo Mortensen, Ian McKellen",
+    synopsis: "La Communauté est divisée, mais la lutte contre les forces de Sauron continue sur plusieurs fronts.",
+    color: 'p6', badge: null,
+    lb: 4.4, imdb: 8.8, sc: 8.6, annee: 2002, imdbID: "tt0167261", cinemas: []
+  },
+  {
+    id: 13, titre: "Fight Club", original: "Fight Club", genre: "Drame", duree: "2h19",
+    real: "David Fincher", acteurs: "Brad Pitt, Edward Norton, Helena Bonham Carter",
+    synopsis: "Un employé insomniaque rencontre un homme charismatique avec qui il fonde un club de combat clandestin.",
+    color: 'p1', badge: null,
+    lb: 4.4, imdb: 8.8, sc: 8.6, annee: 1999, imdbID: "tt0137523", cinemas: []
+  },
+  {
+    id: 14, titre: "Inception", original: "Inception", genre: "Science-fiction", duree: "2h28",
+    real: "Christopher Nolan", acteurs: "Leonardo DiCaprio, Joseph Gordon-Levitt, Elliot Page",
+    synopsis: "Un voleur capable d’infiltrer les rêves accepte une mission impossible : implanter une idée dans l’esprit d’un homme.",
+    color: 'p2', badge: null,
+    lb: 4.3, imdb: 8.8, sc: 8.6, annee: 2010, imdbID: "tt1375666", cinemas: []
+  },
+  {
+    id: 15, titre: "Star Wars : L’Empire contre-attaque", original: "The Empire Strikes Back", genre: "Science-fiction", duree: "2h04",
+    real: "Irvin Kershner", acteurs: "Mark Hamill, Harrison Ford, Carrie Fisher",
+    synopsis: "L’Alliance rebelle est traquée par l’Empire tandis que Luke Skywalker poursuit son apprentissage Jedi.",
+    color: 'p3', badge: null,
+    lb: 4.4, imdb: 8.7, sc: 8.5, annee: 1980, imdbID: "tt0080684", cinemas: []
+  },
+  {
+    id: 16, titre: "Matrix", original: "The Matrix", genre: "Science-fiction", duree: "2h16",
+    real: "Lana Wachowski, Lilly Wachowski", acteurs: "Keanu Reeves, Laurence Fishburne, Carrie-Anne Moss",
+    synopsis: "Un pirate informatique découvre que le monde qu’il connaît n’est qu’une simulation contrôlée par des machines.",
+    color: 'p4', badge: null,
+    lb: 4.3, imdb: 8.7, sc: 8.5, annee: 1999, imdbID: "tt0133093", cinemas: []
+  },
+  {
+    id: 17, titre: "Les Affranchis", original: "Goodfellas", genre: "Policier", duree: "2h25",
+    real: "Martin Scorsese", acteurs: "Robert De Niro, Ray Liotta, Joe Pesci",
+    synopsis: "Henry Hill raconte son ascension puis sa chute dans le milieu de la mafia new-yorkaise.",
+    color: 'p5', badge: null,
+    lb: 4.4, imdb: 8.7, sc: 8.5, annee: 1990, imdbID: "tt0099685", cinemas: []
+  },
+  {
+    id: 18, titre: "Vol au-dessus d’un nid de coucou", original: "One Flew Over the Cuckoo's Nest", genre: "Drame", duree: "2h13",
+    real: "Miloš Forman", acteurs: "Jack Nicholson, Louise Fletcher",
+    synopsis: "Un détenu transféré dans un hôpital psychiatrique s’oppose à l’autorité glaciale de l’infirmière Ratched.",
+    color: 'p6', badge: null,
+    lb: 4.4, imdb: 8.7, sc: 8.6, annee: 1975, imdbID: "tt0073486", cinemas: []
+  },
+  {
+    id: 19, titre: "Interstellar", original: "Interstellar", genre: "Science-fiction", duree: "2h49",
+    real: "Christopher Nolan", acteurs: "Matthew McConaughey, Anne Hathaway, Jessica Chastain",
+    synopsis: "Face à une Terre mourante, une équipe d’explorateurs traverse un trou de ver pour chercher un nouveau foyer pour l’humanité.",
+    color: 'p1', badge: null,
+    lb: 4.4, imdb: 8.7, sc: 7.9, annee: 2014, imdbID: "tt0816692", cinemas: []
+  },
+  {
+    id: 20, titre: "Seven", original: "Se7en", genre: "Thriller", duree: "2h07",
+    real: "David Fincher", acteurs: "Brad Pitt, Morgan Freeman, Gwyneth Paltrow",
+    synopsis: "Deux inspecteurs traquent un tueur en série qui met en scène ses crimes autour des sept péchés capitaux.",
+    color: 'p2', badge: null,
+    lb: 4.3, imdb: 8.6, sc: 8.3, annee: 1995, imdbID: "tt0114369", cinemas: []
+  },
+  {
+    id: 21, titre: "La Vie est belle", original: "Life Is Beautiful", genre: "Drame", duree: "1h56",
+    real: "Roberto Benigni", acteurs: "Roberto Benigni, Nicoletta Braschi",
+    synopsis: "Un père transforme l’horreur d’un camp de concentration en jeu pour protéger son fils.",
+    color: 'p3', badge: null,
+    lb: 4.3, imdb: 8.6, sc: 8.4, annee: 1997, imdbID: "tt0118799", cinemas: []
+  },
+  {
+    id: 22, titre: "Les Sept Samouraïs", original: "Seven Samurai", genre: "Action", duree: "3h27",
+    real: "Akira Kurosawa", acteurs: "Toshirô Mifune, Takashi Shimura",
+    synopsis: "Des paysans engagent sept samouraïs pour défendre leur village contre des bandits.",
+    color: 'p4', badge: null,
+    lb: 4.5, imdb: 8.6, sc: 8.7, annee: 1954, imdbID: "tt0047478", cinemas: []
+  },
+  {
+    id: 23, titre: "Le Silence des agneaux", original: "The Silence of the Lambs", genre: "Thriller", duree: "1h58",
+    real: "Jonathan Demme", acteurs: "Jodie Foster, Anthony Hopkins",
+    synopsis: "Une jeune agente du FBI sollicite l’aide d’un brillant psychiatre criminel pour arrêter un tueur en série.",
+    color: 'p5', badge: null,
+    lb: 4.3, imdb: 8.6, sc: 8.4, annee: 1991, imdbID: "tt0102926", cinemas: []
+  },
+  {
+    id: 24, titre: "Il faut sauver le soldat Ryan", original: "Saving Private Ryan", genre: "Guerre", duree: "2h49",
+    real: "Steven Spielberg", acteurs: "Tom Hanks, Matt Damon, Tom Sizemore",
+    synopsis: "Après le Débarquement, un groupe de soldats reçoit l’ordre de retrouver un parachutiste derrière les lignes ennemies.",
+    color: 'p6', badge: null,
+    lb: 4.3, imdb: 8.6, sc: 8.3, annee: 1998, imdbID: "tt0120815", cinemas: []
+  },
+  {
+    id: 25, titre: "La Cité de Dieu", original: "City of God", genre: "Policier", duree: "2h10",
+    real: "Fernando Meirelles, Kátia Lund", acteurs: "Alexandre Rodrigues, Leandro Firmino",
+    synopsis: "Dans une favela de Rio, deux garçons prennent des chemins opposés entre photographie et criminalité.",
+    color: 'p1', badge: null,
+    lb: 4.4, imdb: 8.6, sc: 8.5, annee: 2002, imdbID: "tt0317248", cinemas: []
+  },
+  {
+    id: 26, titre: "La Ligne verte", original: "The Green Mile", genre: "Drame", duree: "3h09",
+    real: "Frank Darabont", acteurs: "Tom Hanks, Michael Clarke Duncan",
+    synopsis: "Un gardien de prison rencontre un condamné à mort doté d’un don mystérieux.",
+    color: 'p2', badge: null,
+    lb: 4.3, imdb: 8.6, sc: 8.4, annee: 1999, imdbID: "tt0120689", cinemas: []
+  },
+  {
+    id: 27, titre: "Terminator 2 : Le Jugement dernier", original: "Terminator 2: Judgment Day", genre: "Action", duree: "2h17",
+    real: "James Cameron", acteurs: "Arnold Schwarzenegger, Linda Hamilton",
+    synopsis: "Un cyborg est envoyé pour protéger John Connor d’un nouveau Terminator quasi indestructible.",
+    color: 'p3', badge: null,
+    lb: 4.2, imdb: 8.6, sc: 8.2, annee: 1991, imdbID: "tt0103064", cinemas: []
+  },
+  {
+    id: 28, titre: "Star Wars : Un nouvel espoir", original: "Star Wars", genre: "Science-fiction", duree: "2h01",
+    real: "George Lucas", acteurs: "Mark Hamill, Harrison Ford, Carrie Fisher",
+    synopsis: "Luke Skywalker rejoint la Rébellion pour combattre l’Empire et sauver la princesse Leia.",
+    color: 'p4', badge: null,
+    lb: 4.3, imdb: 8.6, sc: 8.4, annee: 1977, imdbID: "tt0076759", cinemas: []
+  },
+  {
+    id: 29, titre: "Retour vers le futur", original: "Back to the Future", genre: "Science-fiction", duree: "1h56",
+    real: "Robert Zemeckis", acteurs: "Michael J. Fox, Christopher Lloyd",
+    synopsis: "Un adolescent voyage accidentellement en 1955 et doit réparer le passé pour sauver son avenir.",
+    color: 'p5', badge: null,
+    lb: 4.2, imdb: 8.5, sc: 8.1, annee: 1985, imdbID: "tt0088763", cinemas: []
+  },
+  {
+    id: 30, titre: "Le Voyage de Chihiro", original: "Spirited Away", genre: "Animation", duree: "2h05",
+    real: "Hayao Miyazaki", acteurs: "Rumi Hiiragi, Miyu Irino",
+    synopsis: "Une fillette se retrouve piégée dans un monde d’esprits et cherche à sauver ses parents transformés.",
+    color: 'p6', badge: null,
+    lb: 4.5, imdb: 8.6, sc: 8.6, annee: 2001, imdbID: "tt0245429", cinemas: []
+  },
+  {
+    id: 31, titre: "Psychose", original: "Psycho", genre: "Thriller", duree: "1h49",
+    real: "Alfred Hitchcock", acteurs: "Anthony Perkins, Janet Leigh",
+    synopsis: "Une jeune femme en fuite s’arrête dans un motel isolé tenu par un propriétaire inquiétant.",
+    color: 'p1', badge: null,
+    lb: 4.3, imdb: 8.5, sc: 8.4, annee: 1960, imdbID: "tt0054215", cinemas: []
+  },
+  {
+    id: 32, titre: "Parasite", original: "Parasite", genre: "Thriller", duree: "2h12",
+    real: "Bong Joon-ho", acteurs: "Song Kang-ho, Lee Sun-kyun",
+    synopsis: "Une famille pauvre s’infiltre progressivement dans le quotidien d’une famille aisée.",
+    color: 'p2', badge: null,
+    lb: 4.4, imdb: 8.5, sc: 8.0, annee: 2019, imdbID: "tt6751668", cinemas: []
+  },
+  {
+    id: 33, titre: "Gladiator", original: "Gladiator", genre: "Action", duree: "2h35",
+    real: "Ridley Scott", acteurs: "Russell Crowe, Joaquin Phoenix, Connie Nielsen",
+    synopsis: "Un général romain trahi devient gladiateur et cherche à venger sa famille face à l’empereur corrompu.",
+    color: 'p3', badge: null,
+    lb: 4.2, imdb: 8.5, sc: 8.2, annee: 2000, imdbID: "tt0172495", cinemas: []
+  },
+  {
+    id: 34, titre: "Les Infiltrés", original: "The Departed", genre: "Policier", duree: "2h31",
+    real: "Martin Scorsese", acteurs: "Leonardo DiCaprio, Matt Damon, Jack Nicholson",
+    synopsis: "Un policier infiltré et une taupe de la mafia tentent chacun de découvrir l’identité de l’autre.",
+    color: 'p4', badge: null,
+    lb: 4.2, imdb: 8.5, sc: 8.1, annee: 2006, imdbID: "tt0407887", cinemas: []
+  },
+  {
+    id: 35, titre: "Whiplash", original: "Whiplash", genre: "Drame", duree: "1h47",
+    real: "Damien Chazelle", acteurs: "Miles Teller, J.K. Simmons, Melissa Benoist",
+    synopsis: "Un jeune batteur ambitieux subit l’entraînement brutal d’un professeur obsédé par l’excellence.",
+    color: 'p5', badge: null,
+    lb: 4.3, imdb: 8.5, sc: 8.2, annee: 2014, imdbID: "tt2582802", cinemas: []
+  },
+  {
+    id: 36, titre: "Le Prestige", original: "The Prestige", genre: "Thriller", duree: "2h10",
+    real: "Christopher Nolan", acteurs: "Christian Bale, Hugh Jackman, Scarlett Johansson",
+    synopsis: "Deux magiciens rivaux se livrent une guerre d’illusions qui tourne à l’obsession destructrice.",
+    color: 'p6', badge: null,
+    lb: 4.2, imdb: 8.5, sc: 8.2, annee: 2006, imdbID: "tt0482571", cinemas: []
+  },
+  {
+    id: 37, titre: "Les Intouchables", original: "Intouchables", genre: "Comédie", duree: "1h52",
+    real: "Olivier Nakache, Éric Toledano", acteurs: "François Cluzet, Omar Sy, Anne Le Ny",
+    synopsis: "Un aristocrate tétraplégique engage un aide à domicile issu d’un milieu opposé, et une amitié inattendue naît.",
+    color: 'p1', badge: null,
+    lb: 4.0, imdb: 8.5, sc: 8.0, annee: 2011, imdbID: "tt1675434", cinemas: []
+  },
+  {
+    id: 38, titre: "Harakiri", original: "Harakiri", genre: "Drame", duree: "2h13",
+    real: "Masaki Kobayashi", acteurs: "Tatsuya Nakadai, Akira Ishihama",
+    synopsis: "Un rônin demande à se donner la mort dans la demeure d’un clan, révélant peu à peu une terrible injustice.",
+    color: 'p2', badge: null,
+    lb: 4.6, imdb: 8.6, sc: 8.7, annee: 1962, imdbID: "tt0056058", cinemas: []
+  },
+  {
+    id: 39, titre: "Il était une fois dans l’Ouest", original: "Once Upon a Time in the West", genre: "Western", duree: "2h46",
+    real: "Sergio Leone", acteurs: "Henry Fonda, Charles Bronson, Claudia Cardinale",
+    synopsis: "Dans l’Ouest américain, plusieurs destins se croisent autour d’une terre convoitée et d’une vengeance silencieuse.",
+    color: 'p3', badge: null,
+    lb: 4.4, imdb: 8.5, sc: 8.5, annee: 1968, imdbID: "tt0064116", cinemas: []
+  },
+  {
+    id: 40, titre: "Usual Suspects", original: "The Usual Suspects", genre: "Policier", duree: "1h46",
+    real: "Bryan Singer", acteurs: "Kevin Spacey, Gabriel Byrne, Chazz Palminteri",
+    synopsis: "Un survivant raconte l’étrange histoire d’un groupe de criminels lié au mystérieux Keyser Söze.",
+    color: 'p4', badge: null,
+    lb: 4.1, imdb: 8.5, sc: 8.2, annee: 1995, imdbID: "tt0114814", cinemas: []
+  },
 ];
 
 // ── Cinémas ──
@@ -161,68 +323,58 @@ const CINEMAS = [
 // ── Utilitaires ──
 function getFilmById(id) { return FILMS.find(f => f.id === id); }
 
+function escapeHTML(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+
 function buildPopupHTML(film) {
   const bg = POSTER_COLORS[film.color] || '#ccc';
-  const cinemasHTML = film.cinemas.length === 0 ? '' : `
-    <div class="popup-cinemas">
-      <div class="popup-cinemas-label">Cinémas les plus proches</div>
-      ${film.cinemas.map((c, ci) => `
-        <div class="cinema-block" id="cb-${film.id}-${ci}">
-          <div class="cinema-block-header" onclick="toggleCinemaBlock('cb-${film.id}-${ci}')">
-            <div class="cinema-block-left">
-              <i class="ti ti-building"></i>
-              <div>
-                <div class="cinema-block-name">${c.nom}</div>
-                <div class="cinema-block-dist">${c.dist}</div>
-              </div>
-            </div>
-            <div class="cinema-block-right">
-              <button class="btn-itineraire" onclick="event.stopPropagation(); openItineraire('${c.nom}')">
-                <i class="ti ti-navigation"></i> Y aller
-              </button>
-              <i class="ti ti-chevron-down chevron"></i>
-            </div>
-          </div>
-          <div class="seances-panel">
-            ${Object.entries(c.seances).map(([jour, horaires]) => `
-              <div class="seances-day">
-                <div class="day-label">${jour}</div>
-                <div class="horaires">
-                  ${horaires.map(h => `
-                    <button class="horaire-btn" onclick="openReservation('${film.titre}', '${c.nom}', '${h}')">${h}</button>
-                  `).join('')}
-                </div>
-              </div>
-            `).join('')}
-          </div>
-        </div>
-      `).join('')}
-    </div>`;
+  const posterHTML = film.poster
+    ? `<img src="${escapeHTML(film.poster)}" alt="Affiche du film ${escapeHTML(film.titre)}" loading="lazy">`
+    : '<i class="ti ti-photo"></i>';
 
   return `
-    <div class="popup-top">
-      <div class="popup-poster" style="background:${bg};">
-        <i class="ti ti-photo"></i>
+    <div class="film-popup-layout">
+      <div class="film-popup-poster" style="background:${bg};">
+        ${posterHTML}
       </div>
-      <div class="popup-header">
-        ${film.badge ? `<span class="popup-badge">${film.badge}</span>` : ''}
-        <div class="popup-title">${film.titre}</div>
-        <div class="popup-tags">
-          <span class="popup-tag">${film.genre}</span>
-          <span class="popup-tag">${film.duree}</span>
-          ${film.annee ? `<span class="popup-tag">${film.annee}</span>` : ''}
+
+      <div class="film-popup-main">
+        <div class="film-popup-title-zone">
+          ${film.badge ? `<span class="popup-badge">${escapeHTML(film.badge)}</span>` : ''}
+          <div class="popup-title">${escapeHTML(film.titre)}</div>
         </div>
-        <div class="popup-crew">
-          <div class="popup-crew-row"><strong>Réalisateur ·</strong> ${film.real}</div>
-          <div class="popup-crew-row"><strong>Avec ·</strong> ${film.acteurs}</div>
+
+        <div class="film-popup-meta-zone">
+          <span class="popup-tag">${escapeHTML(film.genre || 'Genre inconnu')}</span>
+          <span class="popup-tag">${escapeHTML(film.duree || 'Durée inconnue')}</span>
+          ${film.annee ? `<span class="popup-tag">${escapeHTML(film.annee)}</span>` : ''}
+        </div>
+
+        <div class="film-popup-crew-zone">
+          <div class="popup-crew-row"><strong>Réalisateur ·</strong> ${escapeHTML(film.real || 'Non renseigné')}</div>
+          <div class="popup-crew-row"><strong>Avec ·</strong> ${escapeHTML(film.acteurs || 'Non renseigné')}</div>
+        </div>
+
+        <div class="film-popup-synopsis-zone">
+          <div class="section-label">Synopsis</div>
+          <div class="popup-synopsis">${escapeHTML(film.synopsis || 'Synopsis indisponible pour le moment.')}</div>
+        </div>
+      </div>
+
+      <div class="film-popup-seances-zone">
+        <div class="section-label">Séances</div>
+        <div class="empty-seances">
+          Aucune séance réelle n’est encore branchée pour ce film. Cette zone sera connectée plus tard au scraping des cinémas indépendants, avec le cinéma, l’horaire, la VF/VO et le lien de réservation.
         </div>
       </div>
     </div>
-    <div class="popup-synopsis-block">
-      <div class="section-label">Synopsis</div>
-      <div class="popup-synopsis">${film.synopsis}</div>
-    </div>
-    ${cinemasHTML}
+
     <button class="popup-close-btn" onclick="closeFilmPopup()">Fermer</button>
   `;
 }
