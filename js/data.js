@@ -289,7 +289,288 @@ const FILMS = [
     synopsis: "Un survivant raconte l’étrange histoire d’un groupe de criminels lié au mystérieux Keyser Söze.",
     color: 'p4', badge: null,
     lb: 4.1, imdb: 8.5, sc: 8.2, annee: 1995, imdbID: "tt0114814", cinemas: []
+  },,
+  {
+    id: 41, titre: "Alien", original: "Alien", genre: "Science-fiction", duree: "1h57",
+    real: "Ridley Scott", acteurs: "Sigourney Weaver, Tom Skerritt, John Hurt",
+    synopsis: "Dans l’espace, l’équipage du Nostromo répond à un signal de détresse et découvre une menace extraterrestre mortelle.",
+    color: 'p5', badge: null,
+    lb: 4.3, imdb: 8.5, sc: 8.4, annee: 1979, imdbID: "tt0078748", cinemas: []
   },
+  {
+    id: 42, titre: "Apocalypse Now", original: "Apocalypse Now", genre: "Guerre", duree: "2h27",
+    real: "Francis Ford Coppola", acteurs: "Martin Sheen, Marlon Brando, Robert Duvall",
+    synopsis: "Pendant la guerre du Vietnam, un capitaine remonte un fleuve pour retrouver un colonel devenu incontrôlable.",
+    color: 'p6', badge: null,
+    lb: 4.4, imdb: 8.4, sc: 8.4, annee: 1979, imdbID: "tt0078788", cinemas: []
+  },
+  {
+    id: 43, titre: "Memento", original: "Memento", genre: "Thriller", duree: "1h53",
+    real: "Christopher Nolan", acteurs: "Guy Pearce, Carrie-Anne Moss, Joe Pantoliano",
+    synopsis: "Un homme incapable de former de nouveaux souvenirs traque l’assassin de sa femme à l’aide de notes et de tatouages.",
+    color: 'p1', badge: null,
+    lb: 4.2, imdb: 8.4, sc: 8.2, annee: 2000, imdbID: "tt0209144", cinemas: []
+  },
+  {
+    id: 44, titre: "American History X", original: "American History X", genre: "Drame", duree: "1h59",
+    real: "Tony Kaye", acteurs: "Edward Norton, Edward Furlong",
+    synopsis: "Un ancien néonazi tente d’empêcher son jeune frère de suivre le même chemin de haine et de violence.",
+    color: 'p2', badge: null,
+    lb: 4.1, imdb: 8.5, sc: 8.1, annee: 1998, imdbID: "tt0120586", cinemas: []
+  },
+  {
+    id: 45, titre: "Le Tombeau des lucioles", original: "Grave of the Fireflies", genre: "Animation", duree: "1h29",
+    real: "Isao Takahata", acteurs: "Tsutomu Tatsumi, Ayano Shiraishi",
+    synopsis: "Au Japon, deux enfants tentent de survivre seuls pendant les derniers mois de la Seconde Guerre mondiale.",
+    color: 'p3', badge: null,
+    lb: 4.4, imdb: 8.5, sc: 8.6, annee: 1988, imdbID: "tt0095327", cinemas: []
+  },
+  {
+    id: 46, titre: "Le Dictateur", original: "The Great Dictator", genre: "Comédie", duree: "2h05",
+    real: "Charlie Chaplin", acteurs: "Charlie Chaplin, Paulette Goddard",
+    synopsis: "Un barbier juif et un dictateur tyrannique se ressemblent étrangement dans une satire politique devenue classique.",
+    color: 'p4', badge: null,
+    lb: 4.3, imdb: 8.4, sc: 8.3, annee: 1940, imdbID: "tt0032553", cinemas: []
+  },
+  {
+    id: 47, titre: "Les Temps modernes", original: "Modern Times", genre: "Comédie", duree: "1h27",
+    real: "Charlie Chaplin", acteurs: "Charlie Chaplin, Paulette Goddard",
+    synopsis: "Charlot affronte la mécanisation du travail et la misère avec humour, tendresse et révolte.",
+    color: 'p5', badge: null,
+    lb: 4.3, imdb: 8.5, sc: 8.2, annee: 1936, imdbID: "tt0027977", cinemas: []
+  },
+  {
+    id: 48, titre: "Fenêtre sur cour", original: "Rear Window", genre: "Thriller", duree: "1h52",
+    real: "Alfred Hitchcock", acteurs: "James Stewart, Grace Kelly",
+    synopsis: "Immobilisé chez lui, un photographe soupçonne l’un de ses voisins d’avoir commis un meurtre.",
+    color: 'p6', badge: null,
+    lb: 4.3, imdb: 8.5, sc: 8.4, annee: 1954, imdbID: "tt0047396", cinemas: []
+  },
+  {
+    id: 49, titre: "Les Sentiers de la gloire", original: "Paths of Glory", genre: "Guerre", duree: "1h28",
+    real: "Stanley Kubrick", acteurs: "Kirk Douglas, Ralph Meeker",
+    synopsis: "Pendant la Première Guerre mondiale, un colonel défend des soldats accusés de lâcheté après une attaque impossible.",
+    color: 'p1', badge: null,
+    lb: 4.4, imdb: 8.4, sc: 8.6, annee: 1957, imdbID: "tt0050825", cinemas: []
+  },
+  {
+    id: 50, titre: "Casablanca", original: "Casablanca", genre: "Romance", duree: "1h42",
+    real: "Michael Curtiz", acteurs: "Humphrey Bogart, Ingrid Bergman",
+    synopsis: "Dans un café de Casablanca, un homme retrouve l’amour perdu alors que la guerre bouleverse les destins.",
+    color: 'p2', badge: null,
+    lb: 4.2, imdb: 8.5, sc: 8.3, annee: 1942, imdbID: "tt0034583", cinemas: []
+  },
+  {
+    id: 51, titre: "Il était une fois en Amérique", original: "Once Upon a Time in America", genre: "Policier", duree: "3h49",
+    real: "Sergio Leone", acteurs: "Robert De Niro, James Woods",
+    synopsis: "Un gangster vieillissant se souvient de son amitié, de ses trahisons et de son passé dans le crime organisé.",
+    color: 'p3', badge: null,
+    lb: 4.4, imdb: 8.3, sc: 8.5, annee: 1984, imdbID: "tt0087843", cinemas: []
+  },
+  {
+    id: 52, titre: "Cinéma Paradiso", original: "Cinema Paradiso", genre: "Drame", duree: "2h35",
+    real: "Giuseppe Tornatore", acteurs: "Philippe Noiret, Salvatore Cascio",
+    synopsis: "Un cinéaste repense à son enfance sicilienne et à l’amitié qui l’a lié au projectionniste de son village.",
+    color: 'p4', badge: null,
+    lb: 4.4, imdb: 8.5, sc: 8.4, annee: 1988, imdbID: "tt0095765", cinemas: []
+  },
+  {
+    id: 53, titre: "La Haine", original: "La Haine", genre: "Drame", duree: "1h38",
+    real: "Mathieu Kassovitz", acteurs: "Vincent Cassel, Hubert Koundé, Saïd Taghmaoui",
+    synopsis: "Après une nuit d’émeutes, trois jeunes de banlieue vivent une journée sous tension.",
+    color: 'p5', badge: null,
+    lb: 4.3, imdb: 8.1, sc: 8.3, annee: 1995, imdbID: "tt0113247", cinemas: []
+  },
+  {
+    id: 54, titre: "Old Boy", original: "Oldboy", genre: "Thriller", duree: "2h00",
+    real: "Park Chan-wook", acteurs: "Choi Min-sik, Yoo Ji-tae, Kang Hye-jung",
+    synopsis: "Un homme libéré après quinze ans de captivité cherche à comprendre qui l’a enfermé et pourquoi.",
+    color: 'p6', badge: null,
+    lb: 4.4, imdb: 8.3, sc: 8.5, annee: 2003, imdbID: "tt0364569", cinemas: []
+  },
+  {
+    id: 55, titre: "Princesse Mononoké", original: "Princess Mononoke", genre: "Animation", duree: "2h14",
+    real: "Hayao Miyazaki", acteurs: "Yōji Matsuda, Yuriko Ishida",
+    synopsis: "Un jeune prince se retrouve au cœur d’un conflit entre les humains, la forêt et les dieux anciens.",
+    color: 'p1', badge: null,
+    lb: 4.4, imdb: 8.3, sc: 8.5, annee: 1997, imdbID: "tt0119698", cinemas: []
+  },
+  {
+    id: 56, titre: "WALL·E", original: "WALL·E", genre: "Animation", duree: "1h38",
+    real: "Andrew Stanton", acteurs: "Ben Burtt, Elissa Knight",
+    synopsis: "Un petit robot solitaire continue sa mission sur une Terre abandonnée et découvre une nouvelle raison d’espérer.",
+    color: 'p2', badge: null,
+    lb: 4.2, imdb: 8.4, sc: 8.2, annee: 2008, imdbID: "tt0910970", cinemas: []
+  },
+  {
+    id: 57, titre: "Coco", original: "Coco", genre: "Animation", duree: "1h45",
+    real: "Lee Unkrich, Adrian Molina", acteurs: "Anthony Gonzalez, Gael García Bernal",
+    synopsis: "Un jeune musicien rejoint le monde des morts pour découvrir le secret de sa famille.",
+    color: 'p3', badge: null,
+    lb: 4.2, imdb: 8.4, sc: 8.2, annee: 2017, imdbID: "tt2380307", cinemas: []
+  },
+  {
+    id: 58, titre: "Toy Story", original: "Toy Story", genre: "Animation", duree: "1h21",
+    real: "John Lasseter", acteurs: "Tom Hanks, Tim Allen",
+    synopsis: "Dans la chambre d’un enfant, les jouets prennent vie et voient arriver un nouveau rival venu de l’espace.",
+    color: 'p4', badge: null,
+    lb: 4.1, imdb: 8.3, sc: 8.1, annee: 1995, imdbID: "tt0114709", cinemas: []
+  },
+  {
+    id: 59, titre: "Toy Story 3", original: "Toy Story 3", genre: "Animation", duree: "1h43",
+    real: "Lee Unkrich", acteurs: "Tom Hanks, Tim Allen",
+    synopsis: "Alors qu’Andy grandit, ses jouets se retrouvent donnés par erreur à une garderie.",
+    color: 'p5', badge: null,
+    lb: 4.2, imdb: 8.3, sc: 8.2, annee: 2010, imdbID: "tt0435761", cinemas: []
+  },
+  {
+    id: 60, titre: "Spider-Man: New Generation", original: "Spider-Man: Into the Spider-Verse", genre: "Animation", duree: "1h57",
+    real: "Bob Persichetti, Peter Ramsey, Rodney Rothman", acteurs: "Shameik Moore, Jake Johnson, Hailee Steinfeld",
+    synopsis: "Miles Morales découvre ses pouvoirs et rencontre d’autres Spider-Men venus de dimensions parallèles.",
+    color: 'p6', badge: null,
+    lb: 4.4, imdb: 8.4, sc: 8.3, annee: 2018, imdbID: "tt4633694", cinemas: []
+  },
+  {
+    id: 61, titre: "Your Name.", original: "Your Name.", genre: "Animation", duree: "1h46",
+    real: "Makoto Shinkai", acteurs: "Ryunosuke Kamiki, Mone Kamishiraishi",
+    synopsis: "Deux adolescents qui ne se connaissent pas échangent mystérieusement leurs corps à travers le temps et l’espace.",
+    color: 'p1', badge: null,
+    lb: 4.2, imdb: 8.4, sc: 8.2, annee: 2016, imdbID: "tt5311514", cinemas: []
+  },
+  {
+    id: 62, titre: "Le Château ambulant", original: "Howl’s Moving Castle", genre: "Animation", duree: "1h59",
+    real: "Hayao Miyazaki", acteurs: "Chieko Baisho, Takuya Kimura",
+    synopsis: "Transformée en vieille femme, Sophie trouve refuge dans le château magique d’un sorcier énigmatique.",
+    color: 'p2', badge: null,
+    lb: 4.3, imdb: 8.2, sc: 8.2, annee: 2004, imdbID: "tt0347149", cinemas: []
+  },
+  {
+    id: 63, titre: "Akira", original: "Akira", genre: "Animation", duree: "2h04",
+    real: "Katsuhiro Ōtomo", acteurs: "Mitsuo Iwata, Nozomu Sasaki",
+    synopsis: "Dans un Tokyo futuriste, un adolescent développe des pouvoirs incontrôlables qui menacent la ville.",
+    color: 'p3', badge: null,
+    lb: 4.2, imdb: 8.0, sc: 8.2, annee: 1988, imdbID: "tt0094625", cinemas: []
+  },
+  {
+    id: 64, titre: "Blade Runner", original: "Blade Runner", genre: "Science-fiction", duree: "1h57",
+    real: "Ridley Scott", acteurs: "Harrison Ford, Rutger Hauer, Sean Young",
+    synopsis: "Un ancien policier traque des androïdes fugitifs dans un Los Angeles sombre et futuriste.",
+    color: 'p4', badge: null,
+    lb: 4.2, imdb: 8.1, sc: 8.3, annee: 1982, imdbID: "tt0083658", cinemas: []
+  },
+  {
+    id: 65, titre: "Blade Runner 2049", original: "Blade Runner 2049", genre: "Science-fiction", duree: "2h44",
+    real: "Denis Villeneuve", acteurs: "Ryan Gosling, Harrison Ford, Ana de Armas",
+    synopsis: "Un blade runner découvre un secret capable d’ébranler les fondations de la société.",
+    color: 'p5', badge: null,
+    lb: 4.1, imdb: 8.0, sc: 8.1, annee: 2017, imdbID: "tt1856101", cinemas: []
+  },
+  {
+    id: 66, titre: "Mad Max: Fury Road", original: "Mad Max: Fury Road", genre: "Action", duree: "2h00",
+    real: "George Miller", acteurs: "Tom Hardy, Charlize Theron",
+    synopsis: "Dans un désert post-apocalyptique, une fuite explosive oppose des rebelles à un tyran lancé à leurs trousses.",
+    color: 'p6', badge: null,
+    lb: 4.2, imdb: 8.1, sc: 8.1, annee: 2015, imdbID: "tt1392190", cinemas: []
+  },
+  {
+    id: 67, titre: "Django Unchained", original: "Django Unchained", genre: "Western", duree: "2h45",
+    real: "Quentin Tarantino", acteurs: "Jamie Foxx, Christoph Waltz, Leonardo DiCaprio",
+    synopsis: "Un esclave libéré s’allie à un chasseur de primes pour retrouver sa femme.",
+    color: 'p1', badge: null,
+    lb: 4.1, imdb: 8.5, sc: 8.0, annee: 2012, imdbID: "tt1853728", cinemas: []
+  },
+  {
+    id: 68, titre: "Reservoir Dogs", original: "Reservoir Dogs", genre: "Policier", duree: "1h39",
+    real: "Quentin Tarantino", acteurs: "Harvey Keitel, Tim Roth, Michael Madsen",
+    synopsis: "Après un braquage raté, des criminels se soupçonnent mutuellement d’avoir été trahis.",
+    color: 'p2', badge: null,
+    lb: 4.1, imdb: 8.3, sc: 8.1, annee: 1992, imdbID: "tt0105236", cinemas: []
+  },
+  {
+    id: 69, titre: "Kill Bill : Volume 1", original: "Kill Bill: Vol. 1", genre: "Action", duree: "1h51",
+    real: "Quentin Tarantino", acteurs: "Uma Thurman, Lucy Liu, Vivica A. Fox",
+    synopsis: "Une ancienne tueuse sort du coma et part se venger de ceux qui l’ont trahie.",
+    color: 'p3', badge: null,
+    lb: 4.1, imdb: 8.2, sc: 8.0, annee: 2003, imdbID: "tt0266697", cinemas: []
+  },
+  {
+    id: 70, titre: "Inglourious Basterds", original: "Inglourious Basterds", genre: "Guerre", duree: "2h33",
+    real: "Quentin Tarantino", acteurs: "Brad Pitt, Christoph Waltz, Mélanie Laurent",
+    synopsis: "Pendant l’Occupation, plusieurs plans convergent pour renverser le cours de la guerre dans un cinéma parisien.",
+    color: 'p4', badge: null,
+    lb: 4.3, imdb: 8.4, sc: 8.3, annee: 2009, imdbID: "tt0361748", cinemas: []
+  },
+  {
+    id: 71, titre: "Le Loup de Wall Street", original: "The Wolf of Wall Street", genre: "Comédie", duree: "3h00",
+    real: "Martin Scorsese", acteurs: "Leonardo DiCaprio, Jonah Hill, Margot Robbie",
+    synopsis: "L’ascension excessive et délirante d’un courtier devenu symbole de la démesure financière.",
+    color: 'p5', badge: null,
+    lb: 4.0, imdb: 8.2, sc: 7.8, annee: 2013, imdbID: "tt0993846", cinemas: []
+  },
+  {
+    id: 72, titre: "Taxi Driver", original: "Taxi Driver", genre: "Drame", duree: "1h54",
+    real: "Martin Scorsese", acteurs: "Robert De Niro, Jodie Foster",
+    synopsis: "Un vétéran solitaire dérive dans les nuits new-yorkaises et nourrit une obsession violente.",
+    color: 'p6', badge: null,
+    lb: 4.2, imdb: 8.2, sc: 8.4, annee: 1976, imdbID: "tt0075314", cinemas: []
+  },
+  {
+    id: 73, titre: "Raging Bull", original: "Raging Bull", genre: "Drame", duree: "2h09",
+    real: "Martin Scorsese", acteurs: "Robert De Niro, Joe Pesci",
+    synopsis: "La carrière et l’autodestruction du boxeur Jake LaMotta, rongé par la jalousie et la violence.",
+    color: 'p1', badge: null,
+    lb: 4.2, imdb: 8.1, sc: 8.2, annee: 1980, imdbID: "tt0081398", cinemas: []
+  },
+  {
+    id: 74, titre: "Shutter Island", original: "Shutter Island", genre: "Thriller", duree: "2h18",
+    real: "Martin Scorsese", acteurs: "Leonardo DiCaprio, Mark Ruffalo",
+    synopsis: "Deux marshals enquêtent sur une disparition dans un hôpital psychiatrique isolé.",
+    color: 'p2', badge: null,
+    lb: 4.0, imdb: 8.2, sc: 7.9, annee: 2010, imdbID: "tt1130884", cinemas: []
+  },
+  {
+    id: 75, titre: "Le Fabuleux Destin d’Amélie Poulain", original: "Amélie", genre: "Romance", duree: "2h02",
+    real: "Jean-Pierre Jeunet", acteurs: "Audrey Tautou, Mathieu Kassovitz",
+    synopsis: "Une jeune serveuse montmartroise décide d’améliorer discrètement la vie des gens qui l’entourent.",
+    color: 'p3', badge: null,
+    lb: 4.1, imdb: 8.3, sc: 8.2, annee: 2001, imdbID: "tt0211915", cinemas: []
+  },
+  {
+    id: 76, titre: "Les Diaboliques", original: "Diabolique", genre: "Thriller", duree: "1h57",
+    real: "Henri-Georges Clouzot", acteurs: "Simone Signoret, Véra Clouzot, Paul Meurisse",
+    synopsis: "Deux femmes préparent un meurtre parfait, mais le corps disparaît mystérieusement.",
+    color: 'p4', badge: null,
+    lb: 4.2, imdb: 8.1, sc: 8.2, annee: 1955, imdbID: "tt0046911", cinemas: []
+  },
+  {
+    id: 77, titre: "Le Salaire de la peur", original: "The Wages of Fear", genre: "Thriller", duree: "2h11",
+    real: "Henri-Georges Clouzot", acteurs: "Yves Montand, Charles Vanel",
+    synopsis: "Quatre hommes acceptent de transporter de la nitroglycérine sur des routes dangereuses.",
+    color: 'p5', badge: null,
+    lb: 4.3, imdb: 8.2, sc: 8.4, annee: 1953, imdbID: "tt0046268", cinemas: []
+  },
+  {
+    id: 78, titre: "La Grande Illusion", original: "La Grande Illusion", genre: "Guerre", duree: "1h54",
+    real: "Jean Renoir", acteurs: "Jean Gabin, Pierre Fresnay, Erich von Stroheim",
+    synopsis: "Pendant la Première Guerre mondiale, des prisonniers français préparent une évasion dans un camp allemand.",
+    color: 'p6', badge: null,
+    lb: 4.2, imdb: 8.1, sc: 8.2, annee: 1937, imdbID: "tt0028950", cinemas: []
+  },
+  {
+    id: 79, titre: "Les 400 Coups", original: "The 400 Blows", genre: "Drame", duree: "1h39",
+    real: "François Truffaut", acteurs: "Jean-Pierre Léaud, Albert Rémy",
+    synopsis: "Un adolescent parisien incompris cherche sa liberté entre fugues, école et solitude.",
+    color: 'p1', badge: null,
+    lb: 4.2, imdb: 8.1, sc: 8.3, annee: 1959, imdbID: "tt0053198", cinemas: []
+  },
+  {
+    id: 80, titre: "Persona", original: "Persona", genre: "Drame", duree: "1h23",
+    real: "Ingmar Bergman", acteurs: "Bibi Andersson, Liv Ullmann",
+    synopsis: "Une actrice muette et son infirmière s’isolent au bord de la mer, brouillant peu à peu leurs identités.",
+    color: 'p2', badge: null,
+    lb: 4.3, imdb: 8.1, sc: 8.4, annee: 1966, imdbID: "tt0060827", cinemas: []
+  }
+
 ];
 
 // ── Cinémas ──

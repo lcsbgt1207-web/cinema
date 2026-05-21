@@ -86,6 +86,7 @@
     .page-btn:hover { border-color: var(--black); }
     .page-btn.active { background: var(--black); color: var(--white); border-color: var(--black); }
     .page-btn:disabled { opacity: .35; cursor: not-allowed; border-color: var(--gray-200); }
+    .page-ellipsis { height: 38px; min-width: 22px; display: inline-flex; align-items: center; justify-content: center; color: var(--gray-400); font-size: 14px; user-select: none; }
     .page-size-select { height: 38px; border: 0.5px solid var(--gray-200); border-radius: 8px; padding: 0 34px 0 12px; background: var(--white); color: var(--gray-600); font-size: 13px; }
     table th:nth-child(1), table td:nth-child(1) { width: 42px; }
     table th:nth-child(2), table td:nth-child(2) { width: 380px; }
@@ -253,7 +254,6 @@
   let currentPage = 1;
   let pageSize = 8;
   let lastFilteredData = [];
-  const MAX_PAGES = 10;
 
   const LABELS = { lb:'Letterboxd', imdb:'IMDb', sc:'SensCritique', annee:'Année', titre:'Titre', real:'Réalisateur', genre:'Genre' };
 
@@ -293,7 +293,7 @@
 
   function renderTable(data) {
     lastFilteredData = data;
-    const totalPages = Math.max(1, Math.min(MAX_PAGES, Math.ceil(data.length / pageSize)));
+    const totalPages = Math.max(1, Math.ceil(data.length / pageSize));
     if (currentPage > totalPages) currentPage = totalPages;
 
     const start = (currentPage - 1) * pageSize;
@@ -331,16 +331,38 @@
     renderPagination(totalPages);
   }
 
+  function getVisiblePaginationPages(totalPages) {
+    if (totalPages <= 4) {
+      return Array.from({ length: totalPages }, (_, index) => index + 1);
+    }
+
+    const start = currentPage <= 2 ? 1 : currentPage;
+    const pages = [];
+    for (let page = start; page <= Math.min(start + 2, totalPages); page++) {
+      pages.push(page);
+    }
+
+    if (!pages.includes(totalPages)) {
+      if (pages[pages.length - 1] < totalPages - 1) pages.push('ellipsis');
+      pages.push(totalPages);
+    }
+
+    return pages;
+  }
+
   function renderPagination(totalPages) {
     const bottom = document.getElementById('catalogue-bottom');
     if (!bottom) return;
 
-    const pages = Array.from({ length: totalPages }, (_, index) => index + 1);
+    const pages = getVisiblePaginationPages(totalPages);
     bottom.innerHTML = `
       <div class="page-state">Page ${currentPage} sur ${totalPages}</div>
       <div class="pagination-controls">
         <button class="page-btn" ${currentPage === 1 ? 'disabled' : ''} onclick="changePage(${currentPage - 1})"><i class="ti ti-chevron-left"></i></button>
-        ${pages.map(page => `<button class="page-btn ${page === currentPage ? 'active' : ''}" onclick="changePage(${page})">${page}</button>`).join('')}
+        ${pages.map(page => page === 'ellipsis'
+          ? `<span class="page-ellipsis">…</span>`
+          : `<button class="page-btn ${page === currentPage ? 'active' : ''}" onclick="changePage(${page})">${page}</button>`
+        ).join('')}
         <button class="page-btn" ${currentPage === totalPages ? 'disabled' : ''} onclick="changePage(${currentPage + 1})"><i class="ti ti-chevron-right"></i></button>
       </div>
       <select class="page-size-select" onchange="changePageSize(this.value)">
