@@ -3,7 +3,7 @@
    OMDb = vraie note IMDb du tableau, récupérée avec l'ID IMDb quand possible
 */
 
-const OMDB_CACHE_KEY = 'cinepro_omdb_cache_v7_fr_synopsis';
+const OMDB_CACHE_KEY = 'cinepro_omdb_cache_v8_preserve_local_imdb';
 const TMDB_CACHE_KEY = 'cinepro_tmdb_cache_v7_fr_synopsis';
 
 function readCache(key) {
@@ -211,7 +211,17 @@ async function fetchOmdbByTitle(film) {
   }
 }
 
+function getLocalImdbRating(film) {
+  const rating = Number.parseFloat(film?.imdb);
+  return Number.isFinite(rating) ? Math.round(rating * 10) / 10 : null;
+}
+
 function applyDataToFilm(film, tmdb, omdb) {
+  // On garde toujours la note IMDb déjà présente dans js/data.js.
+  // OMDb peut la mettre à jour si une clé API est disponible, mais un échec API
+  // ne doit jamais remplacer une vraie note IMDb par un tiret.
+  const localImdbRating = getLocalImdbRating(film);
+
   film.omdbLoaded = true;
 
   if (tmdb) {
@@ -231,7 +241,9 @@ function applyDataToFilm(film, tmdb, omdb) {
 
   if (omdb && Number.isFinite(omdb.imdbRating)) {
     film.imdbID = omdb.imdbID || film.imdbID;
-    film.imdb = omdb.imdbRating;
+    film.imdb = Math.round(omdb.imdbRating * 10) / 10;
+  } else if (localImdbRating !== null) {
+    film.imdb = localImdbRating;
   } else {
     film.imdb = null;
   }
@@ -264,4 +276,4 @@ async function enrichFilmsWithOmdb(films, onProgress) {
   return films;
 }
 
-// Update générée : synopsis français conservés + affiches TMDB conservées.
+// Update générée : IMDb local conservé si OMDb est indisponible + affiches TMDB conservées.
