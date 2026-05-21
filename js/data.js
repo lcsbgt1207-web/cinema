@@ -232,7 +232,7 @@ const FILMS = [
     real: "Bong Joon-ho", acteurs: "Song Kang-ho, Lee Sun-kyun",
     synopsis: "Une famille pauvre s’infiltre progressivement dans le quotidien d’une famille aisée.",
     color: 'p2', badge: null,
-    lb: 4.5, imdb: 8.5, sc: 8.0, annee: 2019, imdbID: "tt6751668", cinemas: []
+    lb: 4.4, imdb: 8.5, sc: 8.0, annee: 2019, imdbID: "tt6751668", cinemas: []
   },
   {
     id: 33, titre: "Gladiator", original: "Gladiator", genre: "Action", duree: "2h35",
@@ -253,7 +253,7 @@ const FILMS = [
     real: "Damien Chazelle", acteurs: "Miles Teller, J.K. Simmons, Melissa Benoist",
     synopsis: "Un jeune batteur ambitieux subit l’entraînement brutal d’un professeur obsédé par l’excellence.",
     color: 'p5', badge: null,
-    lb: 4.4, imdb: 8.5, sc: 8.2, annee: 2014, imdbID: "tt2582802", cinemas: []
+    lb: 4.3, imdb: 8.5, sc: 8.2, annee: 2014, imdbID: "tt2582802", cinemas: []
   },
   {
     id: 36, titre: "Le Prestige", original: "The Prestige", genre: "Thriller", duree: "2h10",

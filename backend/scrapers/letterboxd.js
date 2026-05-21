@@ -1,3 +1,4 @@
+import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -11,12 +12,43 @@ const OUTPUT_FILE = path.join(OUTPUT_DIR, 'letterboxd-films.json');
 const LOCAL_DATA_FILE = path.join(PROJECT_DIR, 'js', 'data.js');
 const BASE_URL = 'https://letterboxd.com';
 
-// Important : Letterboxd ne met pas toujours la note publique affichée dans le HTML statique.
-// Les anciennes versions du scraper lisaient donc parfois une autre valeur cachée
-// (ex : Parasite 4.4 au lieu de 4.5, ou pire 2.4).
-// Pour éviter de casser le catalogue, on conserve une table vérifiée et on ne scrape plus
-// automatiquement une valeur ambiguë. Letterboxd reste utilisé uniquement pour les notes.
-const VERIFIED_LETTERBOXD_RATINGS = {
+const REQUEST_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36',
+  'Accept-Language': 'en-US,en;q=0.9,fr-FR;q=0.8',
+  Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+};
+
+// Slugs exacts pour les films dont le titre français ou IMDb ne correspond pas parfaitement à Letterboxd.
+const SLUG_OVERRIDES = {
+  'The Shawshank Redemption': 'the-shawshank-redemption',
+  'The Godfather': 'the-godfather',
+  'The Dark Knight': 'the-dark-knight',
+  'The Godfather Part II': 'the-godfather-part-ii',
+  '12 Angry Men': '12-angry-men',
+  'The Lord of the Rings: The Return of the King': 'the-lord-of-the-rings-the-return-of-the-king',
+  'Schindler’s List': 'schindlers-list',
+  "Schindler's List": 'schindlers-list',
+  'The Lord of the Rings: The Fellowship of the Ring': 'the-lord-of-the-rings-the-fellowship-of-the-ring',
+  'The Good, the Bad and the Ugly': 'the-good-the-bad-and-the-ugly',
+  'One Flew Over the Cuckoo’s Nest': 'one-flew-over-the-cuckoos-nest',
+  "One Flew Over the Cuckoo's Nest": 'one-flew-over-the-cuckoos-nest',
+  'City of God': 'city-of-god',
+  'Terminator 2: Judgment Day': 'terminator-2-judgment-day',
+  'Back to the Future': 'back-to-the-future',
+  'Spirited Away': 'spirited-away',
+  'The Departed': 'the-departed',
+  'The Prestige': 'the-prestige',
+  'Intouchables': 'the-intouchables',
+  'The Intouchables': 'the-intouchables',
+  'Harakiri': 'harakiri',
+  'Once Upon a Time in the West': 'once-upon-a-time-in-the-west',
+  'The Usual Suspects': 'the-usual-suspects'
+};
+
+// Notes vérifiées pour le catalogue actuel.
+// Rôle : protéger le site quand Letterboxd change son HTML ou renvoie une valeur parasite.
+// Letterboxd reste uniquement la source de la colonne Letterboxd ; TMDB/IMDb ne sont jamais écrasés ici.
+const VERIFIED_LOCAL_RATINGS = {
   'The Shawshank Redemption': 4.6,
   'The Godfather': 4.6,
   'The Dark Knight': 4.5,
@@ -57,55 +89,9 @@ const VERIFIED_LETTERBOXD_RATINGS = {
   'The Prestige': 4.3,
   'Intouchables': 4.2,
   'The Intouchables': 4.2,
-  'Harakiri': 4.6,
+  'Harakiri': 4.7,
   'Once Upon a Time in the West': 4.4,
   'The Usual Suspects': 4.1
-};
-
-const SLUG_OVERRIDES = {
-  'The Shawshank Redemption': 'the-shawshank-redemption',
-  'The Godfather': 'the-godfather',
-  'The Dark Knight': 'the-dark-knight',
-  'The Godfather Part II': 'the-godfather-part-ii',
-  '12 Angry Men': '12-angry-men',
-  'The Lord of the Rings: The Return of the King': 'the-lord-of-the-rings-the-return-of-the-king',
-  'Schindler’s List': 'schindlers-list',
-  "Schindler's List": 'schindlers-list',
-  'The Lord of the Rings: The Fellowship of the Ring': 'the-lord-of-the-rings-the-fellowship-of-the-ring',
-  'Pulp Fiction': 'pulp-fiction',
-  'The Good, the Bad and the Ugly': 'the-good-the-bad-and-the-ugly',
-  'Forrest Gump': 'forrest-gump',
-  'The Lord of the Rings: The Two Towers': 'the-lord-of-the-rings-the-two-towers',
-  'Fight Club': 'fight-club',
-  'Inception': 'inception',
-  'The Empire Strikes Back': 'the-empire-strikes-back',
-  'The Matrix': 'the-matrix',
-  'Goodfellas': 'goodfellas',
-  'One Flew Over the Cuckoo’s Nest': 'one-flew-over-the-cuckoos-nest',
-  "One Flew Over the Cuckoo's Nest": 'one-flew-over-the-cuckoos-nest',
-  'Interstellar': 'interstellar',
-  'Se7en': 'se7en',
-  'Life Is Beautiful': 'life-is-beautiful',
-  'Seven Samurai': 'seven-samurai',
-  'The Silence of the Lambs': 'the-silence-of-the-lambs',
-  'Saving Private Ryan': 'saving-private-ryan',
-  'City of God': 'city-of-god',
-  'The Green Mile': 'the-green-mile',
-  'Terminator 2: Judgment Day': 'terminator-2-judgment-day',
-  'Star Wars': 'star-wars',
-  'Back to the Future': 'back-to-the-future',
-  'Spirited Away': 'spirited-away',
-  'Psycho': 'psycho',
-  'Parasite': 'parasite-2019',
-  'Gladiator': 'gladiator-2000',
-  'The Departed': 'the-departed',
-  'Whiplash': 'whiplash-2014',
-  'The Prestige': 'the-prestige',
-  'Intouchables': 'the-intouchables',
-  'The Intouchables': 'the-intouchables',
-  'Harakiri': 'harakiri',
-  'Once Upon a Time in the West': 'once-upon-a-time-in-the-west',
-  'The Usual Suspects': 'the-usual-suspects'
 };
 
 function safeRating(value) {
@@ -123,6 +109,10 @@ function slugify(title) {
     .replace(/^-|-$/g, '');
 }
 
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 function extractFilmBlocksFromLocalData() {
   if (!fs.existsSync(LOCAL_DATA_FILE)) return [];
 
@@ -137,7 +127,6 @@ function extractFilmBlocksFromLocalData() {
     const imdbID = block.match(/imdbID:\s*"([^"]+)"/)?.[1];
     const displayTitle = original || titre;
     const slug = SLUG_OVERRIDES[displayTitle] || SLUG_OVERRIDES[titre] || slugify(displayTitle);
-    const verifiedRating = VERIFIED_LETTERBOXD_RATINGS[displayTitle] ?? VERIFIED_LETTERBOXD_RATINGS[titre] ?? lb;
 
     return {
       rank: index + 1,
@@ -146,15 +135,85 @@ function extractFilmBlocksFromLocalData() {
       original,
       letterboxdSlug: slug,
       letterboxdUrl: `${BASE_URL}/film/${slug}/`,
-      letterboxdRating: safeRating(verifiedRating),
+      letterboxdRating: VERIFIED_LOCAL_RATINGS[displayTitle] ?? VERIFIED_LOCAL_RATINGS[titre] ?? lb,
       imdb,
       imdbID,
-      sourceType: VERIFIED_LETTERBOXD_RATINGS[displayTitle] || VERIFIED_LETTERBOXD_RATINGS[titre]
-        ? 'verified-letterboxd-rating'
-        : 'local-preserved'
+      sourceType: 'local-preserved'
     };
   }).filter(film => film.title && film.letterboxdSlug);
 }
+
+function extractRating(html) {
+  const candidates = [];
+
+  // 1) Priorité au bloc AggregateRating, pas aux notes utilisateur / activité amis.
+  const aggregateBlocks = html.match(/"aggregateRating"\s*:\s*\{[\s\S]{0,900}?\}/gi) || [];
+  for (const block of aggregateBlocks) {
+    const match = block.match(/"ratingValue"\s*:\s*"?([0-5](?:\.\d+)?)"?/i);
+    const rating = match ? safeRating(match[1]) : null;
+    if (rating !== null) candidates.push(rating);
+  }
+
+  // 2) Certains rendus Letterboxd exposent directement la note moyenne.
+  const precisePatterns = [
+    /data-average-rating=["']([0-5](?:\.\d+)?)["']/i,
+    /class=["'][^"']*average-rating[^"']*["'][^>]*>\s*([0-5](?:\.\d+)?)/i,
+    /<span[^>]+class=["'][^"']*rating[^"']*average[^"']*["'][^>]*>\s*([0-5](?:\.\d+)?)/i
+  ];
+
+  for (const pattern of precisePatterns) {
+    const match = html.match(pattern);
+    const rating = match ? safeRating(match[1]) : null;
+    if (rating !== null) candidates.push(rating);
+  }
+
+  // 3) Dernier recours : JSON-LD global, uniquement si aucun candidat plus précis n'a été trouvé.
+  if (!candidates.length) {
+    const globalMatch = html.match(/"ratingValue"\s*:\s*"?([0-5](?:\.\d+)?)"?/i);
+    const rating = globalMatch ? safeRating(globalMatch[1]) : null;
+    if (rating !== null) candidates.push(rating);
+  }
+
+  return candidates.length ? candidates[0] : null;
+}
+
+function verifiedRatingFor(film) {
+  return safeRating(
+    VERIFIED_LOCAL_RATINGS[film.title] ??
+    VERIFIED_LOCAL_RATINGS[film.original] ??
+    VERIFIED_LOCAL_RATINGS[film.titre]
+  );
+}
+
+async function fetchFilmRating(film) {
+  const verified = verifiedRatingFor(film);
+
+  try {
+    const response = await axios.get(film.letterboxdUrl, {
+      headers: REQUEST_HEADERS,
+      timeout: 15000,
+      validateStatus: status => status >= 200 && status < 400
+    });
+
+    const liveRating = extractRating(response.data);
+
+    // Si le scraping donne une valeur très éloignée de la note vérifiée, on protège le catalogue.
+    // Exemple réel vu dans le projet : Parasite 2.4 / Gladiator 3.2 à cause d'un mauvais champ HTML.
+    if (verified !== null && (liveRating === null || Math.abs(liveRating - verified) >= 0.2)) {
+      return { rating: verified, sourceType: 'verified-protected' };
+    }
+
+    if (liveRating !== null) {
+      return { rating: liveRating, sourceType: 'letterboxd-film-page' };
+    }
+  } catch (error) {
+    console.log(`Letterboxd indisponible pour ${film.title} : ${error.message}`);
+  }
+
+  if (verified !== null) return { rating: verified, sourceType: 'verified-protected' };
+  return { rating: null, sourceType: 'local-preserved' };
+}
+
 
 function savePayload(payload) {
   if (!fs.existsSync(OUTPUT_DIR)) fs.mkdirSync(OUTPUT_DIR, { recursive: true });
@@ -162,8 +221,8 @@ function savePayload(payload) {
   console.log(`${payload.count} films sauvegardés dans backend/data/letterboxd-films.json`);
 }
 
-async function updateLetterboxdRatings() {
-  console.log('Mise à jour des notes Letterboxd depuis la table vérifiée...');
+async function scrapeLetterboxd() {
+  console.log('Mise à jour des notes Letterboxd film par film...');
 
   const films = extractFilmBlocksFromLocalData();
   if (!films.length) {
@@ -171,17 +230,29 @@ async function updateLetterboxdRatings() {
     return;
   }
 
+  let liveCount = 0;
+  for (const film of films) {
+    const result = await fetchFilmRating(film);
+    if (result.rating !== null) {
+      film.letterboxdRating = result.rating;
+      film.sourceType = result.sourceType;
+      if (result.sourceType === 'letterboxd-film-page') liveCount++;
+    } else {
+      film.sourceType = 'local-preserved';
+    }
+    await sleep(350);
+  }
+
   savePayload({
-    source: 'verified-letterboxd-ratings-no-ambiguous-scrape',
-    reason: 'Le HTML statique Letterboxd contient parfois des valeurs cachées qui ne correspondent pas à la note publique affichée.',
+    source: liveCount > 0 ? 'letterboxd-film-pages-with-local-preserve' : 'local-preserved-no-live-rating',
     scrapedAt: new Date().toISOString(),
     count: films.length,
-    liveCount: 0,
+    liveCount,
     films
   });
 }
 
-updateLetterboxdRatings().catch(error => {
-  console.error('Mise à jour Letterboxd échouée :', error.message);
+scrapeLetterboxd().catch(error => {
+  console.error('Scraping Letterboxd échoué :', error.message);
   process.exitCode = 0;
 });
