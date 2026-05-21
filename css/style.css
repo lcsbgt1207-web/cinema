@@ -576,3 +576,27 @@ img { max-width: 100%; display: block; }
 
 /* cinema-update: popup-layout-like-reference-20260520-2207 */
 
+
+/* Home mockup navigation */
+.header-inner{justify-content:space-between;}
+.nav-modern{
+border:none!important;
+overflow:visible;
+gap:34px;
+margin:0 auto;
+}
+.nav-modern a{
+border:none!important;
+padding:0!important;
+display:flex;
+align-items:center;
+gap:8px;
+font-size:14px;
+font-weight:500;
+color:var(--black);
+background:none!important;
+}
+.nav-modern a i{font-size:17px;}
+.footer-stats{
+margin-top:40px !important;
+}
