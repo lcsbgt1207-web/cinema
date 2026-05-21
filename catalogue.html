@@ -436,9 +436,45 @@
     };
   }
 
+  function normalizeFilmKey(value) {
+    return String(value || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/^(the|le|la|les|l')\s+/i, '')
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
+  }
+
+  function applyLetterboxdRatings(apiFilms) {
+    if (!Array.isArray(apiFilms) || !apiFilms.length) return 0;
+
+    let updated = 0;
+    for (const film of catalogue) {
+      const keys = [film.titre, film.original].map(normalizeFilmKey).filter(Boolean);
+      const match = apiFilms.find(apiFilm => {
+        const apiKeys = [apiFilm.title, apiFilm.titre, apiFilm.original, apiFilm.letterboxdSlug]
+          .map(normalizeFilmKey)
+          .filter(Boolean);
+        return keys.some(key => apiKeys.includes(key));
+      });
+
+      const rating = Number(match?.letterboxdRating ?? match?.lb ?? match?.rating);
+      if (Number.isFinite(rating)) {
+        film.lb = rating;
+        updated++;
+      }
+    }
+    return updated;
+  }
+
   async function loadLetterboxdCatalogue() {
     const countLabel = document.getElementById('film-count');
     if (countLabel) countLabel.textContent = 'Chargement Letterboxd…';
+
+    // Important : Letterboxd ne sert maintenant qu'à mettre à jour les notes.
+    // On garde toujours le catalogue local pour les affiches, synopsis, réalisateurs et genres.
+    catalogue = STATIC_CATALOGUE;
 
     try {
       const response = await fetch(LETTERBOXD_API_URL, { cache: 'no-store' });
@@ -446,22 +482,10 @@
 
       const payload = await response.json();
       const apiFilms = Array.isArray(payload.films) ? payload.films : [];
-      if (!apiFilms.length) throw new Error('Aucun film renvoyé');
-
-      catalogue = apiFilms.map(makeLetterboxdFilm);
-
-      // On ajoute aussi ces films dans FILMS pour que les popups existantes fonctionnent.
-      for (const film of catalogue) {
-        if (!FILMS.some(existing => existing.id === film.id)) FILMS.push(film);
-      }
-
-      sortKey = 'lbRank';
-      sortDir = 1;
-      currentPage = 1;
+      applyLetterboxdRatings(apiFilms);
       return true;
     } catch (error) {
       console.warn('API Letterboxd non disponible, catalogue statique utilisé :', error.message);
-      catalogue = STATIC_CATALOGUE;
       return false;
     }
   }

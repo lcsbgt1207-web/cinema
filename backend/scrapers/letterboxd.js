@@ -9,13 +9,53 @@ const __dirname = path.dirname(__filename);
 const OUTPUT_DIR = path.join(__dirname, '..', 'data');
 const OUTPUT_FILE = path.join(OUTPUT_DIR, 'letterboxd-films.json');
 const SOURCE_URL = 'https://letterboxd.com/films/popular/';
+const BASE_URL = 'https://letterboxd.com';
 
 const FALLBACK_FILMS = [
   'The Shawshank Redemption','The Godfather','The Dark Knight','The Godfather Part II','12 Angry Men','The Lord of the Rings: The Return of the King','Schindler’s List','Pulp Fiction','Parasite','Interstellar','Whiplash','Fight Club','Inception','Goodfellas','Spirited Away','Seven Samurai','City of God','The Matrix','Seven','The Silence of the Lambs','Se7en','Back to the Future','The Green Mile','Saving Private Ryan','The Prestige','Gladiator','The Departed','Django Unchained','Alien','Blade Runner 2049'
 ];
 
 function slugify(title) {
-  return title.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  return String(title || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
+
+function normalizeSlug(slug) {
+  return String(slug || '').replace(/^\/film\//, '').replace(/\/$/, '');
+}
+
+function extractRating(html) {
+  const patterns = [
+    /"ratingValue"\s*:\s*"?([0-5](?:\.\d+)?)"?/i,
+    /"averageRating"\s*:\s*"?([0-5](?:\.\d+)?)"?/i,
+    /averageRating[^0-9]+([0-5](?:\.\d+)?)/i
+  ];
+
+  for (const pattern of patterns) {
+    const match = html.match(pattern);
+    if (match) {
+      const rating = Number.parseFloat(match[1]);
+      if (Number.isFinite(rating)) return Math.round(rating * 10) / 10;
+    }
+  }
+  return null;
+}
+
+async function fetchFilmRating(film) {
+  if (!film.letterboxdUrl) return null;
+
+  try {
+    const response = await axios.get(film.letterboxdUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36',
+        'Accept-Language': 'en-US,en;q=0.9,fr-FR;q=0.8'
+      },
+      timeout: 15000
+    });
+    return extractRating(response.data);
+  } catch (error) {
+    console.log(`Note ignorée pour ${film.title} : ${error.message}`);
+    return null;
+  }
 }
 
 function savePayload(payload) {
@@ -34,7 +74,8 @@ function fallbackPayload(reason) {
       rank: index + 1,
       title,
       letterboxdSlug: slugify(title),
-      letterboxdUrl: null,
+      letterboxdUrl: `https://letterboxd.com/film/${slugify(title)}/`,
+      letterboxdRating: null,
       sourceType: 'fallback'
     }))
   };
@@ -58,15 +99,27 @@ async function scrapeLetterboxd() {
     $('.film-poster').each((_, el) => {
       const poster = $(el);
       const title = poster.attr('data-film-name') || poster.find('img').attr('alt');
-      const slug = poster.attr('data-film-slug') || slugify(title || '');
-      if (title && !films.some(f => f.letterboxdSlug === slug)) {
-        films.push({ rank: films.length + 1, title, letterboxdSlug: slug, letterboxdUrl: `https://letterboxd.com/film/${slug}/`, sourceType: 'letterboxd-html' });
+      const rawSlug = poster.attr('data-film-slug') || poster.attr('data-target-link') || slugify(title || '');
+      const slug = normalizeSlug(rawSlug);
+      if (title && slug && !films.some(f => f.letterboxdSlug === slug)) {
+        films.push({
+          rank: films.length + 1,
+          title,
+          letterboxdSlug: slug,
+          letterboxdUrl: `${BASE_URL}/film/${slug}/`,
+          letterboxdRating: null,
+          sourceType: 'letterboxd-html'
+        });
       }
     });
 
     if (films.length === 0) {
       savePayload(fallbackPayload('Letterboxd ne renvoie pas de films exploitables.'));
       return;
+    }
+
+    for (const film of films.slice(0, 30)) {
+      film.letterboxdRating = await fetchFilmRating(film);
     }
 
     savePayload({ source: SOURCE_URL, scrapedAt: new Date().toISOString(), count: films.length, films });

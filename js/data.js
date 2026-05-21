@@ -267,7 +267,7 @@ const FILMS = [
     real: "Olivier Nakache, Éric Toledano", acteurs: "François Cluzet, Omar Sy, Anne Le Ny",
     synopsis: "Un aristocrate tétraplégique engage un aide à domicile issu d’un milieu opposé, et une amitié inattendue naît.",
     color: 'p1', badge: null,
-    lb: 4.0, imdb: 8.5, sc: 8.0, annee: 2011, imdbID: "tt1675434", cinemas: []
+    lb: 4.2, imdb: 8.5, sc: 8.0, annee: 2011, imdbID: "tt1675434", cinemas: []
   },
   {
     id: 38, titre: "Harakiri", original: "Harakiri", genre: "Drame", duree: "2h13",

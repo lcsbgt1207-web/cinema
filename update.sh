@@ -1,6 +1,8 @@
 #!/bin/bash
 
-set -e
+set -u
+
+clear
 
 echo "======================================"
 echo "  CinéProche — Mise à jour automatique"
@@ -13,6 +15,12 @@ DOWNLOADS_DIR="$HOME/Downloads"
 DOWNLOADS_DIR_FR="$HOME/Téléchargements"
 PROJECT_DIR="$DESKTOP_DIR/cinema"
 REPO_URL="https://github.com/Icsbgt1207-web/cinema.git"
+
+pause_exit() {
+  echo ""
+  read -p "Appuyez sur Entrée pour quitter..."
+  exit "${1:-0}"
+}
 
 find_latest_zip() {
   local latest=""
@@ -43,6 +51,69 @@ stop_node_processes() {
   fi
 }
 
+ensure_git_identity() {
+  if ! git config user.email >/dev/null 2>&1; then
+    git config user.email "cineproche@example.local" || true
+  fi
+  if ! git config user.name >/dev/null 2>&1; then
+    git config user.name "CineProche Auto Update" || true
+  fi
+}
+
+commit_if_needed() {
+  local message="$1"
+  if [ ! -d ".git" ]; then
+    return 0
+  fi
+
+  ensure_git_identity
+  git add -A >/dev/null 2>&1 || true
+
+  if git diff --cached --quiet >/dev/null 2>&1; then
+    return 0
+  fi
+
+  echo "Commit automatique : $message"
+  git commit -m "$message" >/dev/null 2>&1 || {
+    echo "Commit impossible, mais la mise à jour continue."
+    return 0
+  }
+}
+
+sync_git_before_update() {
+  if [ ! -d ".git" ]; then
+    return 0
+  fi
+
+  echo "Vérification Git..."
+
+  if ! git diff --quiet || ! git diff --cached --quiet || [ -n "$(git ls-files --others --exclude-standard 2>/dev/null)" ]; then
+    commit_if_needed "Sauvegarde automatique avant mise à jour"
+  fi
+
+  echo "Récupération de la dernière version GitHub..."
+  git pull --rebase origin main >/dev/null 2>&1 || {
+    echo "Git pull ignoré : conflit ou authentification GitHub. La mise à jour locale continue."
+  }
+}
+
+push_git_after_update() {
+  if [ ! -d ".git" ]; then
+    return 0
+  fi
+
+  commit_if_needed "Mise à jour CinéProche automatique"
+
+  echo "Envoi vers GitHub..."
+  git push origin main >/dev/null 2>&1 || {
+    echo "Git push non effectué : connexion/authentification GitHub requise ou aucun droit d'écriture."
+    echo "Tes fichiers locaux sont quand même mis à jour."
+    return 0
+  }
+
+  echo "GitHub mis à jour."
+}
+
 copy_dir() {
   local name="$1"
   local src="$PROJECT_DIR/$UPDATE_DIR/$name"
@@ -68,37 +139,31 @@ copy_file() {
 
 if ! command -v git >/dev/null 2>&1; then
   echo "Erreur : Git n'est pas installé ou pas détecté."
-  read -p "Appuyez sur Entrée pour quitter..."
-  exit 1
+  pause_exit 1
 fi
 
 if ! command -v unzip >/dev/null 2>&1; then
   echo "Erreur : unzip n'est pas disponible dans Git Bash."
-  read -p "Appuyez sur Entrée pour quitter..."
-  exit 1
+  pause_exit 1
 fi
 
 mkdir -p "$DESKTOP_DIR"
 
 if [ ! -d "$PROJECT_DIR" ]; then
   echo "Première installation : clonage du dépôt..."
-  git clone "$REPO_URL" "$PROJECT_DIR"
+  git clone "$REPO_URL" "$PROJECT_DIR" || pause_exit 1
 fi
 
-cd "$PROJECT_DIR"
+cd "$PROJECT_DIR" || pause_exit 1
 
-if [ -d ".git" ]; then
-  echo "Mise à jour du dépôt GitHub..."
-  git pull --rebase origin main || echo "Git pull ignoré : modifications locales détectées ou GitHub temporairement indisponible."
-fi
+sync_git_before_update
 
 FOUND_ZIP=$(find_latest_zip)
 
 if [ -z "$FOUND_ZIP" ]; then
   echo "Aucun cinema-updates*.zip trouvé."
   echo "Mets le ZIP sur le Bureau ou dans Téléchargements puis relance ./update.sh."
-  read -p "Appuyez sur Entrée pour quitter..."
-  exit 1
+  pause_exit 1
 fi
 
 echo "ZIP trouvé : $FOUND_ZIP"
@@ -107,12 +172,11 @@ stop_node_processes
 
 rm -rf "$PROJECT_DIR/$UPDATE_DIR"
 echo "Extraction du ZIP..."
-unzip -o "$FOUND_ZIP" -d "$PROJECT_DIR"
+unzip -o "$FOUND_ZIP" -d "$PROJECT_DIR" || pause_exit 1
 
 if [ ! -d "$PROJECT_DIR/$UPDATE_DIR" ]; then
   echo "Erreur : le dossier $UPDATE_DIR est introuvable après extraction."
-  read -p "Appuyez sur Entrée pour quitter..."
-  exit 1
+  pause_exit 1
 fi
 
 copy_dir "html"
@@ -133,22 +197,32 @@ copy_file "agenda.html"
 copy_file "profil.html"
 copy_file "overlays.html"
 copy_file "update.sh"
+copy_file ".gitignore"
 copy_file ".env.example"
 
 rm -rf "$PROJECT_DIR/$UPDATE_DIR"
 
+echo "Nettoyage du ZIP de mise à jour..."
+rm -f "$FOUND_ZIP" 2>/dev/null || true
+
+push_git_after_update
+
 if [ -f "$PROJECT_DIR/backend/package.json" ]; then
   echo "Backend détecté."
 
-  if ! command -v npm >/dev/null 2>&1; then
-    echo "Erreur : npm est introuvable. Installe Node.js puis relance ./update.sh."
-    read -p "Appuyez sur Entrée pour quitter..."
-    exit 1
+  if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
+    echo "Node.js/npm n'est pas installé sur ce PC."
+    echo "Ce n'est pas bloquant : le site et Git sont mis à jour."
+    echo "Installe Node.js plus tard si tu veux lancer l'API locale Letterboxd."
+    echo "======================================"
+    echo "  Mise à jour terminée"
+    echo "======================================"
+    pause_exit 0
   fi
 
-  cd "$PROJECT_DIR/backend"
+  cd "$PROJECT_DIR/backend" || pause_exit 1
   echo "Installation automatique des dépendances backend..."
-  npm install
+  npm install || echo "npm install échoué, la mise à jour locale reste valide."
 
   echo "Scraping automatique de Letterboxd..."
   npm run scrape || echo "Scraping échoué, lancement de l'API avec les anciennes données si disponibles."
@@ -158,8 +232,10 @@ if [ -f "$PROJECT_DIR/backend/package.json" ]; then
   echo "======================================"
   echo "Lancement API locale..."
   echo "Garde cette fenêtre Git Bash ouverte."
-  npm start
+  npm start || pause_exit 0
 else
-  echo "Aucun backend/package.json détecté. Mise à jour terminée."
-  read -p "Appuyez sur Entrée pour quitter..."
+  echo "======================================"
+  echo "  Mise à jour terminée"
+  echo "======================================"
+  pause_exit 0
 fi
