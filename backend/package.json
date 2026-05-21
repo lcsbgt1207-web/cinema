@@ -1,7 +1,7 @@
 {
   "name": "cineproche-backend",
   "version": "1.0.0",
-  "description": "Backend CinéProche pour scraper Letterboxd et exposer une API locale.",
+  "description": "Backend CinéProche pour données Letterboxd et API locale.",
   "type": "module",
   "main": "server.js",
   "scripts": {

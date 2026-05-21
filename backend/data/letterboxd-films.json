@@ -1,6 +1,7 @@
 {
   "source": "fallback-local",
-  "scrapedAt": "2026-05-21T09:26:13.938Z",
+  "reason": "Letterboxd ne renvoie pas de films exploitables.",
+  "scrapedAt": "2026-05-21T09:37:26.611Z",
   "count": 30,
   "films": [
     {
@@ -47,7 +48,7 @@
     },
     {
       "rank": 7,
-      "title": "Schindler's List",
+      "title": "Schindler’s List",
       "letterboxdSlug": "schindler-s-list",
       "letterboxdUrl": null,
       "sourceType": "fallback"
@@ -124,15 +125,15 @@
     },
     {
       "rank": 18,
-      "title": "Se7en",
-      "letterboxdSlug": "se7en",
+      "title": "The Matrix",
+      "letterboxdSlug": "the-matrix",
       "letterboxdUrl": null,
       "sourceType": "fallback"
     },
     {
       "rank": 19,
-      "title": "The Matrix",
-      "letterboxdSlug": "the-matrix",
+      "title": "Seven",
+      "letterboxdSlug": "seven",
       "letterboxdUrl": null,
       "sourceType": "fallback"
     },
@@ -145,29 +146,29 @@
     },
     {
       "rank": 21,
-      "title": "The Green Mile",
-      "letterboxdSlug": "the-green-mile",
+      "title": "Se7en",
+      "letterboxdSlug": "se7en",
       "letterboxdUrl": null,
       "sourceType": "fallback"
     },
     {
       "rank": 22,
-      "title": "Star Wars",
-      "letterboxdSlug": "star-wars",
-      "letterboxdUrl": null,
-      "sourceType": "fallback"
-    },
-    {
-      "rank": 23,
       "title": "Back to the Future",
       "letterboxdSlug": "back-to-the-future",
       "letterboxdUrl": null,
       "sourceType": "fallback"
     },
     {
+      "rank": 23,
+      "title": "The Green Mile",
+      "letterboxdSlug": "the-green-mile",
+      "letterboxdUrl": null,
+      "sourceType": "fallback"
+    },
+    {
       "rank": 24,
-      "title": "Gladiator",
-      "letterboxdSlug": "gladiator",
+      "title": "Saving Private Ryan",
+      "letterboxdSlug": "saving-private-ryan",
       "letterboxdUrl": null,
       "sourceType": "fallback"
     },
@@ -180,36 +181,36 @@
     },
     {
       "rank": 26,
+      "title": "Gladiator",
+      "letterboxdSlug": "gladiator",
+      "letterboxdUrl": null,
+      "sourceType": "fallback"
+    },
+    {
+      "rank": 27,
       "title": "The Departed",
       "letterboxdSlug": "the-departed",
       "letterboxdUrl": null,
       "sourceType": "fallback"
     },
     {
-      "rank": 27,
+      "rank": 28,
+      "title": "Django Unchained",
+      "letterboxdSlug": "django-unchained",
+      "letterboxdUrl": null,
+      "sourceType": "fallback"
+    },
+    {
+      "rank": 29,
       "title": "Alien",
       "letterboxdSlug": "alien",
       "letterboxdUrl": null,
       "sourceType": "fallback"
     },
     {
-      "rank": 28,
-      "title": "Apocalypse Now",
-      "letterboxdSlug": "apocalypse-now",
-      "letterboxdUrl": null,
-      "sourceType": "fallback"
-    },
-    {
-      "rank": 29,
-      "title": "Cinema Paradiso",
-      "letterboxdSlug": "cinema-paradiso",
-      "letterboxdUrl": null,
-      "sourceType": "fallback"
-    },
-    {
       "rank": 30,
-      "title": "Oldboy",
-      "letterboxdSlug": "oldboy",
+      "title": "Blade Runner 2049",
+      "letterboxdSlug": "blade-runner-2049",
       "letterboxdUrl": null,
       "sourceType": "fallback"
     }

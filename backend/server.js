@@ -9,7 +9,6 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -17,26 +16,15 @@ app.use(cors());
 app.use(express.json());
 
 app.get('/', (req, res) => {
-  res.json({
-    message: 'Backend CinéProche actif',
-    routes: ['/api/films-letterboxd']
-  });
+  res.json({ message: 'Backend CinéProche actif', routes: ['/api/films-letterboxd'] });
 });
 
 app.get('/api/films-letterboxd', (req, res) => {
   const filePath = path.join(__dirname, 'data', 'letterboxd-films.json');
-
   if (!fs.existsSync(filePath)) {
-    return res.json({
-      source: 'empty',
-      scrapedAt: new Date().toISOString(),
-      count: 0,
-      films: []
-    });
+    return res.json({ source: 'empty', count: 0, films: [] });
   }
-
-  const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-  res.json(data);
+  res.json(JSON.parse(fs.readFileSync(filePath, 'utf-8')));
 });
 
 app.listen(PORT, () => {
