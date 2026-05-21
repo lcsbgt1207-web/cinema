@@ -10,5 +10,5 @@ const CONFIG = {
   TMDB_IMG_LARGE: 'https://image.tmdb.org/t/p/w780',
   LANGUAGE:       'fr-FR',
   REGION:         'FR',
-  SEARCH_RADIUS:  5000, // mètres autour de l'utilisateur
+  SEARCH_RADIUS:  15000, // mètres autour de l'utilisateur (défaut 15km)
 };

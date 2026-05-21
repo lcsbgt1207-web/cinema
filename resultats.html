@@ -27,6 +27,12 @@
     .results-info { font-size: 12px; color: var(--gray-500); display: flex; align-items: center; gap: 5px; }
     .results-info i { color: var(--black); font-size: 13px; }
 
+    .radius-wrap { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--gray-500); }
+    .radius-label { font-weight: 500; color: var(--black); min-width: 38px; font-size: 12px; }
+    .radius-slider { -webkit-appearance: none; appearance: none; width: 110px; height: 3px; border-radius: 2px; background: var(--gray-200); outline: none; cursor: pointer; }
+    .radius-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: var(--black); cursor: pointer; }
+    .radius-slider::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--black); cursor: pointer; border: none; }
+
     .view { display: none; }
     .view.active { display: block; }
 
@@ -98,7 +104,7 @@
   <div class="container">
     <div class="header-inner">
       <a href="index.html" class="logo">
-        <div class="logo-icon"><i class="ti ti-movie"></i></div>
+        <img src="img/logo.svg" alt="CinéProche" style="width:32px;height:32px;display:block;" />
         <span class="logo-text">Ciné<span>Proche</span></span>
       </a>
       <div class="header-right">
@@ -137,12 +143,21 @@
         <i class="ti ti-movie"></i> Film
       </button>
     </div>
+    <div class="radius-wrap" id="radius-wrap">
+      <i class="ti ti-map-pin" aria-hidden="true"></i>
+      <span>Rayon</span>
+      <input type="range" class="radius-slider" id="radius-slider"
+             min="2" max="50" step="1" value="15"
+             oninput="updateRadius(this.value)" />
+      <span class="radius-label" id="radius-label">15 km</span>
+    </div>
     <div class="results-info" id="results-info"></div>
   </div>
 
   <!-- Vue LIEU -->
   <div class="view" id="view-lieu">
     <div id="cinemas-list"></div>
+    <div id="cinemas-pager"></div>
   </div>
 
   <!-- Vue FILM -->
@@ -215,6 +230,7 @@
 <script src="js/config.js"></script>
 <script src="js/tmdb.js"></script>
 <script src="js/places.js"></script>
+<script src="js/pagination.js"></script>
 <script>
   const params      = new URLSearchParams(window.location.search);
   let searchQuery   = params.get('q') || '';
@@ -222,6 +238,14 @@
   const lat         = parseFloat(params.get('lat'));
   const lng         = parseFloat(params.get('lng'));
   let mapsReady     = false;
+  let currentRadius = 15000; // 15km par défaut
+
+  function updateRadius(val) {
+    currentRadius = val * 1000;
+    document.getElementById('radius-label').textContent = val + ' km';
+    // Relancer la recherche si Maps est prêt
+    if (mapsReady && searchMode === 'lieu') runSearch();
+  }
   let nowPlayingFilms = [];
   let pendingReservation = null;
   let currentCinemaForFilm = null;
@@ -246,6 +270,7 @@
     document.getElementById('view-film').classList.toggle('active', mode === 'film');
     document.getElementById('bar-icon').className = mode === 'film' ? 'ti ti-movie' : 'ti ti-map-pin';
     document.getElementById('btn-locate').style.display = mode === 'film' ? 'none' : 'flex';
+    document.getElementById('radius-wrap').style.display = mode === 'film' ? 'none' : 'flex';
     if (autoSearch) runSearch();
   }
 
@@ -276,7 +301,7 @@
         return;
       }
 
-      const cinemas = await PLACES.findNearbycinemas(location);
+      const cinemas = await PLACES.findNearbycinemas(location, currentRadius);
       if (!cinemas.length) {
         list.innerHTML = `<div class="state-box"><i class="ti ti-building-off"></i><p>Aucun cinéma trouvé dans ce secteur.</p></div>`;
         document.getElementById('results-info').innerHTML = 'Aucun résultat';
@@ -289,10 +314,9 @@
       // Films à afficher sous chaque cinéma (films en salle)
       const filmsToShow = nowPlayingFilms.slice(0, 5);
 
-      list.innerHTML = cinemas.map((c, ci) => {
+      function renderCinemaCard(c, ci) {
         const ouvertClass = c.ouvert === true ? 'chip-open' : c.ouvert === false ? 'chip-closed' : 'chip-unknown';
         const ouvertLabel = c.ouvert === true ? 'Ouvert' : c.ouvert === false ? 'Fermé' : 'Horaires inconnus';
-
         const filmThumbs = filmsToShow.map(f => {
           const poster = TMDB.posterUrl(f.poster_path, 'w92');
           return `<div class="film-thumb" onclick="openFilmPopup(${f.id}, ${JSON.stringify(c).replace(/"/g,'&quot;')})">
@@ -302,7 +326,6 @@
             <div class="film-thumb-title">${f.title}</div>
           </div>`;
         }).join('');
-
         return `<div class="cinema-item" style="animation-delay:${ci * 0.06}s">
           <div class="cinema-item-top">
             <div class="cinema-item-left">
@@ -328,7 +351,18 @@
           <div class="cinema-films-label">Films à l'affiche</div>
           <div class="cinema-films">${filmThumbs}</div>
         </div>`;
-      }).join('');
+      }
+
+      PAGINATION.create({
+        items: cinemas,
+        perPage: 5,
+        containerId: 'cinemas-list',
+        scrollTo: 'cinemas-list',
+        renderFn: (pageCinemas, pagerHtml) => {
+          list.innerHTML = pageCinemas.map((c, ci) => renderCinemaCard(c, ci)).join('');
+          document.getElementById('cinemas-pager').innerHTML = pagerHtml;
+        }
+      });
 
     } catch(e) {
       list.innerHTML = `<div class="state-box"><i class="ti ti-alert-circle"></i><p>Erreur : ${e.message}</p></div>`;
