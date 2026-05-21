@@ -1,8 +1,9 @@
 {
   "source": "letterboxd-film-pages-with-local-preserve",
-  "scrapedAt": "2026-05-21T20:53:30.335Z",
+  "scrapedAt": "2026-05-21T21:03:54.547Z",
   "count": 40,
-  "liveCount": 40,
+  "liveCount": 36,
+  "rejectedCount": 4,
   "films": [
     {
       "rank": 1,
@@ -12,7 +13,7 @@
       "letterboxdSlug": "the-shawshank-redemption",
       "letterboxdUrl": "https://letterboxd.com/film/the-shawshank-redemption/",
       "letterboxdRating": 4.6,
-      "imdb": null,
+      "imdb": 9.3,
       "imdbID": "tt0111161",
       "sourceType": "letterboxd-film-page"
     },
@@ -24,7 +25,7 @@
       "letterboxdSlug": "the-godfather",
       "letterboxdUrl": "https://letterboxd.com/film/the-godfather/",
       "letterboxdRating": 4.5,
-      "imdb": null,
+      "imdb": 9.2,
       "imdbID": "tt0068646",
       "sourceType": "letterboxd-film-page"
     },
@@ -36,7 +37,7 @@
       "letterboxdSlug": "the-dark-knight",
       "letterboxdUrl": "https://letterboxd.com/film/the-dark-knight/",
       "letterboxdRating": 4.5,
-      "imdb": null,
+      "imdb": 9,
       "imdbID": "tt0468569",
       "sourceType": "letterboxd-film-page"
     },
@@ -48,7 +49,7 @@
       "letterboxdSlug": "the-godfather-part-ii",
       "letterboxdUrl": "https://letterboxd.com/film/the-godfather-part-ii/",
       "letterboxdRating": 4.6,
-      "imdb": null,
+      "imdb": 9,
       "imdbID": "tt0071562",
       "sourceType": "letterboxd-film-page"
     },
@@ -60,7 +61,7 @@
       "letterboxdSlug": "12-angry-men",
       "letterboxdUrl": "https://letterboxd.com/film/12-angry-men/",
       "letterboxdRating": 4.6,
-      "imdb": null,
+      "imdb": 9,
       "imdbID": "tt0050083",
       "sourceType": "letterboxd-film-page"
     },
@@ -72,7 +73,7 @@
       "letterboxdSlug": "the-lord-of-the-rings-the-return-of-the-king",
       "letterboxdUrl": "https://letterboxd.com/film/the-lord-of-the-rings-the-return-of-the-king/",
       "letterboxdRating": 4.6,
-      "imdb": null,
+      "imdb": 9,
       "imdbID": "tt0167260",
       "sourceType": "letterboxd-film-page"
     },
@@ -84,7 +85,7 @@
       "letterboxdSlug": "schindlers-list",
       "letterboxdUrl": "https://letterboxd.com/film/schindlers-list/",
       "letterboxdRating": 4.5,
-      "imdb": null,
+      "imdb": 9,
       "imdbID": "tt0108052",
       "sourceType": "letterboxd-film-page"
     },
@@ -96,7 +97,7 @@
       "letterboxdSlug": "the-lord-of-the-rings-the-fellowship-of-the-ring",
       "letterboxdUrl": "https://letterboxd.com/film/the-lord-of-the-rings-the-fellowship-of-the-ring/",
       "letterboxdRating": 4.4,
-      "imdb": null,
+      "imdb": 8.9,
       "imdbID": "tt0120737",
       "sourceType": "letterboxd-film-page"
     },
@@ -108,7 +109,7 @@
       "letterboxdSlug": "pulp-fiction",
       "letterboxdUrl": "https://letterboxd.com/film/pulp-fiction/",
       "letterboxdRating": 4.2,
-      "imdb": null,
+      "imdb": 8.9,
       "imdbID": "tt0110912",
       "sourceType": "letterboxd-film-page"
     },
@@ -120,7 +121,7 @@
       "letterboxdSlug": "the-good-the-bad-and-the-ugly",
       "letterboxdUrl": "https://letterboxd.com/film/the-good-the-bad-and-the-ugly/",
       "letterboxdRating": 4.5,
-      "imdb": null,
+      "imdb": 8.8,
       "imdbID": "tt0060196",
       "sourceType": "letterboxd-film-page"
     },
@@ -132,7 +133,7 @@
       "letterboxdSlug": "forrest-gump",
       "letterboxdUrl": "https://letterboxd.com/film/forrest-gump/",
       "letterboxdRating": 4.2,
-      "imdb": null,
+      "imdb": 8.8,
       "imdbID": "tt0109830",
       "sourceType": "letterboxd-film-page"
     },
@@ -144,7 +145,7 @@
       "letterboxdSlug": "the-lord-of-the-rings-the-two-towers",
       "letterboxdUrl": "https://letterboxd.com/film/the-lord-of-the-rings-the-two-towers/",
       "letterboxdRating": 4.4,
-      "imdb": null,
+      "imdb": 8.8,
       "imdbID": "tt0167261",
       "sourceType": "letterboxd-film-page"
     },
@@ -156,7 +157,7 @@
       "letterboxdSlug": "fight-club",
       "letterboxdUrl": "https://letterboxd.com/film/fight-club/",
       "letterboxdRating": 4.3,
-      "imdb": null,
+      "imdb": 8.8,
       "imdbID": "tt0137523",
       "sourceType": "letterboxd-film-page"
     },
@@ -168,7 +169,7 @@
       "letterboxdSlug": "inception",
       "letterboxdUrl": "https://letterboxd.com/film/inception/",
       "letterboxdRating": 4.2,
-      "imdb": null,
+      "imdb": 8.8,
       "imdbID": "tt1375666",
       "sourceType": "letterboxd-film-page"
     },
@@ -180,7 +181,7 @@
       "letterboxdSlug": "the-empire-strikes-back",
       "letterboxdUrl": "https://letterboxd.com/film/the-empire-strikes-back/",
       "letterboxdRating": 4.4,
-      "imdb": null,
+      "imdb": 8.7,
       "imdbID": "tt0080684",
       "sourceType": "letterboxd-film-page"
     },
@@ -192,7 +193,7 @@
       "letterboxdSlug": "the-matrix",
       "letterboxdUrl": "https://letterboxd.com/film/the-matrix/",
       "letterboxdRating": 4.2,
-      "imdb": null,
+      "imdb": 8.7,
       "imdbID": "tt0133093",
       "sourceType": "letterboxd-film-page"
     },
@@ -204,7 +205,7 @@
       "letterboxdSlug": "goodfellas",
       "letterboxdUrl": "https://letterboxd.com/film/goodfellas/",
       "letterboxdRating": 4.5,
-      "imdb": null,
+      "imdb": 8.7,
       "imdbID": "tt0099685",
       "sourceType": "letterboxd-film-page"
     },
@@ -216,7 +217,7 @@
       "letterboxdSlug": "one-flew-over-the-cuckoos-nest",
       "letterboxdUrl": "https://letterboxd.com/film/one-flew-over-the-cuckoos-nest/",
       "letterboxdRating": 4.4,
-      "imdb": null,
+      "imdb": 8.7,
       "imdbID": "tt0073486",
       "sourceType": "letterboxd-film-page"
     },
@@ -228,7 +229,7 @@
       "letterboxdSlug": "interstellar",
       "letterboxdUrl": "https://letterboxd.com/film/interstellar/",
       "letterboxdRating": 4.5,
-      "imdb": null,
+      "imdb": 8.7,
       "imdbID": "tt0816692",
       "sourceType": "letterboxd-film-page"
     },
@@ -240,7 +241,7 @@
       "letterboxdSlug": "se7en",
       "letterboxdUrl": "https://letterboxd.com/film/se7en/",
       "letterboxdRating": 4.4,
-      "imdb": null,
+      "imdb": 8.6,
       "imdbID": "tt0114369",
       "sourceType": "letterboxd-film-page"
     },
@@ -252,7 +253,7 @@
       "letterboxdSlug": "life-is-beautiful",
       "letterboxdUrl": "https://letterboxd.com/film/life-is-beautiful/",
       "letterboxdRating": 4.4,
-      "imdb": null,
+      "imdb": 8.6,
       "imdbID": "tt0118799",
       "sourceType": "letterboxd-film-page"
     },
@@ -264,7 +265,7 @@
       "letterboxdSlug": "seven-samurai",
       "letterboxdUrl": "https://letterboxd.com/film/seven-samurai/",
       "letterboxdRating": 4.6,
-      "imdb": null,
+      "imdb": 8.6,
       "imdbID": "tt0047478",
       "sourceType": "letterboxd-film-page"
     },
@@ -276,7 +277,7 @@
       "letterboxdSlug": "the-silence-of-the-lambs",
       "letterboxdUrl": "https://letterboxd.com/film/the-silence-of-the-lambs/",
       "letterboxdRating": 4.3,
-      "imdb": null,
+      "imdb": 8.6,
       "imdbID": "tt0102926",
       "sourceType": "letterboxd-film-page"
     },
@@ -288,7 +289,7 @@
       "letterboxdSlug": "saving-private-ryan",
       "letterboxdUrl": "https://letterboxd.com/film/saving-private-ryan/",
       "letterboxdRating": 4.3,
-      "imdb": null,
+      "imdb": 8.6,
       "imdbID": "tt0120815",
       "sourceType": "letterboxd-film-page"
     },
@@ -300,7 +301,7 @@
       "letterboxdSlug": "city-of-god",
       "letterboxdUrl": "https://letterboxd.com/film/city-of-god/",
       "letterboxdRating": 4.6,
-      "imdb": null,
+      "imdb": 8.6,
       "imdbID": "tt0317248",
       "sourceType": "letterboxd-film-page"
     },
@@ -312,7 +313,7 @@
       "letterboxdSlug": "the-green-mile",
       "letterboxdUrl": "https://letterboxd.com/film/the-green-mile/",
       "letterboxdRating": 4.3,
-      "imdb": null,
+      "imdb": 8.6,
       "imdbID": "tt0120689",
       "sourceType": "letterboxd-film-page"
     },
@@ -324,7 +325,7 @@
       "letterboxdSlug": "terminator-2-judgment-day",
       "letterboxdUrl": "https://letterboxd.com/film/terminator-2-judgment-day/",
       "letterboxdRating": 4.3,
-      "imdb": null,
+      "imdb": 8.6,
       "imdbID": "tt0103064",
       "sourceType": "letterboxd-film-page"
     },
@@ -336,7 +337,7 @@
       "letterboxdSlug": "star-wars",
       "letterboxdUrl": "https://letterboxd.com/film/star-wars/",
       "letterboxdRating": 4.2,
-      "imdb": null,
+      "imdb": 8.6,
       "imdbID": "tt0076759",
       "sourceType": "letterboxd-film-page"
     },
@@ -348,9 +349,9 @@
       "letterboxdSlug": "back-to-the-future",
       "letterboxdUrl": "https://letterboxd.com/film/back-to-the-future/",
       "letterboxdRating": 4.2,
-      "imdb": null,
+      "imdb": 8.5,
       "imdbID": "tt0088763",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "local-preserved-live-rejected"
     },
     {
       "rank": 30,
@@ -360,7 +361,7 @@
       "letterboxdSlug": "spirited-away",
       "letterboxdUrl": "https://letterboxd.com/film/spirited-away/",
       "letterboxdRating": 4.4,
-      "imdb": null,
+      "imdb": 8.6,
       "imdbID": "tt0245429",
       "sourceType": "letterboxd-film-page"
     },
@@ -372,7 +373,7 @@
       "letterboxdSlug": "psycho",
       "letterboxdUrl": "https://letterboxd.com/film/psycho/",
       "letterboxdRating": 4.3,
-      "imdb": null,
+      "imdb": 8.5,
       "imdbID": "tt0054215",
       "sourceType": "letterboxd-film-page"
     },
@@ -383,10 +384,10 @@
       "original": "Parasite",
       "letterboxdSlug": "parasite",
       "letterboxdUrl": "https://letterboxd.com/film/parasite/",
-      "letterboxdRating": 2.4,
-      "imdb": null,
+      "letterboxdRating": 4.4,
+      "imdb": 8.5,
       "imdbID": "tt6751668",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "local-preserved-live-rejected"
     },
     {
       "rank": 33,
@@ -395,10 +396,10 @@
       "original": "Gladiator",
       "letterboxdSlug": "gladiator",
       "letterboxdUrl": "https://letterboxd.com/film/gladiator/",
-      "letterboxdRating": 3.2,
-      "imdb": null,
+      "letterboxdRating": 4.2,
+      "imdb": 8.5,
       "imdbID": "tt0172495",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "local-preserved-live-rejected"
     },
     {
       "rank": 34,
@@ -408,7 +409,7 @@
       "letterboxdSlug": "the-departed",
       "letterboxdUrl": "https://letterboxd.com/film/the-departed/",
       "letterboxdRating": 4.3,
-      "imdb": null,
+      "imdb": 8.5,
       "imdbID": "tt0407887",
       "sourceType": "letterboxd-film-page"
     },
@@ -419,10 +420,10 @@
       "original": "Whiplash",
       "letterboxdSlug": "whiplash",
       "letterboxdUrl": "https://letterboxd.com/film/whiplash/",
-      "letterboxdRating": 3.2,
-      "imdb": null,
+      "letterboxdRating": 4.3,
+      "imdb": 8.5,
       "imdbID": "tt2582802",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "local-preserved-live-rejected"
     },
     {
       "rank": 36,
@@ -432,7 +433,7 @@
       "letterboxdSlug": "the-prestige",
       "letterboxdUrl": "https://letterboxd.com/film/the-prestige/",
       "letterboxdRating": 4.3,
-      "imdb": null,
+      "imdb": 8.5,
       "imdbID": "tt0482571",
       "sourceType": "letterboxd-film-page"
     },
@@ -444,7 +445,7 @@
       "letterboxdSlug": "the-intouchables",
       "letterboxdUrl": "https://letterboxd.com/film/the-intouchables/",
       "letterboxdRating": 4.2,
-      "imdb": null,
+      "imdb": 8.5,
       "imdbID": "tt1675434",
       "sourceType": "letterboxd-film-page"
     },
@@ -456,7 +457,7 @@
       "letterboxdSlug": "harakiri",
       "letterboxdUrl": "https://letterboxd.com/film/harakiri/",
       "letterboxdRating": 4.7,
-      "imdb": null,
+      "imdb": 8.6,
       "imdbID": "tt0056058",
       "sourceType": "letterboxd-film-page"
     },
@@ -468,7 +469,7 @@
       "letterboxdSlug": "once-upon-a-time-in-the-west",
       "letterboxdUrl": "https://letterboxd.com/film/once-upon-a-time-in-the-west/",
       "letterboxdRating": 4.4,
-      "imdb": null,
+      "imdb": 8.5,
       "imdbID": "tt0064116",
       "sourceType": "letterboxd-film-page"
     },
@@ -480,7 +481,7 @@
       "letterboxdSlug": "the-usual-suspects",
       "letterboxdUrl": "https://letterboxd.com/film/the-usual-suspects/",
       "letterboxdRating": 4.1,
-      "imdb": null,
+      "imdb": 8.5,
       "imdbID": "tt0114814",
       "sourceType": "letterboxd-film-page"
     }

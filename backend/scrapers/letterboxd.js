@@ -45,17 +45,45 @@ const SLUG_OVERRIDES = {
   'The Usual Suspects': 'the-usual-suspects'
 };
 
-// Notes locales conservées si Letterboxd bloque ou change son HTML.
-// Ce fallback ne doit jamais écraser les affiches, synopsis ou notes IMDb.
-const VERIFIED_LOCAL_RATINGS = {
-  'The Prestige': 4.3,
-  'Intouchables': 4.2,
-  'The Intouchables': 4.2
-};
+// Notes locales conservées si Letterboxd bloque, change son HTML, ou renvoie une mauvaise valeur.
+// Règle : Letterboxd ne doit jamais casser le catalogue. On part toujours de js/data.js,
+// puis on accepte une note live uniquement si elle est cohérente avec la note locale.
+const MAX_LIVE_LOCAL_DELTA = 0.35;
 
 function safeRating(value) {
   const rating = Number.parseFloat(String(value).replace(',', '.'));
   return Number.isFinite(rating) && rating >= 0.5 && rating <= 5 ? Math.round(rating * 10) / 10 : null;
+}
+
+function safeScore10(value) {
+  const score = Number.parseFloat(String(value).replace(',', '.'));
+  return Number.isFinite(score) && score >= 0.5 && score <= 10 ? Math.round(score * 10) / 10 : null;
+}
+
+function htmlDecode(value) {
+  return String(value || '')
+    .replace(/&quot;/g, '"')
+    .replace(/&#34;/g, '"')
+    .replace(/&amp;/g, '&')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'");
+}
+
+function chooseBestRating(liveRating, localRating) {
+  const live = safeRating(liveRating);
+  const local = safeRating(localRating);
+
+  if (live === null) return { rating: local, sourceType: 'local-preserved-no-live-rating' };
+  if (local === null) return { rating: live, sourceType: 'letterboxd-film-page' };
+
+  // Protection contre le bug actuel : certaines pages Letterboxd contiennent plusieurs
+  // nombres dans le HTML. Si le parsing récupère 2.4 ou 3.2 alors que la note locale
+  // fiable est autour de 4.3, on rejette la valeur live au lieu de casser le site.
+  if (Math.abs(live - local) > MAX_LIVE_LOCAL_DELTA) {
+    return { rating: local, sourceType: 'local-preserved-live-rejected' };
+  }
+
+  return { rating: live, sourceType: 'letterboxd-film-page' };
 }
 
 function slugify(title) {
@@ -82,7 +110,7 @@ function extractFilmBlocksFromLocalData() {
     const titre = block.match(/titre:\s*"([^"]+)"/)?.[1];
     const original = block.match(/original:\s*"([^"]+)"/)?.[1];
     const lb = safeRating(block.match(/lb:\s*([0-9.]+)/)?.[1]);
-    const imdb = safeRating(block.match(/imdb:\s*([0-9.]+)/)?.[1]);
+    const imdb = safeScore10(block.match(/imdb:\s*([0-9.]+)/)?.[1]);
     const imdbID = block.match(/imdbID:\s*"([^"]+)"/)?.[1];
     const displayTitle = original || titre;
     const slug = SLUG_OVERRIDES[displayTitle] || SLUG_OVERRIDES[titre] || slugify(displayTitle);
@@ -94,7 +122,7 @@ function extractFilmBlocksFromLocalData() {
       original,
       letterboxdSlug: slug,
       letterboxdUrl: `${BASE_URL}/film/${slug}/`,
-      letterboxdRating: VERIFIED_LOCAL_RATINGS[displayTitle] ?? VERIFIED_LOCAL_RATINGS[titre] ?? lb,
+      letterboxdRating: lb,
       imdb,
       imdbID,
       sourceType: 'local-preserved'
@@ -103,22 +131,45 @@ function extractFilmBlocksFromLocalData() {
 }
 
 function extractRating(html) {
-  const patterns = [
-    /"ratingValue"\s*:\s*"?([0-5](?:\.\d+)?)"?/i,
-    /"averageRating"\s*:\s*"?([0-5](?:\.\d+)?)"?/i,
-    /aggregateRating[\s\S]{0,600}?ratingValue["'\s:]+([0-5](?:\.\d+)?)/i,
-    /averageRating["'\s:]+([0-5](?:\.\d+)?)/i,
-    /data-average-rating=["']([0-5](?:\.\d+)?)["']/i,
-    /class=["'][^"']*average-rating[^"']*["'][^>]*>\s*([0-5](?:\.\d+)?)/i
-  ];
+  const source = String(html || '');
+  const candidates = [];
 
-  for (const pattern of patterns) {
-    const match = html.match(pattern);
-    const rating = match ? safeRating(match[1]) : null;
-    if (rating !== null) return rating;
+  const add = (value, label) => {
+    const rating = safeRating(value);
+    if (rating !== null) candidates.push({ rating, label });
+  };
+
+  // 1) Le plus fiable quand présent : métadonnées qui affichent "4.3 out of 5".
+  const metaPatterns = [
+    /<meta[^>]+name=["']twitter:data2["'][^>]+content=["']([0-5](?:[\.,]\d+)?)\s*(?:out of|\/)?\s*5?["'][^>]*>/i,
+    /<meta[^>]+content=["']([0-5](?:[\.,]\d+)?)\s*(?:out of|\/)?\s*5?["'][^>]+name=["']twitter:data2["'][^>]*>/i,
+    /<meta[^>]+property=["']og:description["'][^>]+content=["'][^"']*?([0-5](?:[\.,]\d+)?)\s*(?:out of|\/)?\s*5/i
+  ];
+  for (const pattern of metaPatterns) {
+    const match = source.match(pattern);
+    if (match) add(match[1], 'meta');
   }
 
-  return null;
+  // 2) JSON-LD AggregateRating, mais uniquement si le bloc contient aussi un count.
+  // Ça évite de prendre la note d'une critique ou d'un autre élément de la page.
+  const aggregateBlocks = source.match(/aggregateRating[\s\S]{0,1200}?(?:ratingCount|reviewCount|ratingValue)[\s\S]{0,1200}?\}/gi) || [];
+  for (const block of aggregateBlocks) {
+    const decoded = htmlDecode(block);
+    if (!/(ratingCount|reviewCount)/i.test(decoded)) continue;
+    const match = decoded.match(/ratingValue["'\s:]+([0-5](?:[\.,]\d+)?)/i);
+    if (match) add(match[1], 'aggregateRating');
+  }
+
+  // 3) Dernier recours : data-average-rating, si Letterboxd le garde dans le HTML.
+  const dataAverage = source.match(/data-average-rating=["']([0-5](?:[\.,]\d+)?)["']/i);
+  if (dataAverage) add(dataAverage[1], 'data-average-rating');
+
+  if (!candidates.length) return null;
+
+  // On privilégie les valeurs fortes proches de l'affichage public Letterboxd.
+  // Les mauvaises captures vues dans le projet étaient souvent 2.4 ou 3.2.
+  candidates.sort((a, b) => b.rating - a.rating);
+  return candidates[0].rating;
 }
 
 async function fetchFilmRating(film) {
@@ -151,15 +202,15 @@ async function scrapeLetterboxd() {
   }
 
   let liveCount = 0;
+  let rejectedCount = 0;
   for (const film of films) {
+    const localRating = film.letterboxdRating;
     const liveRating = await fetchFilmRating(film);
-    if (liveRating !== null) {
-      film.letterboxdRating = liveRating;
-      film.sourceType = 'letterboxd-film-page';
-      liveCount++;
-    } else {
-      film.sourceType = 'local-preserved';
-    }
+    const choice = chooseBestRating(liveRating, localRating);
+    film.letterboxdRating = choice.rating;
+    film.sourceType = choice.sourceType;
+    if (choice.sourceType === 'letterboxd-film-page') liveCount++;
+    if (choice.sourceType === 'local-preserved-live-rejected') rejectedCount++;
     await sleep(350);
   }
 
@@ -168,6 +219,7 @@ async function scrapeLetterboxd() {
     scrapedAt: new Date().toISOString(),
     count: films.length,
     liveCount,
+    rejectedCount,
     films
   });
 }
