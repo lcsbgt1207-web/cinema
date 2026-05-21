@@ -247,6 +247,7 @@
   let catalogue = FILMS.filter(f => f.lb && f.sc);
   const STATIC_CATALOGUE = [...catalogue];
   const LETTERBOXD_API_URL = 'http://localhost:3000/api/films-letterboxd';
+  const LETTERBOXD_MIN_VALID_RATING = 0.5;
   const favs = new Set(JSON.parse(localStorage.getItem('cinepro_favs') || '[]'));
   let sortKey = 'imdb', sortDir = -1;
   let currentPage = 1;
@@ -460,8 +461,10 @@
       });
 
       const rating = Number(match?.letterboxdRating ?? match?.lb ?? match?.rating);
-      if (Number.isFinite(rating)) {
-        film.lb = rating;
+      // Sécurité importante : Letterboxd ne doit JAMAIS remplacer une vraie note
+      // par null, 0 ou une donnée invalide. Si le scrape rate, on garde data.js.
+      if (Number.isFinite(rating) && rating >= LETTERBOXD_MIN_VALID_RATING) {
+        film.lb = Math.round(rating * 10) / 10;
         updated++;
       }
     }
@@ -482,7 +485,8 @@
 
       const payload = await response.json();
       const apiFilms = Array.isArray(payload.films) ? payload.films : [];
-      applyLetterboxdRatings(apiFilms);
+      const updated = applyLetterboxdRatings(apiFilms);
+      console.log(`Notes Letterboxd mises à jour : ${updated}. Données TMDB/locales conservées.`);
       return true;
     } catch (error) {
       console.warn('API Letterboxd non disponible, catalogue statique utilisé :', error.message);

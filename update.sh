@@ -1,7 +1,6 @@
 #!/bin/bash
 
 set -u
-
 clear
 
 echo "======================================"
@@ -52,19 +51,13 @@ stop_node_processes() {
 }
 
 ensure_git_identity() {
-  if ! git config user.email >/dev/null 2>&1; then
-    git config user.email "cineproche@example.local" || true
-  fi
-  if ! git config user.name >/dev/null 2>&1; then
-    git config user.name "CineProche Auto Update" || true
-  fi
+  git config user.email >/dev/null 2>&1 || git config user.email "cineproche@example.local" || true
+  git config user.name >/dev/null 2>&1 || git config user.name "CineProche Auto Update" || true
 }
 
 commit_if_needed() {
   local message="$1"
-  if [ ! -d ".git" ]; then
-    return 0
-  fi
+  [ -d ".git" ] || return 0
 
   ensure_git_identity
   git add -A >/dev/null 2>&1 || true
@@ -75,39 +68,35 @@ commit_if_needed() {
 
   echo "Commit automatique : $message"
   git commit -m "$message" >/dev/null 2>&1 || {
-    echo "Commit impossible, mais la mise à jour continue."
+    echo "Commit impossible, la mise à jour continue quand même."
     return 0
   }
 }
 
 sync_git_before_update() {
-  if [ ! -d ".git" ]; then
-    return 0
-  fi
+  [ -d ".git" ] || return 0
 
-  echo "Vérification Git..."
+  echo "Synchronisation GitHub avant mise à jour..."
+  commit_if_needed "Sauvegarde automatique avant mise à jour"
 
-  if ! git diff --quiet || ! git diff --cached --quiet || [ -n "$(git ls-files --others --exclude-standard 2>/dev/null)" ]; then
-    commit_if_needed "Sauvegarde automatique avant mise à jour"
-  fi
-
-  echo "Récupération de la dernière version GitHub..."
   git pull --rebase origin main >/dev/null 2>&1 || {
     echo "Git pull ignoré : conflit ou authentification GitHub. La mise à jour locale continue."
   }
 }
 
-push_git_after_update() {
-  if [ ! -d ".git" ]; then
-    return 0
-  fi
+push_git_after_everything() {
+  [ -d ".git" ] || return 0
 
   commit_if_needed "Mise à jour CinéProche automatique"
 
-  echo "Envoi vers GitHub..."
+  echo "Synchronisation finale avec GitHub..."
+  git pull --rebase origin main >/dev/null 2>&1 || {
+    echo "Git pull final ignoré : conflit ou authentification GitHub."
+  }
+
   git push origin main >/dev/null 2>&1 || {
     echo "Git push non effectué : connexion/authentification GitHub requise ou aucun droit d'écriture."
-    echo "Tes fichiers locaux sont quand même mis à jour."
+    echo "Les fichiers locaux sont quand même mis à jour."
     return 0
   }
 
@@ -162,7 +151,7 @@ FOUND_ZIP=$(find_latest_zip)
 
 if [ -z "$FOUND_ZIP" ]; then
   echo "Aucun cinema-updates*.zip trouvé."
-  echo "Mets le ZIP sur le Bureau ou dans Téléchargements puis relance ./update.sh."
+  echo "Télécharge le ZIP, laisse-le dans Téléchargements, puis relance ./update.sh."
   pause_exit 1
 fi
 
@@ -205,37 +194,35 @@ rm -rf "$PROJECT_DIR/$UPDATE_DIR"
 echo "Nettoyage du ZIP de mise à jour..."
 rm -f "$FOUND_ZIP" 2>/dev/null || true
 
-push_git_after_update
-
 if [ -f "$PROJECT_DIR/backend/package.json" ]; then
   echo "Backend détecté."
 
-  if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
-    echo "Node.js/npm n'est pas installé sur ce PC."
-    echo "Ce n'est pas bloquant : le site et Git sont mis à jour."
-    echo "Installe Node.js plus tard si tu veux lancer l'API locale Letterboxd."
-    echo "======================================"
-    echo "  Mise à jour terminée"
-    echo "======================================"
-    pause_exit 0
+  if command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
+    cd "$PROJECT_DIR/backend" || pause_exit 1
+    echo "Installation automatique des dépendances backend..."
+    npm install || echo "npm install échoué, la mise à jour locale reste valide."
+
+    echo "Scraping automatique de Letterboxd..."
+    npm run scrape || echo "Scraping échoué, anciennes données conservées si disponibles."
+    cd "$PROJECT_DIR" || pause_exit 1
+  else
+    echo "Node.js/npm non détecté : étape backend ignorée."
   fi
+fi
 
-  cd "$PROJECT_DIR/backend" || pause_exit 1
-  echo "Installation automatique des dépendances backend..."
-  npm install || echo "npm install échoué, la mise à jour locale reste valide."
+# IMPORTANT : on push seulement à la toute fin, après le scraper.
+# Comme ça, backend/data/letterboxd-films.json ne reste plus en modification locale.
+push_git_after_everything
 
-  echo "Scraping automatique de Letterboxd..."
-  npm run scrape || echo "Scraping échoué, lancement de l'API avec les anciennes données si disponibles."
+echo "======================================"
+echo "  Mise à jour terminée"
+echo "======================================"
 
-  echo "======================================"
-  echo "  Mise à jour terminée"
-  echo "======================================"
+if [ -f "$PROJECT_DIR/backend/package.json" ] && command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
+  cd "$PROJECT_DIR/backend" || pause_exit 0
   echo "Lancement API locale..."
   echo "Garde cette fenêtre Git Bash ouverte."
   npm start || pause_exit 0
 else
-  echo "======================================"
-  echo "  Mise à jour terminée"
-  echo "======================================"
   pause_exit 0
 fi

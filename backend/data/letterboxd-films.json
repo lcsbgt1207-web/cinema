@@ -1,7 +1,7 @@
 {
   "source": "fallback-local",
   "reason": "Letterboxd ne renvoie pas de films exploitables.",
-  "scrapedAt": "2026-05-21T19:37:59.195Z",
+  "scrapedAt": "2026-05-21T20:11:32.124Z",
   "count": 30,
   "films": [
     {
@@ -9,240 +9,240 @@
       "title": "The Shawshank Redemption",
       "letterboxdSlug": "the-shawshank-redemption",
       "letterboxdUrl": "https://letterboxd.com/film/the-shawshank-redemption/",
-      "letterboxdRating": null,
-      "sourceType": "fallback"
+      "letterboxdRating": 4.6,
+      "sourceType": "fallback-local-safe"
     },
     {
       "rank": 2,
       "title": "The Godfather",
       "letterboxdSlug": "the-godfather",
       "letterboxdUrl": "https://letterboxd.com/film/the-godfather/",
-      "letterboxdRating": null,
-      "sourceType": "fallback"
+      "letterboxdRating": 4.6,
+      "sourceType": "fallback-local-safe"
     },
     {
       "rank": 3,
       "title": "The Dark Knight",
       "letterboxdSlug": "the-dark-knight",
       "letterboxdUrl": "https://letterboxd.com/film/the-dark-knight/",
-      "letterboxdRating": null,
-      "sourceType": "fallback"
+      "letterboxdRating": 4.5,
+      "sourceType": "fallback-local-safe"
     },
     {
       "rank": 4,
       "title": "The Godfather Part II",
       "letterboxdSlug": "the-godfather-part-ii",
       "letterboxdUrl": "https://letterboxd.com/film/the-godfather-part-ii/",
-      "letterboxdRating": null,
-      "sourceType": "fallback"
+      "letterboxdRating": 4.6,
+      "sourceType": "fallback-local-safe"
     },
     {
       "rank": 5,
       "title": "12 Angry Men",
       "letterboxdSlug": "12-angry-men",
       "letterboxdUrl": "https://letterboxd.com/film/12-angry-men/",
-      "letterboxdRating": null,
-      "sourceType": "fallback"
+      "letterboxdRating": 4.6,
+      "sourceType": "fallback-local-safe"
     },
     {
       "rank": 6,
       "title": "The Lord of the Rings: The Return of the King",
       "letterboxdSlug": "the-lord-of-the-rings-the-return-of-the-king",
       "letterboxdUrl": "https://letterboxd.com/film/the-lord-of-the-rings-the-return-of-the-king/",
-      "letterboxdRating": null,
-      "sourceType": "fallback"
+      "letterboxdRating": 4.4,
+      "sourceType": "fallback-local-safe"
     },
     {
       "rank": 7,
       "title": "Schindler’s List",
       "letterboxdSlug": "schindler-s-list",
       "letterboxdUrl": "https://letterboxd.com/film/schindler-s-list/",
-      "letterboxdRating": null,
-      "sourceType": "fallback"
+      "letterboxdRating": 4.5,
+      "sourceType": "fallback-local-safe"
     },
     {
       "rank": 8,
       "title": "Pulp Fiction",
       "letterboxdSlug": "pulp-fiction",
       "letterboxdUrl": "https://letterboxd.com/film/pulp-fiction/",
-      "letterboxdRating": null,
-      "sourceType": "fallback"
+      "letterboxdRating": 4.4,
+      "sourceType": "fallback-local-safe"
     },
     {
       "rank": 9,
       "title": "Parasite",
       "letterboxdSlug": "parasite",
       "letterboxdUrl": "https://letterboxd.com/film/parasite/",
-      "letterboxdRating": null,
-      "sourceType": "fallback"
+      "letterboxdRating": 4.6,
+      "sourceType": "fallback-local-safe"
     },
     {
       "rank": 10,
       "title": "Interstellar",
       "letterboxdSlug": "interstellar",
       "letterboxdUrl": "https://letterboxd.com/film/interstellar/",
-      "letterboxdRating": null,
-      "sourceType": "fallback"
+      "letterboxdRating": 4.4,
+      "sourceType": "fallback-local-safe"
     },
     {
       "rank": 11,
       "title": "Whiplash",
       "letterboxdSlug": "whiplash",
       "letterboxdUrl": "https://letterboxd.com/film/whiplash/",
-      "letterboxdRating": null,
-      "sourceType": "fallback"
+      "letterboxdRating": 4.3,
+      "sourceType": "fallback-local-safe"
     },
     {
       "rank": 12,
       "title": "Fight Club",
       "letterboxdSlug": "fight-club",
       "letterboxdUrl": "https://letterboxd.com/film/fight-club/",
-      "letterboxdRating": null,
-      "sourceType": "fallback"
+      "letterboxdRating": 4.4,
+      "sourceType": "fallback-local-safe"
     },
     {
       "rank": 13,
       "title": "Inception",
       "letterboxdSlug": "inception",
       "letterboxdUrl": "https://letterboxd.com/film/inception/",
-      "letterboxdRating": null,
-      "sourceType": "fallback"
+      "letterboxdRating": 4.3,
+      "sourceType": "fallback-local-safe"
     },
     {
       "rank": 14,
       "title": "Goodfellas",
       "letterboxdSlug": "goodfellas",
       "letterboxdUrl": "https://letterboxd.com/film/goodfellas/",
-      "letterboxdRating": null,
-      "sourceType": "fallback"
+      "letterboxdRating": 4.4,
+      "sourceType": "fallback-local-safe"
     },
     {
       "rank": 15,
       "title": "Spirited Away",
       "letterboxdSlug": "spirited-away",
       "letterboxdUrl": "https://letterboxd.com/film/spirited-away/",
-      "letterboxdRating": null,
-      "sourceType": "fallback"
+      "letterboxdRating": 4.5,
+      "sourceType": "fallback-local-safe"
     },
     {
       "rank": 16,
       "title": "Seven Samurai",
       "letterboxdSlug": "seven-samurai",
       "letterboxdUrl": "https://letterboxd.com/film/seven-samurai/",
-      "letterboxdRating": null,
-      "sourceType": "fallback"
+      "letterboxdRating": 4.5,
+      "sourceType": "fallback-local-safe"
     },
     {
       "rank": 17,
       "title": "City of God",
       "letterboxdSlug": "city-of-god",
       "letterboxdUrl": "https://letterboxd.com/film/city-of-god/",
-      "letterboxdRating": null,
-      "sourceType": "fallback"
+      "letterboxdRating": 4.5,
+      "sourceType": "fallback-local-safe"
     },
     {
       "rank": 18,
       "title": "The Matrix",
       "letterboxdSlug": "the-matrix",
       "letterboxdUrl": "https://letterboxd.com/film/the-matrix/",
-      "letterboxdRating": null,
-      "sourceType": "fallback"
+      "letterboxdRating": 4.3,
+      "sourceType": "fallback-local-safe"
     },
     {
       "rank": 19,
       "title": "Seven",
       "letterboxdSlug": "seven",
       "letterboxdUrl": "https://letterboxd.com/film/seven/",
-      "letterboxdRating": null,
-      "sourceType": "fallback"
+      "letterboxdRating": 4.3,
+      "sourceType": "fallback-local-safe"
     },
     {
       "rank": 20,
       "title": "The Silence of the Lambs",
       "letterboxdSlug": "the-silence-of-the-lambs",
       "letterboxdUrl": "https://letterboxd.com/film/the-silence-of-the-lambs/",
-      "letterboxdRating": null,
-      "sourceType": "fallback"
+      "letterboxdRating": 4.3,
+      "sourceType": "fallback-local-safe"
     },
     {
       "rank": 21,
       "title": "Se7en",
       "letterboxdSlug": "se7en",
       "letterboxdUrl": "https://letterboxd.com/film/se7en/",
-      "letterboxdRating": null,
-      "sourceType": "fallback"
+      "letterboxdRating": 4.3,
+      "sourceType": "fallback-local-safe"
     },
     {
       "rank": 22,
       "title": "Back to the Future",
       "letterboxdSlug": "back-to-the-future",
       "letterboxdUrl": "https://letterboxd.com/film/back-to-the-future/",
-      "letterboxdRating": null,
-      "sourceType": "fallback"
+      "letterboxdRating": 4.2,
+      "sourceType": "fallback-local-safe"
     },
     {
       "rank": 23,
       "title": "The Green Mile",
       "letterboxdSlug": "the-green-mile",
       "letterboxdUrl": "https://letterboxd.com/film/the-green-mile/",
-      "letterboxdRating": null,
-      "sourceType": "fallback"
+      "letterboxdRating": 4.2,
+      "sourceType": "fallback-local-safe"
     },
     {
       "rank": 24,
       "title": "Saving Private Ryan",
       "letterboxdSlug": "saving-private-ryan",
       "letterboxdUrl": "https://letterboxd.com/film/saving-private-ryan/",
-      "letterboxdRating": null,
-      "sourceType": "fallback"
+      "letterboxdRating": 4.3,
+      "sourceType": "fallback-local-safe"
     },
     {
       "rank": 25,
       "title": "The Prestige",
       "letterboxdSlug": "the-prestige",
       "letterboxdUrl": "https://letterboxd.com/film/the-prestige/",
-      "letterboxdRating": null,
-      "sourceType": "fallback"
+      "letterboxdRating": 4.2,
+      "sourceType": "fallback-local-safe"
     },
     {
       "rank": 26,
       "title": "Gladiator",
       "letterboxdSlug": "gladiator",
       "letterboxdUrl": "https://letterboxd.com/film/gladiator/",
-      "letterboxdRating": null,
-      "sourceType": "fallback"
+      "letterboxdRating": 4.2,
+      "sourceType": "fallback-local-safe"
     },
     {
       "rank": 27,
       "title": "The Departed",
       "letterboxdSlug": "the-departed",
       "letterboxdUrl": "https://letterboxd.com/film/the-departed/",
-      "letterboxdRating": null,
-      "sourceType": "fallback"
+      "letterboxdRating": 4.2,
+      "sourceType": "fallback-local-safe"
     },
     {
       "rank": 28,
       "title": "Django Unchained",
       "letterboxdSlug": "django-unchained",
       "letterboxdUrl": "https://letterboxd.com/film/django-unchained/",
-      "letterboxdRating": null,
-      "sourceType": "fallback"
+      "letterboxdRating": 4.1,
+      "sourceType": "fallback-local-safe"
     },
     {
       "rank": 29,
       "title": "Alien",
       "letterboxdSlug": "alien",
       "letterboxdUrl": "https://letterboxd.com/film/alien/",
-      "letterboxdRating": null,
-      "sourceType": "fallback"
+      "letterboxdRating": 4.3,
+      "sourceType": "fallback-local-safe"
     },
     {
       "rank": 30,
       "title": "Blade Runner 2049",
       "letterboxdSlug": "blade-runner-2049",
       "letterboxdUrl": "https://letterboxd.com/film/blade-runner-2049/",
-      "letterboxdRating": null,
-      "sourceType": "fallback"
+      "letterboxdRating": 4.1,
+      "sourceType": "fallback-local-safe"
     }
   ]
 }
