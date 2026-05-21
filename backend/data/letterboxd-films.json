@@ -1,8 +1,8 @@
 {
-  "source": "letterboxd-film-pages-with-local-preserve",
-  "scrapedAt": "2026-05-21T21:42:28.982Z",
+  "source": "local-preserved-no-live-rating",
+  "scrapedAt": "2026-05-21T21:53:15.840Z",
   "count": 80,
-  "liveCount": 74,
+  "liveCount": 0,
   "films": [
     {
       "rank": 1,
@@ -14,7 +14,7 @@
       "letterboxdRating": 4.6,
       "imdb": null,
       "imdbID": "tt0111161",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 2,
@@ -23,10 +23,10 @@
       "original": "The Godfather",
       "letterboxdSlug": "the-godfather",
       "letterboxdUrl": "https://letterboxd.com/film/the-godfather/",
-      "letterboxdRating": 4.5,
+      "letterboxdRating": 4.6,
       "imdb": null,
       "imdbID": "tt0068646",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 3,
@@ -38,7 +38,7 @@
       "letterboxdRating": 4.5,
       "imdb": null,
       "imdbID": "tt0468569",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 4,
@@ -50,7 +50,7 @@
       "letterboxdRating": 4.6,
       "imdb": null,
       "imdbID": "tt0071562",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 5,
@@ -62,7 +62,7 @@
       "letterboxdRating": 4.6,
       "imdb": null,
       "imdbID": "tt0050083",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 6,
@@ -71,10 +71,10 @@
       "original": "The Lord of the Rings: The Return of the King",
       "letterboxdSlug": "the-lord-of-the-rings-the-return-of-the-king",
       "letterboxdUrl": "https://letterboxd.com/film/the-lord-of-the-rings-the-return-of-the-king/",
-      "letterboxdRating": 4.6,
+      "letterboxdRating": 4.4,
       "imdb": null,
       "imdbID": "tt0167260",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 7,
@@ -86,7 +86,7 @@
       "letterboxdRating": 4.5,
       "imdb": null,
       "imdbID": "tt0108052",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 8,
@@ -98,7 +98,7 @@
       "letterboxdRating": 4.4,
       "imdb": null,
       "imdbID": "tt0120737",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 9,
@@ -110,7 +110,7 @@
       "letterboxdRating": 4.4,
       "imdb": null,
       "imdbID": "tt0110912",
-      "sourceType": "verified-protected"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 10,
@@ -122,7 +122,7 @@
       "letterboxdRating": 4.5,
       "imdb": null,
       "imdbID": "tt0060196",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 11,
@@ -131,10 +131,10 @@
       "original": "Forrest Gump",
       "letterboxdSlug": "forrest-gump",
       "letterboxdUrl": "https://letterboxd.com/film/forrest-gump/",
-      "letterboxdRating": 4.2,
+      "letterboxdRating": 4.3,
       "imdb": null,
       "imdbID": "tt0109830",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 12,
@@ -146,7 +146,7 @@
       "letterboxdRating": 4.4,
       "imdb": null,
       "imdbID": "tt0167261",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 13,
@@ -155,10 +155,10 @@
       "original": "Fight Club",
       "letterboxdSlug": "fight-club",
       "letterboxdUrl": "https://letterboxd.com/film/fight-club/",
-      "letterboxdRating": 4.3,
+      "letterboxdRating": 4.4,
       "imdb": null,
       "imdbID": "tt0137523",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 14,
@@ -167,10 +167,10 @@
       "original": "Inception",
       "letterboxdSlug": "inception",
       "letterboxdUrl": "https://letterboxd.com/film/inception/",
-      "letterboxdRating": 4.2,
+      "letterboxdRating": 4.3,
       "imdb": null,
       "imdbID": "tt1375666",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 15,
@@ -182,7 +182,7 @@
       "letterboxdRating": 4.4,
       "imdb": null,
       "imdbID": "tt0080684",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 16,
@@ -191,10 +191,10 @@
       "original": "The Matrix",
       "letterboxdSlug": "the-matrix",
       "letterboxdUrl": "https://letterboxd.com/film/the-matrix/",
-      "letterboxdRating": 4.2,
+      "letterboxdRating": 4.3,
       "imdb": null,
       "imdbID": "tt0133093",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 17,
@@ -203,10 +203,10 @@
       "original": "Goodfellas",
       "letterboxdSlug": "goodfellas",
       "letterboxdUrl": "https://letterboxd.com/film/goodfellas/",
-      "letterboxdRating": 4.5,
+      "letterboxdRating": 4.4,
       "imdb": null,
       "imdbID": "tt0099685",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 18,
@@ -218,7 +218,7 @@
       "letterboxdRating": 4.4,
       "imdb": null,
       "imdbID": "tt0073486",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 19,
@@ -227,10 +227,10 @@
       "original": "Interstellar",
       "letterboxdSlug": "interstellar",
       "letterboxdUrl": "https://letterboxd.com/film/interstellar/",
-      "letterboxdRating": 4.5,
+      "letterboxdRating": 4.4,
       "imdb": null,
       "imdbID": "tt0816692",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 20,
@@ -239,10 +239,10 @@
       "original": "Se7en",
       "letterboxdSlug": "se7en",
       "letterboxdUrl": "https://letterboxd.com/film/se7en/",
-      "letterboxdRating": 4.4,
+      "letterboxdRating": 4.3,
       "imdb": null,
       "imdbID": "tt0114369",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 21,
@@ -251,10 +251,10 @@
       "original": "Life Is Beautiful",
       "letterboxdSlug": "life-is-beautiful",
       "letterboxdUrl": "https://letterboxd.com/film/life-is-beautiful/",
-      "letterboxdRating": 4.4,
+      "letterboxdRating": 4.3,
       "imdb": null,
       "imdbID": "tt0118799",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 22,
@@ -263,10 +263,10 @@
       "original": "Seven Samurai",
       "letterboxdSlug": "seven-samurai",
       "letterboxdUrl": "https://letterboxd.com/film/seven-samurai/",
-      "letterboxdRating": 4.6,
+      "letterboxdRating": 4.5,
       "imdb": null,
       "imdbID": "tt0047478",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 23,
@@ -278,7 +278,7 @@
       "letterboxdRating": 4.3,
       "imdb": null,
       "imdbID": "tt0102926",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 24,
@@ -290,7 +290,7 @@
       "letterboxdRating": 4.3,
       "imdb": null,
       "imdbID": "tt0120815",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 25,
@@ -299,10 +299,10 @@
       "original": "City of God",
       "letterboxdSlug": "city-of-god",
       "letterboxdUrl": "https://letterboxd.com/film/city-of-god/",
-      "letterboxdRating": 4.6,
+      "letterboxdRating": 4.4,
       "imdb": null,
       "imdbID": "tt0317248",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 26,
@@ -314,7 +314,7 @@
       "letterboxdRating": 4.3,
       "imdb": null,
       "imdbID": "tt0120689",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 27,
@@ -323,10 +323,10 @@
       "original": "Terminator 2: Judgment Day",
       "letterboxdSlug": "terminator-2-judgment-day",
       "letterboxdUrl": "https://letterboxd.com/film/terminator-2-judgment-day/",
-      "letterboxdRating": 4.3,
+      "letterboxdRating": 4.2,
       "imdb": null,
       "imdbID": "tt0103064",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 28,
@@ -335,10 +335,10 @@
       "original": "Star Wars",
       "letterboxdSlug": "star-wars",
       "letterboxdUrl": "https://letterboxd.com/film/star-wars/",
-      "letterboxdRating": 4.2,
+      "letterboxdRating": 4.3,
       "imdb": null,
       "imdbID": "tt0076759",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 29,
@@ -350,7 +350,7 @@
       "letterboxdRating": 4.2,
       "imdb": null,
       "imdbID": "tt0088763",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 30,
@@ -359,10 +359,10 @@
       "original": "Spirited Away",
       "letterboxdSlug": "spirited-away",
       "letterboxdUrl": "https://letterboxd.com/film/spirited-away/",
-      "letterboxdRating": 4.4,
+      "letterboxdRating": 4.5,
       "imdb": null,
       "imdbID": "tt0245429",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 31,
@@ -374,7 +374,7 @@
       "letterboxdRating": 4.3,
       "imdb": null,
       "imdbID": "tt0054215",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 32,
@@ -386,7 +386,7 @@
       "letterboxdRating": 4.5,
       "imdb": null,
       "imdbID": "tt6751668",
-      "sourceType": "verified-protected"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 33,
@@ -398,7 +398,7 @@
       "letterboxdRating": 4.2,
       "imdb": null,
       "imdbID": "tt0172495",
-      "sourceType": "verified-protected"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 34,
@@ -410,7 +410,7 @@
       "letterboxdRating": 4.3,
       "imdb": null,
       "imdbID": "tt0407887",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 35,
@@ -422,7 +422,7 @@
       "letterboxdRating": 4.4,
       "imdb": null,
       "imdbID": "tt2582802",
-      "sourceType": "verified-protected"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 36,
@@ -434,7 +434,7 @@
       "letterboxdRating": 4.3,
       "imdb": null,
       "imdbID": "tt0482571",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 37,
@@ -446,7 +446,7 @@
       "letterboxdRating": 4.2,
       "imdb": null,
       "imdbID": "tt1675434",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 38,
@@ -458,7 +458,7 @@
       "letterboxdRating": 4.7,
       "imdb": null,
       "imdbID": "tt0056058",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 39,
@@ -470,7 +470,7 @@
       "letterboxdRating": 4.4,
       "imdb": null,
       "imdbID": "tt0064116",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 40,
@@ -482,7 +482,7 @@
       "letterboxdRating": 4.1,
       "imdb": null,
       "imdbID": "tt0114814",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 41,
@@ -494,7 +494,7 @@
       "letterboxdRating": 4.3,
       "imdb": null,
       "imdbID": "tt0078748",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 42,
@@ -506,7 +506,7 @@
       "letterboxdRating": 4.4,
       "imdb": null,
       "imdbID": "tt0078788",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 43,
@@ -518,7 +518,7 @@
       "letterboxdRating": 4.2,
       "imdb": null,
       "imdbID": "tt0209144",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 44,
@@ -527,10 +527,10 @@
       "original": "American History X",
       "letterboxdSlug": "american-history-x",
       "letterboxdUrl": "https://letterboxd.com/film/american-history-x/",
-      "letterboxdRating": 4.2,
+      "letterboxdRating": 4.1,
       "imdb": null,
       "imdbID": "tt0120586",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 45,
@@ -539,10 +539,10 @@
       "original": "Grave of the Fireflies",
       "letterboxdSlug": "grave-of-the-fireflies",
       "letterboxdUrl": "https://letterboxd.com/film/grave-of-the-fireflies/",
-      "letterboxdRating": 4.5,
+      "letterboxdRating": 4.4,
       "imdb": null,
       "imdbID": "tt0095327",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 46,
@@ -554,7 +554,7 @@
       "letterboxdRating": 4.3,
       "imdb": null,
       "imdbID": "tt0032553",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 47,
@@ -566,7 +566,7 @@
       "letterboxdRating": 4.3,
       "imdb": null,
       "imdbID": "tt0027977",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 48,
@@ -575,10 +575,10 @@
       "original": "Rear Window",
       "letterboxdSlug": "rear-window",
       "letterboxdUrl": "https://letterboxd.com/film/rear-window/",
-      "letterboxdRating": 4.4,
+      "letterboxdRating": 4.3,
       "imdb": null,
       "imdbID": "tt0047396",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 49,
@@ -587,10 +587,10 @@
       "original": "Paths of Glory",
       "letterboxdSlug": "paths-of-glory",
       "letterboxdUrl": "https://letterboxd.com/film/paths-of-glory/",
-      "letterboxdRating": 4.5,
+      "letterboxdRating": 4.4,
       "imdb": null,
       "imdbID": "tt0050825",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 50,
@@ -599,10 +599,10 @@
       "original": "Casablanca",
       "letterboxdSlug": "casablanca",
       "letterboxdUrl": "https://letterboxd.com/film/casablanca/",
-      "letterboxdRating": 4.3,
+      "letterboxdRating": 4.2,
       "imdb": null,
       "imdbID": "tt0034583",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 51,
@@ -611,10 +611,10 @@
       "original": "Once Upon a Time in America",
       "letterboxdSlug": "once-upon-a-time-in-america",
       "letterboxdUrl": "https://letterboxd.com/film/once-upon-a-time-in-america/",
-      "letterboxdRating": 4.2,
+      "letterboxdRating": 4.4,
       "imdb": null,
       "imdbID": "tt0087843",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 52,
@@ -623,10 +623,10 @@
       "original": "Cinema Paradiso",
       "letterboxdSlug": "cinema-paradiso",
       "letterboxdUrl": "https://letterboxd.com/film/cinema-paradiso/",
-      "letterboxdRating": 4.5,
+      "letterboxdRating": 4.4,
       "imdb": null,
       "imdbID": "tt0095765",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 53,
@@ -635,10 +635,10 @@
       "original": "La Haine",
       "letterboxdSlug": "la-haine",
       "letterboxdUrl": "https://letterboxd.com/film/la-haine/",
-      "letterboxdRating": 4.5,
+      "letterboxdRating": 4.3,
       "imdb": null,
       "imdbID": "tt0113247",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 54,
@@ -650,7 +650,7 @@
       "letterboxdRating": 4.4,
       "imdb": null,
       "imdbID": "tt0364569",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 55,
@@ -662,7 +662,7 @@
       "letterboxdRating": 4.4,
       "imdb": null,
       "imdbID": "tt0119698",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 56,
@@ -674,19 +674,19 @@
       "letterboxdRating": 4.2,
       "imdb": null,
       "imdbID": "tt0910970",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 57,
       "title": "Coco",
       "titre": "Coco",
       "original": "Coco",
-      "letterboxdSlug": "coco",
-      "letterboxdUrl": "https://letterboxd.com/film/coco/",
-      "letterboxdRating": 2.4,
+      "letterboxdSlug": "coco-2017",
+      "letterboxdUrl": "https://letterboxd.com/film/coco-2017/",
+      "letterboxdRating": 4.2,
       "imdb": null,
       "imdbID": "tt2380307",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 58,
@@ -698,7 +698,7 @@
       "letterboxdRating": 4.1,
       "imdb": null,
       "imdbID": "tt0114709",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 59,
@@ -707,10 +707,10 @@
       "original": "Toy Story 3",
       "letterboxdSlug": "toy-story-3",
       "letterboxdUrl": "https://letterboxd.com/film/toy-story-3/",
-      "letterboxdRating": 4,
+      "letterboxdRating": 4.2,
       "imdb": null,
       "imdbID": "tt0435761",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 60,
@@ -722,7 +722,7 @@
       "letterboxdRating": 4.4,
       "imdb": null,
       "imdbID": "tt4633694",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 61,
@@ -734,19 +734,19 @@
       "letterboxdRating": 4.2,
       "imdb": null,
       "imdbID": "tt5311514",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 62,
       "title": "Howl’s Moving Castle",
       "titre": "Le Château ambulant",
       "original": "Howl’s Moving Castle",
-      "letterboxdSlug": "howl-s-moving-castle",
-      "letterboxdUrl": "https://letterboxd.com/film/howl-s-moving-castle/",
+      "letterboxdSlug": "howls-moving-castle",
+      "letterboxdUrl": "https://letterboxd.com/film/howls-moving-castle/",
       "letterboxdRating": 4.3,
       "imdb": null,
       "imdbID": "tt0347149",
-      "sourceType": "local-preserved"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 63,
@@ -755,10 +755,10 @@
       "original": "Akira",
       "letterboxdSlug": "akira",
       "letterboxdUrl": "https://letterboxd.com/film/akira/",
-      "letterboxdRating": 4.3,
+      "letterboxdRating": 4.2,
       "imdb": null,
       "imdbID": "tt0094625",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 64,
@@ -767,10 +767,10 @@
       "original": "Blade Runner",
       "letterboxdSlug": "blade-runner",
       "letterboxdUrl": "https://letterboxd.com/film/blade-runner/",
-      "letterboxdRating": 4.1,
+      "letterboxdRating": 4.2,
       "imdb": null,
       "imdbID": "tt0083658",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 65,
@@ -782,7 +782,7 @@
       "letterboxdRating": 4.1,
       "imdb": null,
       "imdbID": "tt1856101",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 66,
@@ -794,7 +794,7 @@
       "letterboxdRating": 4.2,
       "imdb": null,
       "imdbID": "tt1392190",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 67,
@@ -803,10 +803,10 @@
       "original": "Django Unchained",
       "letterboxdSlug": "django-unchained",
       "letterboxdUrl": "https://letterboxd.com/film/django-unchained/",
-      "letterboxdRating": 4.3,
+      "letterboxdRating": 4.1,
       "imdb": null,
       "imdbID": "tt1853728",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 68,
@@ -818,7 +818,7 @@
       "letterboxdRating": 4.1,
       "imdb": null,
       "imdbID": "tt0105236",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 69,
@@ -827,10 +827,10 @@
       "original": "Kill Bill: Vol. 1",
       "letterboxdSlug": "kill-bill-vol-1",
       "letterboxdUrl": "https://letterboxd.com/film/kill-bill-vol-1/",
-      "letterboxdRating": 4.2,
+      "letterboxdRating": 4.1,
       "imdb": null,
       "imdbID": "tt0266697",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 70,
@@ -839,10 +839,10 @@
       "original": "Inglourious Basterds",
       "letterboxdSlug": "inglourious-basterds",
       "letterboxdUrl": "https://letterboxd.com/film/inglourious-basterds/",
-      "letterboxdRating": 4.4,
+      "letterboxdRating": 4.3,
       "imdb": null,
       "imdbID": "tt0361748",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 71,
@@ -854,7 +854,7 @@
       "letterboxdRating": 4,
       "imdb": null,
       "imdbID": "tt0993846",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 72,
@@ -863,10 +863,10 @@
       "original": "Taxi Driver",
       "letterboxdSlug": "taxi-driver",
       "letterboxdUrl": "https://letterboxd.com/film/taxi-driver/",
-      "letterboxdRating": 4.1,
+      "letterboxdRating": 4.2,
       "imdb": null,
       "imdbID": "tt0075314",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 73,
@@ -878,7 +878,7 @@
       "letterboxdRating": 4.2,
       "imdb": null,
       "imdbID": "tt0081398",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 74,
@@ -887,10 +887,10 @@
       "original": "Shutter Island",
       "letterboxdSlug": "shutter-island",
       "letterboxdUrl": "https://letterboxd.com/film/shutter-island/",
-      "letterboxdRating": 4.2,
+      "letterboxdRating": 4,
       "imdb": null,
       "imdbID": "tt1130884",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 75,
@@ -899,10 +899,10 @@
       "original": "Amélie",
       "letterboxdSlug": "amelie",
       "letterboxdUrl": "https://letterboxd.com/film/amelie/",
-      "letterboxdRating": 4.2,
+      "letterboxdRating": 4.1,
       "imdb": null,
       "imdbID": "tt0211915",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 76,
@@ -911,10 +911,10 @@
       "original": "Diabolique",
       "letterboxdSlug": "diabolique",
       "letterboxdUrl": "https://letterboxd.com/film/diabolique/",
-      "letterboxdRating": 2.9,
+      "letterboxdRating": 4.2,
       "imdb": null,
       "imdbID": "tt0046911",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 77,
@@ -923,10 +923,10 @@
       "original": "The Wages of Fear",
       "letterboxdSlug": "the-wages-of-fear",
       "letterboxdUrl": "https://letterboxd.com/film/the-wages-of-fear/",
-      "letterboxdRating": 4.4,
+      "letterboxdRating": 4.3,
       "imdb": null,
       "imdbID": "tt0046268",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 78,
@@ -938,7 +938,7 @@
       "letterboxdRating": 4.2,
       "imdb": null,
       "imdbID": "tt0028950",
-      "sourceType": "local-preserved"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 79,
@@ -947,10 +947,10 @@
       "original": "The 400 Blows",
       "letterboxdSlug": "the-400-blows",
       "letterboxdUrl": "https://letterboxd.com/film/the-400-blows/",
-      "letterboxdRating": 4.3,
+      "letterboxdRating": 4.2,
       "imdb": null,
       "imdbID": "tt0053198",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     },
     {
       "rank": 80,
@@ -959,10 +959,10 @@
       "original": "Persona",
       "letterboxdSlug": "persona",
       "letterboxdUrl": "https://letterboxd.com/film/persona/",
-      "letterboxdRating": 4.4,
+      "letterboxdRating": 4.3,
       "imdb": null,
       "imdbID": "tt0060827",
-      "sourceType": "letterboxd-film-page"
+      "sourceType": "verified-local-priority"
     }
   ]
 }

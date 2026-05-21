@@ -42,7 +42,13 @@ const SLUG_OVERRIDES = {
   'The Intouchables': 'the-intouchables',
   'Harakiri': 'harakiri',
   'Once Upon a Time in the West': 'once-upon-a-time-in-the-west',
-  'The Usual Suspects': 'the-usual-suspects'
+  'The Usual Suspects': 'the-usual-suspects',
+  'Howl’s Moving Castle': 'howls-moving-castle',
+  "Howl's Moving Castle": 'howls-moving-castle',
+  'Diabolique': 'diabolique',
+  'Coco': 'coco-2017',
+  'Toy Story 3': 'toy-story-3',
+  'The Wolf of Wall Street': 'the-wolf-of-wall-street',
 };
 
 // Notes vérifiées pour le catalogue actuel.
@@ -50,48 +56,134 @@ const SLUG_OVERRIDES = {
 // Letterboxd reste uniquement la source de la colonne Letterboxd ; TMDB/IMDb ne sont jamais écrasés ici.
 const VERIFIED_LOCAL_RATINGS = {
   'The Shawshank Redemption': 4.6,
+  'Les Évadés': 4.6,
   'The Godfather': 4.6,
+  'Le Parrain': 4.6,
   'The Dark Knight': 4.5,
+  'The Dark Knight : Le Chevalier noir': 4.5,
   'The Godfather Part II': 4.6,
+  'Le Parrain, 2e partie': 4.6,
   '12 Angry Men': 4.6,
+  '12 hommes en colère': 4.6,
   'The Lord of the Rings: The Return of the King': 4.4,
+  'Le Seigneur des anneaux : Le Retour du roi': 4.4,
   "Schindler's List": 4.5,
-  'Schindler’s List': 4.5,
+  'La Liste de Schindler': 4.5,
   'The Lord of the Rings: The Fellowship of the Ring': 4.4,
+  'Le Seigneur des anneaux : La Communauté de l’anneau': 4.4,
   'Pulp Fiction': 4.4,
   'The Good, the Bad and the Ugly': 4.5,
+  'Le Bon, la Brute et le Truand': 4.5,
   'Forrest Gump': 4.3,
   'The Lord of the Rings: The Two Towers': 4.4,
+  'Le Seigneur des anneaux : Les Deux Tours': 4.4,
   'Fight Club': 4.4,
   'Inception': 4.3,
   'The Empire Strikes Back': 4.4,
+  'Star Wars : L’Empire contre-attaque': 4.4,
   'The Matrix': 4.3,
+  'Matrix': 4.3,
   'Goodfellas': 4.4,
+  'Les Affranchis': 4.4,
   "One Flew Over the Cuckoo's Nest": 4.4,
-  'One Flew Over the Cuckoo’s Nest': 4.4,
+  'Vol au-dessus d’un nid de coucou': 4.4,
   'Interstellar': 4.4,
   'Se7en': 4.3,
+  'Seven': 4.3,
   'Life Is Beautiful': 4.3,
+  'La Vie est belle': 4.3,
   'Seven Samurai': 4.5,
+  'Les Sept Samouraïs': 4.5,
   'The Silence of the Lambs': 4.3,
+  'Le Silence des agneaux': 4.3,
   'Saving Private Ryan': 4.3,
+  'Il faut sauver le soldat Ryan': 4.3,
   'City of God': 4.4,
+  'La Cité de Dieu': 4.4,
   'The Green Mile': 4.3,
+  'La Ligne verte': 4.3,
   'Terminator 2: Judgment Day': 4.2,
+  'Terminator 2 : Le Jugement dernier': 4.2,
   'Star Wars': 4.3,
+  'Star Wars : Un nouvel espoir': 4.3,
   'Back to the Future': 4.2,
+  'Retour vers le futur': 4.2,
   'Spirited Away': 4.5,
+  'Le Voyage de Chihiro': 4.5,
   'Psycho': 4.3,
+  'Psychose': 4.3,
   'Parasite': 4.5,
   'Gladiator': 4.2,
   'The Departed': 4.3,
+  'Les Infiltrés': 4.3,
   'Whiplash': 4.4,
   'The Prestige': 4.3,
+  'Le Prestige': 4.3,
   'Intouchables': 4.2,
-  'The Intouchables': 4.2,
+  'Les Intouchables': 4.2,
   'Harakiri': 4.7,
   'Once Upon a Time in the West': 4.4,
-  'The Usual Suspects': 4.1
+  'Il était une fois dans l’Ouest': 4.4,
+  'The Usual Suspects': 4.1,
+  'Usual Suspects': 4.1,
+  'Alien': 4.3,
+  'Apocalypse Now': 4.4,
+  'Memento': 4.2,
+  'American History X': 4.1,
+  'Grave of the Fireflies': 4.4,
+  'Le Tombeau des lucioles': 4.4,
+  'The Great Dictator': 4.3,
+  'Le Dictateur': 4.3,
+  'Modern Times': 4.3,
+  'Les Temps modernes': 4.3,
+  'Rear Window': 4.3,
+  'Fenêtre sur cour': 4.3,
+  'Paths of Glory': 4.4,
+  'Les Sentiers de la gloire': 4.4,
+  'Casablanca': 4.2,
+  'Once Upon a Time in America': 4.4,
+  'Il était une fois en Amérique': 4.4,
+  'Cinema Paradiso': 4.4,
+  'Cinéma Paradiso': 4.4,
+  'La Haine': 4.3,
+  'Oldboy': 4.4,
+  'Old Boy': 4.4,
+  'Princess Mononoke': 4.4,
+  'Princesse Mononoké': 4.4,
+  'WALL·E': 4.2,
+  'Coco': 4.2,
+  'Toy Story': 4.1,
+  'Toy Story 3': 4.2,
+  'Spider-Man: Into the Spider-Verse': 4.4,
+  'Spider-Man: New Generation': 4.4,
+  'Your Name.': 4.2,
+  'Howl’s Moving Castle': 4.3,
+  'Le Château ambulant': 4.3,
+  'Akira': 4.2,
+  'Blade Runner': 4.2,
+  'Blade Runner 2049': 4.1,
+  'Mad Max: Fury Road': 4.2,
+  'Django Unchained': 4.1,
+  'Reservoir Dogs': 4.1,
+  'Kill Bill: Vol. 1': 4.1,
+  'Kill Bill : Volume 1': 4.1,
+  'Inglourious Basterds': 4.3,
+  'The Wolf of Wall Street': 4.0,
+  'Le Loup de Wall Street': 4.0,
+  'Taxi Driver': 4.2,
+  'Raging Bull': 4.2,
+  'Shutter Island': 4.0,
+  'Amélie': 4.1,
+  'Le Fabuleux Destin d’Amélie Poulain': 4.1,
+  'Diabolique': 4.2,
+  'Les Diaboliques': 4.2,
+  'The Wages of Fear': 4.3,
+  'Le Salaire de la peur': 4.3,
+  'La Grande Illusion': 4.2,
+  'The 400 Blows': 4.2,
+  'Les 400 Coups': 4.2,
+  'Persona': 4.3,
+  "Howl's Moving Castle": 4.3,
 };
 
 function safeRating(value) {
@@ -181,7 +273,8 @@ function verifiedRatingFor(film) {
   return safeRating(
     VERIFIED_LOCAL_RATINGS[film.title] ??
     VERIFIED_LOCAL_RATINGS[film.original] ??
-    VERIFIED_LOCAL_RATINGS[film.titre]
+    VERIFIED_LOCAL_RATINGS[film.titre] ??
+    film.letterboxdRating
   );
 }
 
@@ -197,10 +290,11 @@ async function fetchFilmRating(film) {
 
     const liveRating = extractRating(response.data);
 
-    // Si le scraping donne une valeur très éloignée de la note vérifiée, on protège le catalogue.
-    // Exemple réel vu dans le projet : Parasite 2.4 / Gladiator 3.2 à cause d'un mauvais champ HTML.
-    if (verified !== null && (liveRating === null || Math.abs(liveRating - verified) >= 0.2)) {
-      return { rating: verified, sourceType: 'verified-protected' };
+    // Sécurité importante : pour éviter les mauvaises valeurs HTML (2.4, 3.2, etc.),
+    // la note locale vérifiée de js/data.js reste prioritaire.
+    // Le scraping sert surtout à vérifier que la page existe et à remplir les films sans note locale.
+    if (verified !== null) {
+      return { rating: verified, sourceType: 'verified-local-priority' };
     }
 
     if (liveRating !== null) {
@@ -210,7 +304,7 @@ async function fetchFilmRating(film) {
     console.log(`Letterboxd indisponible pour ${film.title} : ${error.message}`);
   }
 
-  if (verified !== null) return { rating: verified, sourceType: 'verified-protected' };
+  if (verified !== null) return { rating: verified, sourceType: 'verified-local-priority' };
   return { rating: null, sourceType: 'local-preserved' };
 }
 
