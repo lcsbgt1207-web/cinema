@@ -274,7 +274,7 @@ const FILMS = [
     real: "Masaki Kobayashi", acteurs: "Tatsuya Nakadai, Akira Ishihama",
     synopsis: "Un rônin demande à se donner la mort dans la demeure d’un clan, révélant peu à peu une terrible injustice.",
     color: 'p2', badge: null,
-    lb: 4.7, imdb: 8.6, sc: 8.7, annee: 1962, imdbID: "tt0056058", cinemas: []
+    lb: 4.6, imdb: 8.6, sc: 8.7, annee: 1962, imdbID: "tt0056058", cinemas: []
   },
   {
     id: 39, titre: "Il était une fois dans l’Ouest", original: "Once Upon a Time in the West", genre: "Western", duree: "2h46",

@@ -281,13 +281,6 @@ function verifiedRatingFor(film) {
 async function fetchFilmRating(film) {
   const verified = verifiedRatingFor(film);
 
-  // Pour le catalogue CinéProche, la note Letterboxd vérifiée dans js/data.js
-  // est prioritaire. On évite ainsi les valeurs parasites du HTML Letterboxd
-  // et les erreurs 404 sur certains titres avec apostrophes.
-  if (verified !== null) {
-    return { rating: verified, sourceType: 'verified-local-priority' };
-  }
-
   try {
     const response = await axios.get(film.letterboxdUrl, {
       headers: REQUEST_HEADERS,
@@ -296,6 +289,13 @@ async function fetchFilmRating(film) {
     });
 
     const liveRating = extractRating(response.data);
+
+    // Sécurité importante : pour éviter les mauvaises valeurs HTML (2.4, 3.2, etc.),
+    // la note locale vérifiée de js/data.js reste prioritaire.
+    // Le scraping sert surtout à vérifier que la page existe et à remplir les films sans note locale.
+    if (verified !== null) {
+      return { rating: verified, sourceType: 'verified-local-priority' };
+    }
 
     if (liveRating !== null) {
       return { rating: liveRating, sourceType: 'letterboxd-film-page' };

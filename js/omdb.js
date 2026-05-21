@@ -3,7 +3,7 @@
    OMDb = vraie note IMDb du tableau, récupérée avec l'ID IMDb quand possible
 */
 
-const OMDB_CACHE_KEY = 'cinepro_omdb_cache_v9_preserve_local_imdb';
+const OMDB_CACHE_KEY = 'cinepro_omdb_cache_v9_safe_local_imdb';
 const TMDB_CACHE_KEY = 'cinepro_tmdb_cache_v7_fr_synopsis';
 
 function readCache(key) {
@@ -137,7 +137,7 @@ async function fetchTmdbFilm(film) {
 }
 
 async function fetchOmdbById(imdbID) {
-  if (!imdbID) return null;
+  if (!imdbID || !CONFIG.OMDB_API_KEY) return null;
 
   const cacheKey = `id-${imdbID}`;
   const cache = readCache(OMDB_CACHE_KEY);
@@ -174,6 +174,7 @@ async function fetchOmdbById(imdbID) {
 }
 
 async function fetchOmdbByTitle(film) {
+  if (!CONFIG.OMDB_API_KEY) return null;
   const title = searchTitle(film);
   const cacheKey = `title-${normalizeText(title)}-${film.annee || ''}`;
   const cache = readCache(OMDB_CACHE_KEY);
@@ -221,7 +222,6 @@ function applyDataToFilm(film, tmdb, omdb) {
   // OMDb peut la mettre à jour si une clé API est disponible, mais un échec API
   // ne doit jamais remplacer une vraie note IMDb par un tiret.
   const localImdbRating = getLocalImdbRating(film);
-  if (localImdbRating !== null) film.localImdb = localImdbRating;
 
   film.omdbLoaded = true;
 
@@ -245,8 +245,6 @@ function applyDataToFilm(film, tmdb, omdb) {
     film.imdb = Math.round(omdb.imdbRating * 10) / 10;
   } else if (localImdbRating !== null) {
     film.imdb = localImdbRating;
-  } else if (Number.isFinite(Number(film.localImdb))) {
-    film.imdb = Math.round(Number(film.localImdb) * 10) / 10;
   } else {
     film.imdb = null;
   }
