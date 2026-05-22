@@ -1,8 +1,9 @@
-/* CinéProche — Catalogue proche — ZIP 2.7
+/* CinéProche — Catalogue proche — ZIP 2.8
    Objectif unique :
-   - garder les films proches déjà assemblés
-   - si le film n'est pas reconnu dans js/data.js, chercher sa note via TMDB
-   - afficher combien de notes viennent du local et combien viennent de TMDB
+   - garder le moteur 2.7
+   - ajouter un debug détaillé des notes
+   - priorité : IMDb local -> OMDb/IMDb si clé navigateur disponible -> TMDB secours
+   - expliquer précisément pourquoi un film reste sans note
    - ne pas encore modifier l'affichage HTML du Catalogue
 */
 
@@ -11,6 +12,7 @@
 
   const NEARBY_CATALOGUE_API = 'https://cinepro-api-yal8.onrender.com';
   const tmdbRatingCache = new Map();
+  const omdbRatingCache = new Map();
 
   function stripAccents(value) {
     return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -71,7 +73,6 @@
         const normalized = normalizeNearbyTitle(title);
         const compact = compactNearbyTitle(title);
         if (!normalized) continue;
-
         index.push({ film, title, normalized, compact });
       }
     }
@@ -100,24 +101,31 @@
     const intersection = [...wordsA].filter(w => wordsB.has(w));
 
     if (!intersection.length) return 0;
-
     const ratio = intersection.length / Math.max(wordsA.size, wordsB.size);
     return Math.round(ratio * 80);
   }
 
-  function findLocalFilmByTitle(title) {
-    const index = buildLocalFilmIndex();
-    let best = null;
+  function getClosestLocalTitles(title, limit = 5) {
+    return buildLocalFilmIndex()
+      .map(item => ({
+        titreCatalogue: item.title,
+        score: scoreTitleMatch(title, item.title),
+        imdb: item.film?.imdb ?? '—',
+        tmdb: item.film?.tmdb ?? '—'
+      }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit);
+  }
 
-    for (const item of index) {
-      const score = scoreTitleMatch(title, item.title);
-      if (!best || score > best.score) best = { ...item, score };
-    }
+  function findLocalFilmByTitle(title) {
+    const candidates = getClosestLocalTitles(title, 1);
+    const best = candidates[0];
 
     if (best && best.score >= 82) {
+      const match = buildLocalFilmIndex().find(item => item.title === best.titreCatalogue);
       return {
-        film: best.film,
-        matchedTitle: best.title,
+        film: match?.film || null,
+        matchedTitle: best.titreCatalogue,
         score: best.score
       };
     }
@@ -147,21 +155,84 @@
     return null;
   }
 
+  async function searchOmdbRating(title) {
+    const cacheKey = normalizeNearbyTitle(title);
+    if (!cacheKey) return null;
+    if (omdbRatingCache.has(cacheKey)) return omdbRatingCache.get(cacheKey);
+
+    const apiKey = window.CONFIG?.OMDB_API_KEY || '';
+    if (!apiKey) {
+      const skipped = { skipped: true, reason: 'CONFIG.OMDB_API_KEY vide côté navigateur' };
+      omdbRatingCache.set(cacheKey, null);
+      console.log(`[Catalogue proche][OMDb] ${title} : ignoré (${skipped.reason}).`);
+      return null;
+    }
+
+    try {
+      const base = window.CONFIG?.OMDB_BASE_URL || 'https://www.omdbapi.com/';
+      const url = `${base}?apikey=${encodeURIComponent(apiKey)}&t=${encodeURIComponent(title)}&type=movie&r=json`;
+      console.log(`[Catalogue proche][OMDb] Appel pour "${title}" :`, url.replace(apiKey, '***'));
+      const response = await fetch(url);
+      const data = await response.json();
+
+      console.log(`[Catalogue proche][OMDb] Réponse pour "${title}" :`, data);
+
+      if (data?.Response === 'False') {
+        omdbRatingCache.set(cacheKey, null);
+        return null;
+      }
+
+      const imdbRating = Number(data?.imdbRating);
+      if (!Number.isFinite(imdbRating) || imdbRating <= 0) {
+        omdbRatingCache.set(cacheKey, null);
+        return null;
+      }
+
+      const result = {
+        source: 'IMDb via OMDb',
+        value: Math.round(imdbRating * 10) / 10,
+        matchedTitle: data?.Title || title,
+        imdbId: data?.imdbID || '',
+        score: scoreTitleMatch(title, data?.Title || title)
+      };
+
+      omdbRatingCache.set(cacheKey, result);
+      return result;
+    } catch (error) {
+      console.warn(`[Catalogue proche][OMDb] Erreur pour "${title}" :`, error?.message || error);
+      omdbRatingCache.set(cacheKey, null);
+      return null;
+    }
+  }
+
   async function searchTmdbRating(title) {
     const cacheKey = normalizeNearbyTitle(title);
     if (!cacheKey) return null;
     if (tmdbRatingCache.has(cacheKey)) return tmdbRatingCache.get(cacheKey);
 
     if (!window.CONFIG?.TMDB_API_KEY || !window.CONFIG?.TMDB_BASE_URL) {
+      console.warn(`[Catalogue proche][TMDB] Impossible pour "${title}" : CONFIG.TMDB_API_KEY ou CONFIG.TMDB_BASE_URL absent.`);
       tmdbRatingCache.set(cacheKey, null);
       return null;
     }
 
     try {
       const url = `${CONFIG.TMDB_BASE_URL}/search/movie?api_key=${CONFIG.TMDB_API_KEY}&language=${CONFIG.LANGUAGE || 'fr-FR'}&region=${CONFIG.REGION || 'FR'}&query=${encodeURIComponent(title)}`;
+      console.log(`[Catalogue proche][TMDB] Appel pour "${title}" :`, url.replace(CONFIG.TMDB_API_KEY, '***'));
+
       const response = await fetch(url);
       const data = await response.json();
       const results = Array.isArray(data?.results) ? data.results : [];
+
+      console.log(`[Catalogue proche][TMDB] "${title}" → ${results.length} résultat(s).`, results.slice(0, 5).map(item => ({
+        id: item.id,
+        title: item.title,
+        original_title: item.original_title,
+        release_date: item.release_date,
+        vote_average: item.vote_average,
+        score_title: scoreTitleMatch(title, item.title || ''),
+        score_original: scoreTitleMatch(title, item.original_title || '')
+      })));
 
       let best = null;
 
@@ -177,14 +248,27 @@
         }
       }
 
-      if (!best || best.score < 70) {
-        console.warn(`[Catalogue proche][TMDB] Aucun match fiable pour "${title}".`, results.slice(0, 3));
+      if (!best) {
+        console.warn(`[Catalogue proche][TMDB] Aucun résultat TMDB pour "${title}".`);
+        tmdbRatingCache.set(cacheKey, null);
+        return null;
+      }
+
+      if (best.score < 55) {
+        console.warn(`[Catalogue proche][TMDB] Match rejeté pour "${title}" : meilleur score ${best.score}.`, {
+          meilleurTitre: best.candidateTitle,
+          original: best.result?.original_title
+        });
         tmdbRatingCache.set(cacheKey, null);
         return null;
       }
 
       const vote = Number(best.result?.vote_average);
       if (!Number.isFinite(vote) || vote <= 0) {
+        console.warn(`[Catalogue proche][TMDB] Match trouvé pour "${title}", mais note invalide :`, {
+          titre: best.candidateTitle,
+          vote_average: best.result?.vote_average
+        });
         tmdbRatingCache.set(cacheKey, null);
         return null;
       }
@@ -216,6 +300,18 @@
         ratingKind: 'local',
         matchedTitle: localMatch?.film?.titre || localMatch?.matchedTitle || title,
         matchScore: localMatch?.score || 0
+      };
+    }
+
+    const omdbRating = await searchOmdbRating(title);
+    if (omdbRating) {
+      return {
+        source: omdbRating.source,
+        value: omdbRating.value,
+        ratingKind: 'omdb',
+        matchedTitle: omdbRating.matchedTitle,
+        matchScore: omdbRating.score,
+        imdbId: omdbRating.imdbId
       };
     }
 
@@ -350,7 +446,6 @@
   function normalizeShowtimeItem(rawItem) {
     const movieObject = extractMovieObject(rawItem);
     const title = extractMovieTitle(movieObject) || extractMovieTitle(rawItem);
-
     if (!title) return null;
 
     return {
@@ -438,9 +533,7 @@
   }
 
   async function getNearbyRankedMovies(options = {}) {
-    if (!window.PLACES) {
-      throw new Error('PLACES n’est pas chargé. Vérifie js/places.js.');
-    }
+    if (!window.PLACES) throw new Error('PLACES n’est pas chargé. Vérifie js/places.js.');
 
     const radius = options.radius || window.CONFIG?.SEARCH_RADIUS || 15000;
     let location = options.location || null;
@@ -452,7 +545,7 @@
 
     if (!location) location = await window.PLACES.geolocate();
 
-    console.log('[Catalogue proche] ZIP 2.7 actif.');
+    console.log('[Catalogue proche] ZIP 2.8 actif.');
     console.log('[Catalogue proche] Position utilisée :', location);
 
     const cinemas = await window.PLACES.findNearbycinemas(location, radius);
@@ -464,6 +557,7 @@
     const moviesByKey = new Map();
     const matchDebug = [];
     const unmatchedTitles = new Set();
+    const closestDebug = [];
 
     for (const cinema of cinemas.slice(0, maxCinemas)) {
       try {
@@ -477,6 +571,7 @@
           if (!key) continue;
 
           const localMatch = findLocalFilmByTitle(title);
+          const closestLocal = getClosestLocalTitles(title, 3);
           const rating = await resolveMovieRating(title, localMatch, item.rawMovie);
 
           matchDebug.push({
@@ -490,7 +585,15 @@
             cinema: cinema.nom
           });
 
-          if (!localMatch) unmatchedTitles.add(title);
+          if (!localMatch) {
+            unmatchedTitles.add(title);
+            closestDebug.push({
+              filmSeances: title,
+              choix1: closestLocal[0] ? `${closestLocal[0].titreCatalogue} (${closestLocal[0].score})` : '—',
+              choix2: closestLocal[1] ? `${closestLocal[1].titreCatalogue} (${closestLocal[1].score})` : '—',
+              choix3: closestLocal[2] ? `${closestLocal[2].titreCatalogue} (${closestLocal[2].score})` : '—'
+            });
+          }
 
           if (!moviesByKey.has(key)) {
             moviesByKey.set(key, {
@@ -503,6 +606,7 @@
               ratingSource: rating?.source ?? null,
               ratingKind: rating?.ratingKind || null,
               tmdbId: rating?.tmdbId || null,
+              imdbId: rating?.imdbId || null,
               cinemas: [],
               rawShowtimes: []
             });
@@ -521,6 +625,7 @@
               existing.ratingSource = rating.source;
               existing.ratingKind = rating.ratingKind;
               existing.tmdbId = rating.tmdbId || existing.tmdbId;
+              existing.imdbId = rating.imdbId || existing.imdbId;
               existing.matchedTitle = existing.matchedTitle || rating.matchedTitle;
             }
 
@@ -553,18 +658,23 @@
     });
 
     const localCount = ranked.filter(movie => movie.ratingKind === 'local').length;
+    const omdbCount = ranked.filter(movie => movie.ratingKind === 'omdb').length;
     const tmdbCount = ranked.filter(movie => movie.ratingKind === 'tmdb').length;
     const noRatingCount = ranked.filter(movie => movie.ratingValue === null).length;
 
-    console.log(`[Catalogue proche] Résultat étape 2.7 : ${ranked.length} film(s) proche(s) assemblé(s).`);
-    console.log(`[Catalogue proche] Notes trouvées : local=${localCount}, TMDB=${tmdbCount}, sans note=${noRatingCount}.`);
+    console.log(`[Catalogue proche] Résultat étape 2.8 : ${ranked.length} film(s) proche(s) assemblé(s).`);
+    console.log(`[Catalogue proche] Notes trouvées : local=${localCount}, OMDb/IMDb=${omdbCount}, TMDB=${tmdbCount}, sans note=${noRatingCount}.`);
 
     console.group('[Catalogue proche] Debug correspondances titres + notes');
     console.table(matchDebug);
     console.groupEnd();
 
+    console.group('[Catalogue proche] Debug meilleurs matchs locaux pour les films non reconnus');
+    console.table(closestDebug);
+    console.groupEnd();
+
     if (unmatchedTitles.size) {
-      console.warn('[Catalogue proche] Films absents de js/data.js mais enrichis via TMDB si possible :', Array.from(unmatchedTitles));
+      console.warn('[Catalogue proche] Films absents de js/data.js :', Array.from(unmatchedTitles));
     }
 
     console.table(ranked.map((movie, index) => ({
