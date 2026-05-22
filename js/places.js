@@ -160,5 +160,6 @@ const PLACES = {
   getWazeUrl(c) { return `https://waze.com/ul?ll=${c.location.lat},${c.location.lng}&navigate=yes`; }
 };
 
-// Expose le service Places pour les autres fichiers JS (ex: nearby-catalogue.js).
+
+// Expose le service pour les autres fichiers (catalogue proche, console, etc.)
 window.PLACES = PLACES;
