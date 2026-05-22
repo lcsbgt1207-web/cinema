@@ -223,98 +223,82 @@
     loadFilms(tab);
   }
 
-  // ── Popup film avec cinémas dépliables ──
+  // ── Popup film unifiée, même mise en page que le catalogue ──
+
+  function escapeHTML(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  async function getPopupSynopsis(film) {
+    const imdbSynopsis = await TMDB.getImdbSynopsis(film);
+    return imdbSynopsis || film.overview || 'Synopsis indisponible pour le moment.';
+  }
+
+  function buildUnifiedFilmPopupHTML({ film, poster, director, actors, duree, synopsis, genres }) {
+    const year = film.release_date ? String(film.release_date).slice(0, 4) : '';
+    const genre = Array.isArray(genres) && genres.length ? genres[0] : 'Cinéma';
+    const original = film.original_title && film.original_title !== film.title ? film.original_title : '';
+    const posterHTML = poster
+      ? `<img src="${escapeHTML(poster)}" alt="Affiche du film ${escapeHTML(film.title)}" loading="lazy">`
+      : `<i class="ti ti-photo"></i>`;
+
+    return `
+      <div class="film-popup-layout">
+        <div class="film-popup-poster">${posterHTML}</div>
+        <div class="film-popup-main">
+          <div class="film-popup-title-zone">
+            <h2>${escapeHTML(film.title)}</h2>
+            ${original ? `<div style="font-size:12px;color:var(--gray-400);margin-top:6px;">${escapeHTML(original)}</div>` : ''}
+          </div>
+          <div class="film-popup-meta-zone">
+            <span class="popup-tag">${escapeHTML(genre)}</span>
+            ${duree ? `<span class="popup-tag">${escapeHTML(duree)}</span>` : ''}
+            ${year ? `<span class="popup-tag">${escapeHTML(year)}</span>` : ''}
+          </div>
+          <div class="film-popup-crew-zone">
+            <div class="popup-crew-row"><strong>Réalisateur ·</strong> ${escapeHTML(director || 'Non renseigné')}</div>
+            <div class="popup-crew-row"><strong>Avec ·</strong> ${escapeHTML(actors || 'Non renseigné')}</div>
+          </div>
+          <div class="film-popup-synopsis-zone">
+            <div class="section-label">Synopsis</div>
+            <p>${escapeHTML(synopsis)}</p>
+          </div>
+        </div>
+        <div class="film-popup-seances-zone">
+          <div class="section-label">Séances</div>
+          <div class="empty-seances">
+            Aucune séance réelle n’est encore branchée pour ce film. Cette zone sera connectée plus tard au scraping des cinémas indépendants, avec le cinéma, l’horaire, la VF/VO et le lien de réservation.
+          </div>
+        </div>
+      </div>
+      <button class="popup-close-btn" onclick="closeFilmPopup()">Fermer</button>`;
+  }
+
   async function openFilmPopup(tmdbId, titre) {
     const overlay = document.getElementById('film-overlay');
     const popup   = document.getElementById('film-popup');
-    popup.innerHTML = `<div style="padding:60px;text-align:center;color:var(--gray-400);"><i class="ti ti-loader" style="font-size:28px;display:block;margin-bottom:10px;"></i>Chargement…</div>`;
-    overlay.classList.add('open');
-    document.body.style.overflow = 'hidden';
 
     try {
       const film     = await TMDB.getMovie(tmdbId);
       const poster   = TMDB.posterUrl(film.poster_path, 'w342');
-      const director = film.credits?.crew?.find(c => c.job === 'Director');
-      const actors   = film.credits?.cast?.slice(0,3).map(a=>a.name).join(', ') || '—';
+      const director = film.credits?.crew?.find(c => c.job === 'Director')?.name || '';
+      const actors   = film.credits?.cast?.slice(0,4).map(a=>a.name).join(', ') || '';
       const duree    = TMDB.formatDuration(film.runtime);
-      const note     = film.vote_average ? (film.vote_average/2).toFixed(1) : '—';
-      const genres   = film.genres?.map(g=>g.name).join(', ') || '';
-      const imdbSynopsis = await TMDB.getImdbSynopsis(film);
-      const synopsis = imdbSynopsis || 'Synopsis IMDb indisponible pour ce film.';
+      const genres   = film.genres?.map(g=>g.name) || [];
+      const synopsis = await getPopupSynopsis(film);
 
-      // Séances générées (AlloCiné pour les vraies)
-      const SEANCES = {
-        "Aujourd'hui": ['13h30','16h00','18h45','21h15'],
-        'Demain':      ['14h00','16h30','19h00','21h30']
-      };
-
-      // Cinémas proches — vrais si dispo, exemples sinon
-      const cinemas = nearbyCinemas.length > 0 ? nearbyCinemas.slice(0,4) : [
-        { id:'ex1', nom:'Cinéma local', adresse:'Activez votre position pour voir les vrais cinémas', dist:0, location:{lat:0,lng:0} }
-      ];
-
-      const cinemasHtml = cinemas.map((c, ci) => {
-        const mapsUrl = nearbyCinemas.length > 0 ? PLACES.getMapsUrl(c) : '#';
-        const seancesHtml = Object.entries(SEANCES).map(([jour, horaires]) => `
-          <div class="seances-day">
-            <div class="day-label">${jour}</div>
-            <div class="horaires">
-              ${horaires.map(h => `<button class="horaire-btn" onclick="openReservation('${film.title.replace(/'/g,"\\'")}','${c.nom.replace(/'/g,"\\'")}','${h}')">${h}</button>`).join('')}
-            </div>
-          </div>`).join('');
-
-        return `
-          <div class="cinema-block" id="cb-${ci}">
-            <div class="cinema-block-header" onclick="document.getElementById('cb-${ci}').classList.toggle('open')">
-              <div class="cinema-block-left">
-                <i class="ti ti-building"></i>
-                <div>
-                  <div class="cinema-block-name">${c.nom}</div>
-                  <div class="cinema-block-dist">${nearbyCinemas.length > 0 ? PLACES.formatDist(c.dist) : c.adresse}</div>
-                </div>
-              </div>
-              <div class="cinema-block-right">
-                ${nearbyCinemas.length > 0 ? `<button class="btn-itineraire" onclick="event.stopPropagation();window.open('${mapsUrl}','_blank')"><i class="ti ti-navigation"></i> Y aller</button>` : ''}
-                <i class="ti ti-chevron-down chevron"></i>
-              </div>
-            </div>
-            <div class="seances-panel">${seancesHtml}</div>
-          </div>`;
-      }).join('');
-
-      popup.innerHTML = `
-        <div class="popup-top">
-          <div class="popup-poster" style="${poster ? 'padding:0;overflow:hidden;' : 'background:var(--gray-200);'}">
-            ${poster ? `<img src="${poster}" alt="${film.title}" style="width:100%;height:100%;object-fit:cover;" />` : `<i class="ti ti-photo"></i>`}
-          </div>
-          <div class="popup-header">
-            <span class="popup-badge">À l'affiche</span>
-            <div class="popup-title">${film.title}</div>
-            ${film.original_title && film.original_title !== film.title ? `<div style="font-size:12px;color:var(--gray-400);margin-bottom:6px;">${film.original_title}</div>` : ''}
-            <div class="popup-tags">
-              ${genres.split(', ').slice(0,2).map(g=>`<span class="popup-tag">${g}</span>`).join('')}
-              ${duree ? `<span class="popup-tag">${duree}</span>` : ''}
-              <span class="popup-tag">★ ${note}/5</span>
-            </div>
-            <div class="popup-crew">
-              ${director ? `<div class="popup-crew-row"><strong>Réalisateur ·</strong> ${director.name}</div>` : ''}
-              <div class="popup-crew-row"><strong>Avec ·</strong> ${actors}</div>
-            </div>
-          </div>
-        </div>
-        <div class="popup-synopsis-block">
-          <div class="section-label">Synopsis</div>
-          <div class="popup-synopsis">${synopsis}</div>
-        </div>
-        <div class="popup-cinemas">
-          <div class="popup-cinemas-label">Cinémas les plus proches</div>
-          ${!nearbyCinemas.length ? `<div style="padding:10px 18px 6px;font-size:12px;color:var(--gray-500);display:flex;align-items:center;gap:6px;"><i class="ti ti-info-circle"></i> Activez votre position sur la <a href="index.html" style="color:var(--black);font-weight:500;margin:0 3px;">page d'accueil</a> pour voir les vrais cinémas proches.</div>` : ''}
-          ${cinemasHtml}
-        </div>
-        <button class="popup-close-btn" onclick="closeFilmPopup()">Fermer</button>`;
-
+      popup.innerHTML = buildUnifiedFilmPopupHTML({ film, poster, director, actors, duree, synopsis, genres });
+      overlay.classList.add('open');
+      document.body.style.overflow = 'hidden';
     } catch(e) {
       popup.innerHTML = `<div style="padding:40px;text-align:center;color:var(--gray-400);">Impossible de charger ce film.<button class="popup-close-btn" onclick="closeFilmPopup()" style="display:block;margin:16px auto 0;">Fermer</button></div>`;
+      overlay.classList.add('open');
+      document.body.style.overflow = 'hidden';
     }
   }
 
