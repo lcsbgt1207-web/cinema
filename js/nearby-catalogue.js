@@ -1,4 +1,4 @@
-/* CinéProche — Catalogue proche — ZIP 2.9.1
+/* CinéProche — Catalogue proche — ZIP 2.9.3
    Objectif unique : rendre les films des séances exploitables.
    - Les films reconnus dans js/data.js gardent leur note locale.
    - Les films non reconnus ne restent plus vides : badge "À enrichir".
@@ -309,6 +309,101 @@
     return json;
   }
 
+  function isLikelyAllocineCinemaId(value) {
+    const text = String(value || '').trim();
+    // Exemples observés : B0016, B0218, W9329.
+    // On reste volontairement large pour ne pas rater un format Cinéro/Allociné proche.
+    return /^[A-Z][0-9]{3,8}$/i.test(text) || /^[A-Z]{1,3}[0-9]{2,8}$/i.test(text);
+  }
+
+  function extractIdsFromString(value, path, candidates) {
+    const text = String(value || '');
+    if (!text) return;
+    const matches = text.match(/[A-Z]{1,3}[0-9]{3,8}/gi) || [];
+    for (const match of matches) {
+      candidates.push({ id: match.toUpperCase(), path, reason: 'string-match', raw: text.slice(0, 180) });
+    }
+  }
+
+  function scoreCinemaIdCandidate(candidate, cinemaName) {
+    const path = String(candidate.path || '').toLowerCase();
+    const raw = String(candidate.raw || '').toLowerCase();
+    const normalizedCinema = normalizeNearbyTitle(cinemaName);
+    let score = 0;
+
+    if (/allocine|theater|cinema|cine|id|code/.test(path)) score += 40;
+    if (/^id$|\.id$|_id$|cinemaid|cinema_id|allocineid|theater\.id/.test(path)) score += 50;
+    if (/movie|film|show|session|seance|poster|image|rating|note/.test(path)) score -= 35;
+    if (normalizedCinema && normalizeNearbyTitle(raw).includes(normalizedCinema.slice(0, Math.min(12, normalizedCinema.length)))) score += 25;
+    if (candidate.id && /^[BW][0-9]/i.test(candidate.id)) score += 12;
+    if (candidate.reason === 'direct-key') score += 15;
+    return score;
+  }
+
+  function collectCinemaIdCandidates(data, cinemaName) {
+    const candidates = [];
+    const seenObjects = new WeakSet();
+    const importantKeys = new Set([
+      'id', 'cinema_id', 'cinemaId', 'allocineId', 'allocine_id', 'theaterId', 'theater_id',
+      'code', 'codeAllocine', 'allocineCode', 'entityId', 'placeId'
+    ]);
+
+    function visit(node, path = '$', depth = 0) {
+      if (node === null || node === undefined || depth > 10) return;
+
+      if (typeof node === 'string' || typeof node === 'number') {
+        const value = String(node).trim();
+        if (isLikelyAllocineCinemaId(value)) {
+          candidates.push({
+            id: value.toUpperCase(),
+            path,
+            reason: importantKeys.has(path.split('.').pop()) ? 'direct-key' : 'value-match',
+            raw: value
+          });
+        } else if (typeof node === 'string') {
+          extractIdsFromString(node, path, candidates);
+        }
+        return;
+      }
+
+      if (typeof node !== 'object') return;
+      if (seenObjects.has(node)) return;
+      seenObjects.add(node);
+
+      if (Array.isArray(node)) {
+        node.forEach((item, index) => visit(item, `${path}[${index}]`, depth + 1));
+        return;
+      }
+
+      for (const [key, value] of Object.entries(node)) {
+        const nextPath = `${path}.${key}`;
+        if (importantKeys.has(key) && (typeof value === 'string' || typeof value === 'number')) {
+          const id = String(value).trim();
+          if (isLikelyAllocineCinemaId(id)) {
+            candidates.push({ id: id.toUpperCase(), path: nextPath, reason: 'direct-key', raw: id });
+          }
+        }
+        visit(value, nextPath, depth + 1);
+      }
+    }
+
+    visit(data);
+
+    const deduped = [];
+    const seen = new Set();
+    for (const candidate of candidates) {
+      const key = `${candidate.id}|${candidate.path}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      deduped.push({
+        ...candidate,
+        score: scoreCinemaIdCandidate(candidate, cinemaName)
+      });
+    }
+
+    return deduped.sort((a, b) => b.score - a.score);
+  }
+
   async function getCinemaAllocineId(cinema) {
     const params = new URLSearchParams({
       name: cinema?.nom || '',
@@ -316,9 +411,28 @@
       lng: cinema?.location?.lng || ''
     });
     const data = await fetchJsonWithDebug(`${NEARBY_CATALOGUE_API}/search-cinema?${params}`, `search-cinema pour ${cinema?.nom}`);
-    const id = data?.id || data?.cinema_id || data?.cinemaId || data?.allocineId || data?.theater?.id || null;
-    if (id) console.log(`[Catalogue proche][DEBUG] ID extrait pour ${cinema?.nom} :`, id);
-    else console.warn(`[Catalogue proche][DEBUG] Aucun ID cinéma trouvé pour ${cinema?.nom}.`);
+
+    const candidates = collectCinemaIdCandidates(data, cinema?.nom || '');
+    if (candidates.length) {
+      console.group(`[Catalogue proche][DEBUG] IDs candidats pour ${cinema?.nom}`);
+      console.table(candidates.slice(0, 20).map(candidate => ({
+        id: candidate.id,
+        score: candidate.score,
+        chemin: candidate.path,
+        raison: candidate.reason,
+        aperçu: String(candidate.raw || '').slice(0, 90)
+      })));
+      console.groupEnd();
+    }
+
+    const best = candidates.find(candidate => candidate.score >= 0) || candidates[0] || null;
+    const id = best?.id || null;
+
+    if (id) {
+      console.log(`[Catalogue proche][DEBUG] ID extrait pour ${cinema?.nom} :`, id, best);
+    } else {
+      console.warn(`[Catalogue proche][DEBUG] Aucun ID cinéma trouvé pour ${cinema?.nom}. JSON complet ci-dessous :`, data);
+    }
     return id;
   }
 
@@ -330,7 +444,7 @@
   }
 
   function extractSeancesArray(data) {
-    // ZIP 2.9.1 : l'API Cinéro peut renvoyer les films à plusieurs profondeurs
+    // ZIP 2.9.3 : l'API Cinéro peut renvoyer les films à plusieurs profondeurs
     // selon le cinéma. En 2.9, on ne lisait que quelques clés directes,
     // donc certains retours JSON valides donnaient [] dans l'interface.
     const directArrays = [
@@ -475,7 +589,7 @@
         <div class="nearby-catalogue-head">
           <div>
             <h2>Films proches trouvés</h2>
-            <p>ZIP 2.9.1 : extraction des séances corrigée + films absents visibles pour enrichissement Catalogue.</p>
+            <p>ZIP 2.9.3 : extraction ID cinéma robuste + films absents visibles pour enrichissement Catalogue.</p>
           </div>
           <div class="nearby-catalogue-stats">
             <div class="nearby-catalogue-stat"><strong>${stats.total}</strong> films</div>
@@ -532,7 +646,7 @@
     }
     if (!location) location = await window.PLACES.geolocate();
 
-    console.log('[Catalogue proche] ZIP 2.9.1 actif — extraction séances corrigée.');
+    console.log('[Catalogue proche] ZIP 2.9.3 actif — extraction ID cinéma robuste.');
     console.log('[Catalogue proche] Position utilisée :', location);
 
     const cinemas = await window.PLACES.findNearbycinemas(location, radius);
@@ -636,7 +750,7 @@
 
     const missingDraft = buildMissingCatalogueDraft(ranked);
 
-    console.log(`[Catalogue proche] Résultat ZIP 2.9.1 : ${stats.total} film(s), ${stats.rated} classé(s), ${stats.missing} à enrichir.`);
+    console.log(`[Catalogue proche] Résultat ZIP 2.9.3 : ${stats.total} film(s), ${stats.rated} classé(s), ${stats.missing} à enrichir.`);
     console.group('[Catalogue proche] Debug correspondances titres');
     console.table(matchDebug);
     console.groupEnd();
