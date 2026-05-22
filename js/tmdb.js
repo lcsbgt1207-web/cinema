@@ -66,14 +66,14 @@ const TMDB = {
     if (!imdbId && !title) return '';
 
     const cacheIdentity = imdbId || (tmdbId ? `tmdb-${tmdbId}` : `${title.toLowerCase()}-${year}`);
-    const cacheKey = `cinepro_imdb_synopsis_v16_imdb_short_fr_${cacheIdentity}`;
+    const cacheKey = `cinepro_imdb_synopsis_v30_imdb_fr_official_only_${cacheIdentity}`;
 
     try {
-      if (!localStorage.getItem('cinepro_imdb_synopsis_fr_cache_cleaned_v2')) {
+      if (!localStorage.getItem('cinepro_imdb_synopsis_fr_cache_cleaned_v30')) {
         Object.keys(localStorage)
-          .filter(key => key.startsWith('cinepro_imdb_synopsis_v14_') || key.startsWith('cinepro_imdb_synopsis_v15_') || key.startsWith('cinepro_imdb_synopsis_v16_'))
+          .filter(key => key.startsWith('cinepro_imdb_synopsis_'))
           .forEach(key => localStorage.removeItem(key));
-        localStorage.setItem('cinepro_imdb_synopsis_fr_cache_cleaned_v2', '1');
+        localStorage.setItem('cinepro_imdb_synopsis_fr_cache_cleaned_v30', '1');
       }
       const cached = localStorage.getItem(cacheKey);
       if (cached) return cached;
