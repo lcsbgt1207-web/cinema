@@ -470,14 +470,10 @@
 
   async function getPopupSynopsis(film) {
     try {
-      const imdbPromise = TMDB.getImdbSynopsis(film);
-      const fastSynopsis = await Promise.race([
-        imdbPromise,
-        new Promise(resolve => setTimeout(() => resolve(''), 1200))
-      ]);
-      return fastSynopsis || film.overview || 'Synopsis indisponible pour le moment.';
+      const imdbSynopsis = await TMDB.getImdbSynopsis(film);
+      return imdbSynopsis || 'Synopsis IMDb indisponible. Lance le backend et ajoute OMDB_API_KEY dans backend/.env pour activer une source fiable.';
     } catch {
-      return film.overview || 'Synopsis indisponible pour le moment.';
+      return 'Synopsis IMDb indisponible. Lance le backend et ajoute OMDB_API_KEY dans backend/.env pour activer une source fiable.';
     }
   }
 
@@ -539,7 +535,7 @@
       overlay.classList.add('open');
       document.body.style.overflow = 'hidden';
 
-      // Si le backend IMDb répond après l'ouverture, on remplace proprement le synopsis TMDB.
+      // Si le backend IMDb répond après l'ouverture, on remplace proprement le message d'attente.
       TMDB.getImdbSynopsis(film).then((imdbSynopsis) => {
         if (!imdbSynopsis) return;
         const synopsisNode = popup.querySelector('.popup-synopsis');
