@@ -311,22 +311,10 @@
       document.getElementById('results-info').innerHTML =
         `<i class="ti ti-building"></i> ${cinemas.length} cinéma${cinemas.length > 1 ? 's' : ''} trouvé${cinemas.length > 1 ? 's' : ''}`;
 
-      // Films à afficher sous chaque cinéma (films en salle)
-      const filmsToShow = nowPlayingFilms.slice(0, 5);
-
       function renderCinemaCard(c, ci) {
         const ouvertClass = c.ouvert === true ? 'chip-open' : c.ouvert === false ? 'chip-closed' : 'chip-unknown';
         const ouvertLabel = c.ouvert === true ? 'Ouvert' : c.ouvert === false ? 'Fermé' : 'Horaires inconnus';
-        const filmThumbs = filmsToShow.map(f => {
-          const poster = TMDB.posterUrl(f.poster_path, 'w92');
-          return `<div class="film-thumb" onclick="openFilmPopup(${f.id}, ${JSON.stringify(c).replace(/"/g,'&quot;')})">
-            <div class="film-thumb-poster">
-              ${poster ? `<img src="${poster}" alt="${f.title}" loading="lazy" />` : `<i class="ti ti-photo" style="font-size:20px;color:var(--gray-300);"></i>`}
-            </div>
-            <div class="film-thumb-title">${f.title}</div>
-          </div>`;
-        }).join('');
-        return `<div class="cinema-item" style="animation-delay:${ci * 0.06}s">
+        return `<div class="cinema-item" style="animation-delay:${ci * 0.06}s" id="cinema-card-${ci}">
           <div class="cinema-item-top">
             <div class="cinema-item-left">
               <div class="cinema-rank-name">
@@ -349,7 +337,11 @@
             </div>
           </div>
           <div class="cinema-films-label">Films à l'affiche</div>
-          <div class="cinema-films">${filmThumbs}</div>
+          <div class="cinema-films" id="films-cinema-${ci}">
+            <div style="font-size:12px;color:var(--gray-400);padding:8px 0;display:flex;align-items:center;gap:6px;">
+              <i class="ti ti-loader"></i> Chargement des films…
+            </div>
+          </div>
         </div>`;
       }
 
@@ -361,6 +353,8 @@
         renderFn: (pageCinemas, pagerHtml) => {
           list.innerHTML = pageCinemas.map((c, ci) => renderCinemaCard(c, ci)).join('');
           document.getElementById('cinemas-pager').innerHTML = pagerHtml;
+          // Charger les vrais films AlloCiné pour chaque cinéma en parallèle
+          pageCinemas.forEach((c, ci) => loadFilmsForCinema(c, ci));
         }
       });
 
@@ -455,6 +449,115 @@
     }
   }
 
+
+  // ── Chargement des vrais films AlloCiné pour un cinéma ──
+  async function loadFilmsForCinema(cinema, ci) {
+    const container = document.getElementById('films-cinema-' + ci);
+    if (!container) return;
+    try {
+      // 1. Trouver l'ID AlloCiné du cinéma
+      const searchParams = new URLSearchParams({
+        name: cinema.nom,
+        lat: cinema.location?.lat || '',
+        lng: cinema.location?.lng || ''
+      });
+      const searchR = await fetch(`${CINEPRO_API}/search-cinema?${searchParams}`);
+      if (!searchR.ok) throw new Error('API indisponible');
+      const searchData = await searchR.json();
+      if (!searchData.id) {
+        container.innerHTML = renderFilmsFallback(cinema);
+        return;
+      }
+
+      // 2. Récupérer les séances du cinéma (= les films à l'affiche)
+      const todayStr = new Date().toISOString().split('T')[0];
+      const s = await fetch(`${CINEPRO_API}/seances?id=${searchData.id}&date=${todayStr}`);
+      if (!s.ok) throw new Error('Séances indisponibles');
+      const data = await s.json();
+      const films = data.seances || [];
+
+      if (!films.length) {
+        container.innerHTML = renderFilmsFallback(cinema);
+        return;
+      }
+
+      // 3. Afficher les films avec leurs horaires
+      // On cherche les posters sur TMDB pour chaque film AlloCiné
+      const filmsHtml = await Promise.all(films.slice(0, 6).map(async f => {
+        const titre = f.title || f.name || '';
+        // Chercher le poster sur TMDB
+        let posterHtml = `<i class="ti ti-photo" style="font-size:20px;color:var(--gray-300);"></i>`;
+        let tmdbId = null;
+        try {
+          const tmdbResults = await TMDB.searchMovie(titre);
+          if (tmdbResults.length) {
+            const poster = TMDB.posterUrl(tmdbResults[0].poster_path, 'w92');
+            tmdbId = tmdbResults[0].id;
+            if (poster) posterHtml = `<img src="${poster}" alt="${titre}" loading="lazy" style="width:100%;height:100%;object-fit:cover;" />`;
+          }
+        } catch(e) {}
+
+        const cineData = JSON.stringify({
+          id: cinema.id, nom: cinema.nom, adresse: cinema.adresse,
+          location: cinema.location, dist: cinema.dist, ouvert: cinema.ouvert
+        }).replace(/"/g,'&quot;');
+
+        if (tmdbId) {
+          return `<div class="film-thumb" onclick="openFilmPopup(${tmdbId}, JSON.parse(this.dataset.c))" data-c="${cineData}">
+            <div class="film-thumb-poster">${posterHtml}</div>
+            <div class="film-thumb-title">${titre}</div>
+          </div>`;
+        } else {
+          return `<div class="film-thumb" onclick="openFilmPopupByTitle('${titre.replace(/'/g,"\'")}', JSON.parse(this.dataset.c))" data-c="${cineData}">
+            <div class="film-thumb-poster">${posterHtml}</div>
+            <div class="film-thumb-title">${titre}</div>
+          </div>`;
+        }
+      }));
+
+      container.innerHTML = filmsHtml.join('');
+
+    } catch(e) {
+      container.innerHTML = renderFilmsFallback(cinema);
+    }
+  }
+
+  function renderFilmsFallback(cinema) {
+    // Fallback : afficher les films TMDB populaires
+    const filmsToShow = nowPlayingFilms.slice(0, 5);
+    return filmsToShow.map(f => {
+      const poster = TMDB.posterUrl(f.poster_path, 'w92');
+      const cineData = JSON.stringify({
+        id: cinema.id, nom: cinema.nom, adresse: cinema.adresse,
+        location: cinema.location, dist: cinema.dist, ouvert: cinema.ouvert
+      }).replace(/"/g,'&quot;');
+      return `<div class="film-thumb" onclick="openFilmPopup(${f.id}, JSON.parse(this.dataset.c))" data-c="${cineData}">
+        <div class="film-thumb-poster">
+          ${poster ? `<img src="${poster}" alt="${f.title}" loading="lazy" />` : `<i class="ti ti-photo" style="font-size:20px;color:var(--gray-300);"></i>`}
+        </div>
+        <div class="film-thumb-title">${f.title}</div>
+      </div>`;
+    }).join('');
+  }
+
+  async function openFilmPopupByTitle(titre, cinema) {
+    const overlay = document.getElementById('film-overlay');
+    const popup   = document.getElementById('film-popup');
+    currentCinemaForFilm = cinema;
+    popup.innerHTML = `<div style="padding:60px;text-align:center;color:var(--gray-400);"><i class="ti ti-loader" style="font-size:28px;display:block;margin-bottom:10px;"></i>Chargement…</div>`;
+    overlay.classList.add('open');
+    document.body.style.overflow = 'hidden';
+    try {
+      const results = await TMDB.searchMovie(titre);
+      if (results.length) {
+        await openFilmPopup(results[0].id, cinema);
+      } else {
+        popup.innerHTML = `<div style="padding:40px;text-align:center;color:var(--gray-400);">Film non trouvé.<button class="popup-close-btn" onclick="closeFilmPopup()" style="display:block;margin:16px auto 0;">Fermer</button></div>`;
+      }
+    } catch(e) {
+      popup.innerHTML = `<div style="padding:40px;text-align:center;color:var(--gray-400);">Erreur.<button class="popup-close-btn" onclick="closeFilmPopup()" style="display:block;margin:16px auto 0;">Fermer</button></div>`;
+    }
+  }
 
   // ── API CinéProche — Récupération séances AlloCiné ──
   const CINEPRO_API = 'https://cinepro-api-yal8.onrender.com';
@@ -631,22 +734,10 @@
         </div>
         <div class="popup-synopsis-block">
           <div class="section-label">Synopsis</div>
-          <div class="popup-synopsis">Chargement du synopsis…</div>
+          <div class="popup-synopsis">${film.overview || 'Synopsis non disponible.'}</div>
         </div>
         ${cinemasHtml}
         <button class="popup-close-btn" onclick="closeFilmPopup()">Fermer</button>`;
-
-      // Afficher le synopsis IMDb FR si disponible, sinon le synopsis TMDB FR.
-      TMDB.getImdbSynopsis(film)
-        .then((synopsis) => {
-          const node = popup.querySelector('.popup-synopsis');
-          if (node) node.textContent = synopsis || 'Aucun synopsis disponible pour ce film.';
-        })
-        .catch(() => {
-          const node = popup.querySelector('.popup-synopsis');
-          if (node) node.textContent = 'Aucun synopsis disponible pour ce film.';
-        });
-
       // Charger les vraies séances en async
       if (cinema) {
         fetchSeancesForCinema(cinema.nom, film.title, cinema.location?.lat, cinema.location?.lng).then(seances => {
