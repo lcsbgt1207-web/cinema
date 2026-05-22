@@ -167,11 +167,11 @@ function pickBestSynopsis(candidates = []) {
     })[0];
 }
 
-async function fetchHtml(url) {
+async function fetchHtml(url, language = 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7') {
   const response = await fetch(url, {
     headers: {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
-      'Accept-Language': 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7',
+      'Accept-Language': language,
       'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
       'Cache-Control': 'no-cache',
       'Pragma': 'no-cache'
@@ -417,6 +417,7 @@ app.get('/', (req, res) => {
 });
 
 
+
 app.get('/api/imdb-synopsis', async (req, res) => {
   let imdbId = String(req.query.imdbId || '').trim();
   const title = String(req.query.title || '').trim();
@@ -426,48 +427,60 @@ app.get('/api/imdb-synopsis', async (req, res) => {
 
   if (imdbId && !/^tt\d+$/.test(imdbId)) imdbId = '';
 
-  // Source autorisée pour trouver l'identifiant : TMDB external_ids ou suggestion IMDb.
-  // Source NON autorisée pour le synopsis : OMDb / TMDB / traduction automatique.
+  // On utilise TMDB / suggestion IMDb UNIQUEMENT pour retrouver le bon identifiant IMDb.
+  // Le texte du synopsis ne vient pas de TMDB.
   if (!imdbId && tmdbId) imdbId = await fetchTmdbExternalId(tmdbId);
   const lookupTitle = originalTitle || title;
   if (!imdbId && lookupTitle) imdbId = await findImdbIdBySuggestion(lookupTitle, year);
 
   if (!imdbId) {
-    return res.json({
-      source: 'unavailable-no-imdb-id',
-      imdbId: '',
-      synopsis: ''
-    });
+    return res.json({ source: 'unavailable-no-imdb-id', imdbId: '', synopsis: '' });
   }
 
-  // IMPORTANT : on veut le synopsis IMDb français officiel visible sur la fiche IMDb FR.
-  // On ne prend PAS OMDb, on ne traduit PAS l'anglais, et on ne prend PAS /plotsummary
-  // car /plotsummary donne souvent de longs résumés utilisateurs.
-  const url = `https://www.imdb.com/fr/title/${imdbId}/`;
-
   try {
-    const html = await fetchHtml(url);
-    const synopsis = extractImdbMainSynopsis(html);
+    // 1) Priorité absolue : page IMDb française officielle.
+    const frHtml = await fetchHtml(
+      `https://www.imdb.com/fr/title/${imdbId}/`,
+      'fr-FR,fr;q=0.95,en-US;q=0.6,en;q=0.5'
+    );
+    const frSynopsis = extractImdbMainSynopsis(frHtml);
 
-    if (synopsis && looksFrench(synopsis)) {
+    if (frSynopsis && looksFrench(frSynopsis)) {
+      return res.json({ source: 'imdb-fr-official-short', imdbId, synopsis: frSynopsis });
+    }
+
+    // 2) Si IMDb n'a pas de synopsis FR : on prend le court synopsis officiel anglais IMDb.
+    // Puis on le traduit en français. C'est le fallback demandé.
+    const enHtml = await fetchHtml(
+      `https://www.imdb.com/title/${imdbId}/`,
+      'en-US,en;q=0.95,fr-FR;q=0.4,fr;q=0.3'
+    );
+    const enSynopsis = extractImdbMainSynopsis(enHtml) || frSynopsis;
+
+    if (enSynopsis) {
+      const translated = await translateSynopsisToFrench(enSynopsis, `${imdbId}-official-short-v2`);
       return res.json({
-        source: 'imdb-fr-main-plot',
+        source: looksFrench(translated) ? 'imdb-en-official-short-translated-fr' : 'imdb-en-official-short',
         imdbId,
-        synopsis
+        synopsis: translated
       });
     }
 
-    return res.json({
-      source: synopsis ? 'imdb-fr-plot-not-french' : 'imdb-fr-plot-missing',
-      imdbId,
-      synopsis: ''
-    });
+    // 3) Dernier secours : OMDb, uniquement s'il n'y a rien sur IMDb.
+    // OMDb sert seulement de secours pour les films sans synopsis public récupérable sur IMDb.
+    const omdbPlot = await fetchOmdbPlot(imdbId);
+    if (omdbPlot) {
+      const translated = await translateSynopsisToFrench(omdbPlot, `${imdbId}-omdb-fallback-v2`);
+      return res.json({
+        source: looksFrench(translated) ? 'omdb-fallback-translated-fr' : 'omdb-fallback',
+        imdbId,
+        synopsis: translated
+      });
+    }
+
+    return res.json({ source: 'unavailable-no-synopsis', imdbId, synopsis: '' });
   } catch (error) {
-    return res.json({
-      source: 'imdb-fr-fetch-error',
-      imdbId,
-      synopsis: ''
-    });
+    return res.json({ source: 'imdb-fetch-error', imdbId, synopsis: '' });
   }
 });
 
