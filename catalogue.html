@@ -100,6 +100,7 @@
   </style>
 </head>
 <body>
+<div id="map-hidden" style="display:none;width:1px;height:1px;"></div>
 
 <!-- ── HEADER ── -->
 <header class="site-header">
@@ -243,6 +244,9 @@
 </script>
 <script src="js/data.js"></script>
 <script src="js/omdb.js"></script>
+<script src="js/tmdb.js"></script>
+<script src="js/places.js"></script>
+<script src="js/nearby-catalogue.js"></script>
 <script>
   // Catalogue = films avec annee définie + films nouveautés
   let catalogue = FILMS.filter(f => f && !f.isMock); // garder le catalogue même si une API échoue
@@ -564,5 +568,6 @@
 
   initCatalogue();
 </script>
+<script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAx4ILK4VPFvYxaZX-HwpUPMEOpkQLJEmE&libraries=places&language=fr&callback=initNearbyCatalogueGoogleMaps"></script>
 </body>
 </html>
