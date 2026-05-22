@@ -66,9 +66,15 @@ const TMDB = {
     if (!imdbId && !title) return '';
 
     const cacheIdentity = imdbId || (tmdbId ? `tmdb-${tmdbId}` : `${title.toLowerCase()}-${year}`);
-    const cacheKey = `cinepro_imdb_synopsis_v14_${cacheIdentity}`;
+    const cacheKey = `cinepro_imdb_synopsis_v15_fr_${cacheIdentity}`;
 
     try {
+      if (!localStorage.getItem('cinepro_imdb_synopsis_fr_cache_cleaned_v1')) {
+        Object.keys(localStorage)
+          .filter(key => key.startsWith('cinepro_imdb_synopsis_v14_') || key.startsWith('cinepro_imdb_synopsis_v15_'))
+          .forEach(key => localStorage.removeItem(key));
+        localStorage.setItem('cinepro_imdb_synopsis_fr_cache_cleaned_v1', '1');
+      }
       const cached = localStorage.getItem(cacheKey);
       if (cached) return cached;
     } catch {}
