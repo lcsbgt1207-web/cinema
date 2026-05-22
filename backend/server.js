@@ -19,25 +19,6 @@ app.use(express.json());
 const TMDB_API_KEY = process.env.TMDB_API_KEY || process.env.VITE_TMDB_API_KEY || '16d984ea5d9a771088779b56497e0890';
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 
-const KNOWN_IMDB_ID_BY_TITLE_YEAR = [
-  {
-    imdbId: 'tt32612507',
-    year: '2026',
-    titles: ["lee cronin's the mummy", 'lee cronins the mummy', 'le reveil de la momie', 'le réveil de la momie']
-  }
-];
-
-function findKnownImdbId(title = '', originalTitle = '', year = '') {
-  const candidates = [normalizeSearchTitle(title), normalizeSearchTitle(originalTitle)].filter(Boolean);
-  const wantedYear = String(year || '').trim();
-  for (const item of KNOWN_IMDB_ID_BY_TITLE_YEAR) {
-    if (item.year && wantedYear && item.year !== wantedYear) continue;
-    const aliases = item.titles.map(normalizeSearchTitle);
-    if (candidates.some(candidate => aliases.includes(candidate))) return item.imdbId;
-  }
-  return '';
-}
-
 function normalizeSearchTitle(value = '') {
   return String(value)
     .toLowerCase()
@@ -302,6 +283,85 @@ async function fetchOmdbByTitle(title, year = '') {
   }
 }
 
+
+function looksFrench(text = '') {
+  const value = String(text).toLowerCase();
+  const frenchHits = (value.match(/\b(le|la|les|des|une|dans|avec|pour|qui|que|est|sont|son|sa|ses|leur|leurs|été|après|avant|mais|plus|tout|toute)\b/g) || []).length;
+  const englishHits = (value.match(/\b(the|and|with|from|after|before|his|her|their|into|while|when|who|that|this|story|life)\b/g) || []).length;
+  return frenchHits >= 3 && frenchHits >= englishHits;
+}
+
+function getTranslationCachePath() {
+  return path.join(__dirname, 'data', 'imdb-synopsis-fr-cache.json');
+}
+
+function readTranslationCache() {
+  const filePath = getTranslationCachePath();
+  try {
+    if (!fs.existsSync(filePath)) return {};
+    return JSON.parse(fs.readFileSync(filePath, 'utf-8')) || {};
+  } catch {
+    return {};
+  }
+}
+
+function writeTranslationCache(cache) {
+  const filePath = getTranslationCachePath();
+  try {
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, JSON.stringify(cache, null, 2), 'utf-8');
+  } catch {}
+}
+
+async function translateSynopsisToFrench(text = '', cacheKey = '') {
+  const synopsis = cleanSynopsis(text);
+  if (!synopsis || looksFrench(synopsis)) return synopsis;
+
+  const key = cacheKey || synopsis;
+  const cache = readTranslationCache();
+  if (cache[key]) return cache[key];
+
+  try {
+    const params = new URLSearchParams({
+      client: 'gtx',
+      sl: 'en',
+      tl: 'fr',
+      dt: 't',
+      q: synopsis
+    });
+    const response = await fetch(`https://translate.googleapis.com/translate_a/single?${params.toString()}`, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0',
+        'Accept': 'application/json,text/plain,*/*'
+      }
+    });
+    if (!response.ok) return synopsis;
+    const data = await response.json();
+    const translated = Array.isArray(data?.[0])
+      ? data[0].map(part => part?.[0] || '').join('').trim()
+      : '';
+
+    const cleanTranslated = cleanSynopsis(translated);
+    if (cleanTranslated && cleanTranslated.length >= 30) {
+      cache[key] = cleanTranslated;
+      writeTranslationCache(cache);
+      return cleanTranslated;
+    }
+  } catch {}
+
+  return synopsis;
+}
+
+async function sendSynopsisJson(res, { source, imdbId = '', synopsis = '', title = '', year = '' }) {
+  const cacheKey = imdbId || `${normalizeSearchTitle(title)}-${year}` || synopsis;
+  const synopsisFr = await translateSynopsisToFrench(synopsis, cacheKey);
+  return res.json({
+    source: synopsisFr && synopsisFr !== synopsis ? `${source}-fr` : source,
+    imdbId,
+    synopsis: synopsisFr
+  });
+}
+
 app.get('/', (req, res) => {
   res.json({ message: 'Backend CinéProche actif', routes: ['/api/films-letterboxd', '/api/imdb-synopsis'] });
 });
@@ -327,15 +387,15 @@ app.get('/api/imdb-synopsis', async (req, res) => {
   const omdbByTitle = !imdbId && lookupTitle ? await fetchOmdbByTitle(lookupTitle, year) : null;
   if (!imdbId && omdbByTitle?.imdbId) imdbId = omdbByTitle.imdbId;
 
-  if (!imdbId) imdbId = findKnownImdbId(title, originalTitle, year);
-
   if (!imdbId && lookupTitle) imdbId = await findImdbIdBySuggestion(lookupTitle, year);
 
   if (!imdbId) {
-    return res.json({
+    return sendSynopsisJson(res, {
       source: omdbByTitle?.synopsis ? 'omdb-title-plot' : 'unavailable',
       imdbId: '',
-      synopsis: omdbByTitle?.synopsis || ''
+      synopsis: omdbByTitle?.synopsis || '',
+      title: lookupTitle,
+      year
     });
   }
 
@@ -354,18 +414,18 @@ app.get('/api/imdb-synopsis', async (req, res) => {
 
       const synopsis = extractImdbSynopsis(html);
       if (synopsis) {
-        return res.json({ source: 'imdb', imdbId, synopsis });
+        return sendSynopsisJson(res, { source: 'imdb', imdbId, synopsis, title: lookupTitle, year });
       }
     } catch {}
   }
 
   const omdbPlot = await fetchOmdbPlot(imdbId);
   if (omdbPlot) {
-    return res.json({ source: 'omdb-imdb-plot', imdbId, synopsis: omdbPlot });
+    return sendSynopsisJson(res, { source: 'omdb-imdb-plot', imdbId, synopsis: omdbPlot, title: lookupTitle, year });
   }
 
   if (omdbByTitle?.synopsis) {
-    return res.json({ source: 'omdb-title-plot', imdbId, synopsis: omdbByTitle.synopsis });
+    return sendSynopsisJson(res, { source: 'omdb-title-plot', imdbId, synopsis: omdbByTitle.synopsis, title: lookupTitle, year });
   }
 
   res.json({ source: 'unavailable', imdbId, synopsis: '' });
