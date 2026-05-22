@@ -69,14 +69,14 @@ const TMDB = {
     if (!imdbId && !title) return tmdbFallback;
 
     const cacheIdentity = imdbId || (tmdbId ? `tmdb-${tmdbId}` : `${title.toLowerCase()}-${year}`);
-    const cacheKey = `cinepro_synopsis_v50_imdb_fr_then_tmdb_fr_${cacheIdentity}`;
+    const cacheKey = `cinepro_synopsis_v60_imdb_cache_then_imdb_fr_then_tmdb_fr_${cacheIdentity}`;
 
     try {
-      if (!localStorage.getItem('cinepro_synopsis_cache_cleaned_v50')) {
+      if (!localStorage.getItem('cinepro_synopsis_cache_cleaned_v60')) {
         Object.keys(localStorage)
           .filter(key => key.startsWith('cinepro_imdb_synopsis_') || key.startsWith('cinepro_synopsis_'))
           .forEach(key => localStorage.removeItem(key));
-        localStorage.setItem('cinepro_synopsis_cache_cleaned_v50', '1');
+        localStorage.setItem('cinepro_synopsis_cache_cleaned_v60', '1');
       }
       const cached = localStorage.getItem(cacheKey);
       if (cached && !isBadSynopsis(cached)) return cached;
@@ -98,10 +98,15 @@ const TMDB = {
 
       const data = await res.json();
       const synopsis = String(data?.synopsis || '').trim();
+      const source = String(data?.source || '').toLowerCase();
       const finalSynopsis = synopsis && !isBadSynopsis(synopsis) ? synopsis : tmdbFallback;
       if (!finalSynopsis || isBadSynopsis(finalSynopsis)) return '';
 
-      try { localStorage.setItem(cacheKey, finalSynopsis); } catch {}
+      // On ne stocke dans le navigateur que les vrais IMDb/cache IMDb.
+      // Les fallback TMDB doivent rester temporaires pour permettre à IMDb de repasser devant plus tard.
+      if (source.includes('imdb') && !source.includes('tmdb') && !source.includes('omdb')) {
+        try { localStorage.setItem(cacheKey, finalSynopsis); } catch {}
+      }
       return finalSynopsis;
     } catch (error) {
       console.warn('Synopsis IMDb indisponible, fallback TMDB utilisé.', error);
