@@ -1,4 +1,4 @@
-/* CinéProche — Catalogue proche — ZIP 2.9.3
+/* CinéProche — Catalogue proche — ZIP 2.9.4
    Objectif unique : rendre les films des séances exploitables.
    - Les films reconnus dans js/data.js gardent leur note locale.
    - Les films non reconnus ne restent plus vides : badge "À enrichir".
@@ -233,25 +233,47 @@
     try { return path.split('.').reduce((acc, key) => acc?.[key], obj); } catch (_) { return undefined; }
   }
 
+  function looksLikeRealMovieTitle(value) {
+    const text = String(value || '').trim();
+    if (!text) return false;
+    if (text.length < 2 || text.length > 140) return false;
+    if (/^https?:\/\//i.test(text)) return false;
+    if (/^\d{1,2}[:h]\d{0,2}$/i.test(text)) return false;
+    if (/^\d{4}-\d{2}-\d{2}/.test(text)) return false;
+    if (/^[A-Z]{1,3}\d{3,8}$/i.test(text)) return false;
+    if (/^(vf|vo|vost|vostfr|imax|4dx|dolby|standard|version|seance|séance)$/i.test(text)) return false;
+    return /[A-Za-zÀ-ÿ]/.test(text);
+  }
+
+  function keyLooksLikeMovieTitle(path = '') {
+    return /(title|titre|name|nom|label|movie|film|work|show|production|localized|original|display)/i.test(String(path));
+  }
+
   function extractMovieTitle(item) {
+    if (typeof item === 'string' || typeof item === 'number') {
+      const value = String(item).trim();
+      return looksLikeRealMovieTitle(value) ? value : '';
+    }
     if (!item || typeof item !== 'object') return '';
     return firstString(
-      item.title, item.titre, item.name, item.nom, item.label,
-      item.originalTitle, item.original_title, item.movieTitle, item.filmTitle,
-      item.fullTitle, item.displayTitle,
-      getDeep(item, 'movie.title'), getDeep(item, 'movie.name'), getDeep(item, 'movie.titre'),
-      getDeep(item, 'film.title'), getDeep(item, 'film.name'), getDeep(item, 'film.titre'),
-      getDeep(item, 'show.title'), getDeep(item, 'show.name'),
-      getDeep(item, 'entity.title'), getDeep(item, 'entity.name'),
-      getDeep(item, 'data.title'), getDeep(item, 'data.name')
+      item.title, item.titre, item.name, item.nom, item.label, item.text,
+      item.originalTitle, item.original_title, item.localizedTitle, item.localized_title,
+      item.movieTitle, item.filmTitle, item.workTitle, item.fullTitle, item.displayTitle,
+      item.titleText?.text, item.originalTitleText?.text, item.primaryTitle, item.secondaryTitle,
+      getDeep(item, 'movie.title'), getDeep(item, 'movie.name'), getDeep(item, 'movie.titre'), getDeep(item, 'movie.label'),
+      getDeep(item, 'film.title'), getDeep(item, 'film.name'), getDeep(item, 'film.titre'), getDeep(item, 'film.label'),
+      getDeep(item, 'work.title'), getDeep(item, 'work.name'), getDeep(item, 'show.title'), getDeep(item, 'show.name'),
+      getDeep(item, 'entity.title'), getDeep(item, 'entity.name'), getDeep(item, 'data.title'), getDeep(item, 'data.name'),
+      getDeep(item, 'data.movie.title'), getDeep(item, 'data.film.title'), getDeep(item, 'node.title'), getDeep(item, 'node.name')
     );
   }
 
   function extractMovieObject(item) {
+    if (typeof item === 'string') return { title: item };
     if (!item || typeof item !== 'object') return null;
     const candidates = [
-      item.movie, item.film, item.filmShow, item.show, item.entity, item.work,
-      item.movieShow, item.data?.movie, item.data?.film, item.production, item
+      item.movie, item.film, item.filmShow, item.show, item.entity, item.work, item.node,
+      item.movieShow, item.data?.movie, item.data?.film, item.data?.work, item.production, item
     ];
     for (const candidate of candidates) {
       if (candidate && typeof candidate === 'object' && extractMovieTitle(candidate)) return candidate;
@@ -319,7 +341,7 @@
   function extractIdsFromString(value, path, candidates) {
     const text = String(value || '');
     if (!text) return;
-    const matches = text.match(/[A-Z]{1,3}[0-9]{3,8}/gi) || [];
+    const matches = text.match(/\b[A-Z]{1,3}[0-9]{3,8}\b/gi) || [];
     for (const match of matches) {
       candidates.push({ id: match.toUpperCase(), path, reason: 'string-match', raw: text.slice(0, 180) });
     }
@@ -437,66 +459,121 @@
   }
 
   function looksLikeMovieShowtimeObject(value) {
+    if (typeof value === 'string') return looksLikeRealMovieTitle(value);
     if (!value || typeof value !== 'object') return false;
     if (extractMovieTitle(value)) return true;
     const nested = extractMovieObject(value);
     return Boolean(nested && nested !== value && extractMovieTitle(nested));
   }
 
-  function extractSeancesArray(data) {
-    // ZIP 2.9.3 : l'API Cinéro peut renvoyer les films à plusieurs profondeurs
-    // selon le cinéma. En 2.9, on ne lisait que quelques clés directes,
-    // donc certains retours JSON valides donnaient [] dans l'interface.
-    const directArrays = [
-      data,
-      data?.seances, data?.sessions, data?.showtimes, data?.movies, data?.films,
-      data?.data, data?.results, data?.items, data?.program, data?.programme,
-      data?.data?.seances, data?.data?.sessions, data?.data?.showtimes,
-      data?.data?.movies, data?.data?.films, data?.data?.results, data?.data?.items
+  function parseEmbeddedJson(value) {
+    if (typeof value !== 'string') return null;
+    const text = value.trim();
+    if (!text || !/^[\[{]/.test(text)) return null;
+    try { return JSON.parse(text); } catch (_) { return null; }
+  }
+
+  function collectTitleCandidatesFromHtml(html = '') {
+    const candidates = [];
+    const text = String(html || '');
+    if (!text || !/[<>]/.test(text)) return candidates;
+
+    const attrPatterns = [
+      /(?:data-title|data-movie-title|title|alt|aria-label)=['"]([^'"]{2,140})['"]/gi,
+      /<h[1-6][^>]*>([^<]{2,140})<\/h[1-6]>/gi,
+      /<[^>]*(?:movie|film|title)[^>]*>([^<]{2,140})<\/[^>]+>/gi
     ];
 
-    for (const candidate of directArrays) {
-      if (Array.isArray(candidate) && candidate.some(looksLikeMovieShowtimeObject)) {
-        return candidate.filter(looksLikeMovieShowtimeObject);
+    for (const pattern of attrPatterns) {
+      let match;
+      while ((match = pattern.exec(text)) !== null) {
+        const title = decodeHtml(match[1]);
+        if (looksLikeRealMovieTitle(title)) candidates.push({ title, rawItem: { title, source: 'html' } });
       }
     }
+    return candidates;
+  }
 
+  function extractSeancesArray(data) {
+    // ZIP 2.9.4 : on ne suppose plus une structure précise.
+    // L'API /seances peut renvoyer les films dans data, results, showtimes, movie, film,
+    // ou même dans des fragments HTML/JSON imbriqués. On scanne tout récursivement.
     const found = [];
     const seenObjects = new WeakSet();
 
-    function visit(node) {
-      if (!node || typeof node !== 'object') return;
+    function addCandidate(title, rawItem, path, reason) {
+      const cleanTitle = String(title || '').trim();
+      if (!looksLikeRealMovieTitle(cleanTitle)) return;
+      found.push({
+        title: cleanTitle,
+        rawItem: rawItem && typeof rawItem === 'object' ? rawItem : { title: cleanTitle },
+        path,
+        reason
+      });
+    }
+
+    function visit(node, path = '$', parent = null, depth = 0) {
+      if (node === null || node === undefined || depth > 14) return;
+
+      if (typeof node === 'string' || typeof node === 'number') {
+        const value = String(node).trim();
+        const parsed = parseEmbeddedJson(value);
+        if (parsed) visit(parsed, `${path}{json}`, parent, depth + 1);
+
+        for (const candidate of collectTitleCandidatesFromHtml(value)) {
+          addCandidate(candidate.title, parent || candidate.rawItem, `${path}{html}`, 'html-title');
+        }
+
+        if (keyLooksLikeMovieTitle(path)) addCandidate(value, parent || { title: value }, path, 'title-key-string');
+        return;
+      }
+
+      if (typeof node !== 'object') return;
       if (seenObjects.has(node)) return;
       seenObjects.add(node);
 
+      const directTitle = extractMovieTitle(node);
+      if (directTitle) addCandidate(directTitle, node, path, 'object-title');
+
       if (Array.isArray(node)) {
-        const movieLikeItems = node.filter(looksLikeMovieShowtimeObject);
-        if (movieLikeItems.length) {
-          for (const item of movieLikeItems) found.push(item);
-          return;
+        node.forEach((item, index) => visit(item, `${path}[${index}]`, parent, depth + 1));
+        return;
+      }
+
+      for (const [key, value] of Object.entries(node)) {
+        const nextPath = `${path}.${key}`;
+        if ((typeof value === 'string' || typeof value === 'number') && keyLooksLikeMovieTitle(nextPath)) {
+          addCandidate(value, node, nextPath, 'title-key');
         }
-        for (const item of node) visit(item);
-        return;
+        visit(value, nextPath, node, depth + 1);
       }
-
-      if (looksLikeMovieShowtimeObject(node)) {
-        found.push(node);
-        return;
-      }
-
-      for (const value of Object.values(node)) visit(value);
     }
 
     visit(data);
 
     const unique = [];
     const seenKeys = new Set();
-    for (const item of found) {
-      const title = extractMovieTitle(extractMovieObject(item)) || extractMovieTitle(item);
-      const key = normalizeNearbyTitle(title) + '|' + JSON.stringify(extractShowtimes(item)).slice(0, 80);
-      if (!title || seenKeys.has(key)) continue;
-      seenKeys.add(key);
-      unique.push(item);
+    for (const candidate of found) {
+      const normalized = normalizeNearbyTitle(candidate.title);
+      if (!normalized || seenKeys.has(normalized)) continue;
+      seenKeys.add(normalized);
+      const raw = candidate.rawItem || { title: candidate.title };
+      if (raw && typeof raw === 'object' && !extractMovieTitle(raw)) {
+        raw.title = candidate.title;
+      }
+      unique.push(raw);
+    }
+
+    if (!unique.length) {
+      console.warn('[Catalogue proche][DEBUG] Aucun film extrait de /seances. JSON complet analysé :', data);
+    } else {
+      console.group('[Catalogue proche][DEBUG] Candidats films extraits de /seances');
+      console.table(unique.slice(0, 60).map((item, index) => ({
+        index,
+        titre: extractMovieTitle(extractMovieObject(item)) || extractMovieTitle(item),
+        cles: item && typeof item === 'object' ? Object.keys(item).slice(0, 8).join(', ') : typeof item
+      })));
+      console.groupEnd();
     }
 
     return unique;
@@ -507,6 +584,7 @@
     if (!allocineId) return [];
     const today = new Date().toISOString().split('T')[0];
     const data = await fetchJsonWithDebug(`${NEARBY_CATALOGUE_API}/seances?id=${encodeURIComponent(allocineId)}&date=${today}`, `seances pour ${cinema?.nom}`);
+    console.log(`[Catalogue proche][DEBUG] JSON complet /seances pour ${cinema?.nom} :`, data);
     const rawShowtimes = extractSeancesArray(data);
     console.log(`[Catalogue proche][DEBUG] Tableau extrait pour ${cinema?.nom} :`, rawShowtimes);
     if (rawShowtimes[0]) {
@@ -589,7 +667,7 @@
         <div class="nearby-catalogue-head">
           <div>
             <h2>Films proches trouvés</h2>
-            <p>ZIP 2.9.3 : extraction ID cinéma robuste + films absents visibles pour enrichissement Catalogue.</p>
+            <p>ZIP 2.9.4 : extraction ID cinéma robuste + films absents visibles pour enrichissement Catalogue.</p>
           </div>
           <div class="nearby-catalogue-stats">
             <div class="nearby-catalogue-stat"><strong>${stats.total}</strong> films</div>
@@ -646,7 +724,7 @@
     }
     if (!location) location = await window.PLACES.geolocate();
 
-    console.log('[Catalogue proche] ZIP 2.9.3 actif — extraction ID cinéma robuste.');
+    console.log('[Catalogue proche] ZIP 2.9.4 actif — extraction séances robuste.');
     console.log('[Catalogue proche] Position utilisée :', location);
 
     const cinemas = await window.PLACES.findNearbycinemas(location, radius);
@@ -750,7 +828,7 @@
 
     const missingDraft = buildMissingCatalogueDraft(ranked);
 
-    console.log(`[Catalogue proche] Résultat ZIP 2.9.3 : ${stats.total} film(s), ${stats.rated} classé(s), ${stats.missing} à enrichir.`);
+    console.log(`[Catalogue proche] Résultat ZIP 2.9.4 : ${stats.total} film(s), ${stats.rated} classé(s), ${stats.missing} à enrichir.`);
     console.group('[Catalogue proche] Debug correspondances titres');
     console.table(matchDebug);
     console.groupEnd();
