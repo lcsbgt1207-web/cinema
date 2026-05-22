@@ -59,7 +59,7 @@ const TMDB = {
     const imdbId = film?.external_ids?.imdb_id || film?.imdb_id || film?.imdbID || '';
     if (!imdbId) return '';
 
-    const cacheKey = `cinepro_imdb_synopsis_v2_${imdbId}`;
+    const cacheKey = `cinepro_imdb_synopsis_${imdbId}`;
     try {
       const cached = localStorage.getItem(cacheKey);
       if (cached) return cached;
