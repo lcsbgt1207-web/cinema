@@ -1,4 +1,4 @@
-/* CinéProche — Catalogue proche — ZIP 2.9
+/* CinéProche — Catalogue proche — ZIP 2.9.1
    Objectif unique : rendre les films des séances exploitables.
    - Les films reconnus dans js/data.js gardent leur note locale.
    - Les films non reconnus ne restent plus vides : badge "À enrichir".
@@ -322,15 +322,70 @@
     return id;
   }
 
+  function looksLikeMovieShowtimeObject(value) {
+    if (!value || typeof value !== 'object') return false;
+    if (extractMovieTitle(value)) return true;
+    const nested = extractMovieObject(value);
+    return Boolean(nested && nested !== value && extractMovieTitle(nested));
+  }
+
   function extractSeancesArray(data) {
-    if (Array.isArray(data)) return data;
-    if (Array.isArray(data?.seances)) return data.seances;
-    if (Array.isArray(data?.sessions)) return data.sessions;
-    if (Array.isArray(data?.showtimes)) return data.showtimes;
-    if (Array.isArray(data?.movies)) return data.movies;
-    if (Array.isArray(data?.films)) return data.films;
-    if (Array.isArray(data?.data)) return data.data;
-    return [];
+    // ZIP 2.9.1 : l'API Cinéro peut renvoyer les films à plusieurs profondeurs
+    // selon le cinéma. En 2.9, on ne lisait que quelques clés directes,
+    // donc certains retours JSON valides donnaient [] dans l'interface.
+    const directArrays = [
+      data,
+      data?.seances, data?.sessions, data?.showtimes, data?.movies, data?.films,
+      data?.data, data?.results, data?.items, data?.program, data?.programme,
+      data?.data?.seances, data?.data?.sessions, data?.data?.showtimes,
+      data?.data?.movies, data?.data?.films, data?.data?.results, data?.data?.items
+    ];
+
+    for (const candidate of directArrays) {
+      if (Array.isArray(candidate) && candidate.some(looksLikeMovieShowtimeObject)) {
+        return candidate.filter(looksLikeMovieShowtimeObject);
+      }
+    }
+
+    const found = [];
+    const seenObjects = new WeakSet();
+
+    function visit(node) {
+      if (!node || typeof node !== 'object') return;
+      if (seenObjects.has(node)) return;
+      seenObjects.add(node);
+
+      if (Array.isArray(node)) {
+        const movieLikeItems = node.filter(looksLikeMovieShowtimeObject);
+        if (movieLikeItems.length) {
+          for (const item of movieLikeItems) found.push(item);
+          return;
+        }
+        for (const item of node) visit(item);
+        return;
+      }
+
+      if (looksLikeMovieShowtimeObject(node)) {
+        found.push(node);
+        return;
+      }
+
+      for (const value of Object.values(node)) visit(value);
+    }
+
+    visit(data);
+
+    const unique = [];
+    const seenKeys = new Set();
+    for (const item of found) {
+      const title = extractMovieTitle(extractMovieObject(item)) || extractMovieTitle(item);
+      const key = normalizeNearbyTitle(title) + '|' + JSON.stringify(extractShowtimes(item)).slice(0, 80);
+      if (!title || seenKeys.has(key)) continue;
+      seenKeys.add(key);
+      unique.push(item);
+    }
+
+    return unique;
   }
 
   async function getCinemaShowtimes(cinema) {
@@ -420,7 +475,7 @@
         <div class="nearby-catalogue-head">
           <div>
             <h2>Films proches trouvés</h2>
-            <p>ZIP 2.9 : les films absents sont maintenant visibles et prêts à être enrichis dans le Catalogue.</p>
+            <p>ZIP 2.9.1 : extraction des séances corrigée + films absents visibles pour enrichissement Catalogue.</p>
           </div>
           <div class="nearby-catalogue-stats">
             <div class="nearby-catalogue-stat"><strong>${stats.total}</strong> films</div>
@@ -477,7 +532,7 @@
     }
     if (!location) location = await window.PLACES.geolocate();
 
-    console.log('[Catalogue proche] ZIP 2.9 actif.');
+    console.log('[Catalogue proche] ZIP 2.9.1 actif — extraction séances corrigée.');
     console.log('[Catalogue proche] Position utilisée :', location);
 
     const cinemas = await window.PLACES.findNearbycinemas(location, radius);
@@ -581,7 +636,7 @@
 
     const missingDraft = buildMissingCatalogueDraft(ranked);
 
-    console.log(`[Catalogue proche] Résultat ZIP 2.9 : ${stats.total} film(s), ${stats.rated} classé(s), ${stats.missing} à enrichir.`);
+    console.log(`[Catalogue proche] Résultat ZIP 2.9.1 : ${stats.total} film(s), ${stats.rated} classé(s), ${stats.missing} à enrichir.`);
     console.group('[Catalogue proche] Debug correspondances titres');
     console.table(matchDebug);
     console.groupEnd();
