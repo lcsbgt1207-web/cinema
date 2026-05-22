@@ -378,10 +378,14 @@ function synopsisCachePath() {
   return dataPath('imdb-synopsis-cache.json');
 }
 
+function synopsisFrCachePath() {
+  return dataPath('imdb-synopsis-fr-cache.json');
+}
+
 function readSynopsisCache() {
-  const frCache = readJson(dataPath('imdb-synopsis-fr-cache.json'), {});
-  const imdbCache = readJson(dataPath('imdb-synopsis-cache.json'), {});
-  return { ...imdbCache, ...frCache };
+  const normal = readJson(synopsisCachePath(), {});
+  const fr = readJson(synopsisFrCachePath(), {});
+  return { ...normal, ...fr };
 }
 
 function saveSynopsisCacheEntry(imdbId, entry) {
