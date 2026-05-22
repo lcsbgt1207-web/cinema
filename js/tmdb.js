@@ -91,8 +91,9 @@ const TMDB = {
       if (originalTitle) params.set('originalTitle', originalTitle);
       if (year) params.set('year', year);
 
-      params.set('mode', 'cache-imdb-then-tmdb');
-      // Pas de live=1 ici : au clic, le backend lit le cache IMDb local puis TMDB FR.
+      params.set('mode', 'live-imdb-official-then-tmdb');
+      params.set('live', '1');
+      // Au clic, le backend tente maintenant IMDb officiel d'abord, puis TMDB seulement si IMDb bloque.
       params.set('_', String(Date.now()));
       const res = await fetch(`http://localhost:3000/api/imdb-synopsis?${params.toString()}`, { cache: 'no-store' });
       if (!res.ok) return '';

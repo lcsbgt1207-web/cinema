@@ -615,7 +615,23 @@ app.get('/api/imdb-synopsis', async (req, res) => {
       }
     }
 
-    // 2) Secours TMDB FR, même si on n'a reçu que imdbId.
+    // 2) Tentative IMDb officielle en direct.
+    // Important : ce n'est PAS OMDb. On tente d'abord imdb.com/fr/title/tt...
+    // Si IMDb bloque la requête, on ne casse pas le site : on passe ensuite à TMDB.
+    if (resolvedId) {
+      const official = await getOfficialSynopsis(resolvedId);
+      if (official?.synopsis && /^imdb/i.test(String(official.source || '')) && !isBadSynopsisText(official.synopsis)) {
+        saveSynopsisCacheEntry(resolvedId, official);
+        return res.json({
+          source: official.source,
+          cacheKey: resolvedId,
+          imdbId: resolvedId,
+          synopsis: official.synopsis
+        });
+      }
+    }
+
+    // 3) Secours TMDB FR, même si on n'a reçu que imdbId.
     let tmdbSynopsis = await fetchTmdbFrenchOverview(input.tmdbId, input.title, input.year);
     if (!tmdbSynopsis && resolvedId) {
       tmdbSynopsis = await fetchTmdbFrenchOverviewByImdbId(resolvedId);
@@ -624,7 +640,6 @@ app.get('/api/imdb-synopsis', async (req, res) => {
       return res.json({ source: 'tmdb-fr-fallback', imdbId: resolvedId || '', synopsis: tmdbSynopsis });
     }
 
-    // 3) Aucun scraping IMDb au clic : on évite les blocages anti-bot.
     return res.json({ source: 'unavailable', imdbId: resolvedId || '', synopsis: '' });
   } catch (error) {
     return res.json({ source: 'imdb-synopsis-error', message: error?.message || String(error), imdbId: '', synopsis: '' });
