@@ -458,91 +458,87 @@
   }
 
   // ── Popup film ──
+  function popupEscape(value) {
+    return String(value ?? '')
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;');
+  }
+
+  function popupPosterHTML(film, size = 'w342') {
+    const poster = TMDB.posterUrl(film.poster_path, size);
+    return poster
+      ? `<img src="${popupEscape(poster)}" alt="Affiche du film ${popupEscape(film.title)}" loading="lazy">`
+      : '<i class="ti ti-photo"></i>';
+  }
+
+  function buildCleanMoviePopup(film, imdbSynopsis) {
+    const director = film.credits?.crew?.find(c => c.job === 'Director')?.name || 'Non renseigné';
+    const actors = film.credits?.cast?.slice(0, 4).map(a => a.name).join(', ') || 'Non renseigné';
+    const genres = film.genres?.slice(0, 2).map(g => g.name).filter(Boolean) || [];
+    const duration = TMDB.formatDuration(film.runtime) || 'Durée inconnue';
+    const year = film.release_date ? film.release_date.slice(0, 4) : '';
+    const synopsis = imdbSynopsis || film.overview || 'Synopsis indisponible pour le moment.';
+
+    return `
+      <div class="film-popup-layout">
+        <div class="film-popup-poster">
+          ${popupPosterHTML(film)}
+        </div>
+
+        <div class="film-popup-main">
+          <div class="film-popup-title-zone">
+            <div class="popup-title">${popupEscape(film.title)}</div>
+          </div>
+
+          <div class="film-popup-meta-zone">
+            ${genres.map(g => `<span class="popup-tag">${popupEscape(g)}</span>`).join('')}
+            <span class="popup-tag">${popupEscape(duration)}</span>
+            ${year ? `<span class="popup-tag">${popupEscape(year)}</span>` : ''}
+          </div>
+
+          <div class="film-popup-crew-zone">
+            <div class="popup-crew-row"><strong>Réalisateur ·</strong> ${popupEscape(director)}</div>
+            <div class="popup-crew-row"><strong>Avec ·</strong> ${popupEscape(actors)}</div>
+          </div>
+
+          <div class="film-popup-synopsis-zone">
+            <div class="section-label">Synopsis</div>
+            <div class="popup-synopsis">${popupEscape(synopsis)}</div>
+          </div>
+        </div>
+
+        <div class="film-popup-seances-zone">
+          <div class="section-label">Séances</div>
+          <div class="empty-seances">
+            Aucune séance réelle n’est encore branchée pour ce film. Cette zone sera connectée plus tard au scraping des cinémas indépendants, avec le cinéma, l’horaire, la VF/VO et le lien de réservation.
+          </div>
+        </div>
+      </div>
+
+      <button class="popup-close-btn" onclick="closeFilmPopup()">Fermer</button>
+    `;
+  }
+
+  // ── Popup film unifiée : même mise en page que le catalogue, sans écran de chargement ──
   async function openFilmPopup(tmdbId, cinema) {
     const overlay = document.getElementById('film-overlay');
-    const popup   = document.getElementById('film-popup');
+    const popup = document.getElementById('film-popup');
     currentCinemaForFilm = cinema;
-    popup.innerHTML = `<div style="padding:60px;text-align:center;color:var(--gray-400);"><i class="ti ti-loader" style="font-size:28px;display:block;margin-bottom:10px;"></i>Chargement…</div>`;
-    overlay.classList.add('open');
-    document.body.style.overflow = 'hidden';
+    if (!overlay || !popup) return;
+
     try {
       const film = await TMDB.getMovie(tmdbId);
-      const poster = TMDB.posterUrl(film.poster_path, 'w342');
-      const director = film.credits?.crew?.find(c => c.job === 'Director');
-      const actors = film.credits?.cast?.slice(0,3).map(a=>a.name).join(', ') || '—';
-      const duree = TMDB.formatDuration(film.runtime);
-      const note = film.vote_average ? (film.vote_average/2).toFixed(1) : '—';
-      const genres = film.genres?.map(g=>g.name).join(', ') || '';
       const imdbSynopsis = await TMDB.getImdbSynopsis(film);
-      const synopsis = imdbSynopsis || film.overview || 'Synopsis non disponible.';
-
-      const seances = cinema ? {
-        "Aujourd'hui": ['14h00','17h30','20h15','22h30'],
-        'Demain':      ['13h30','16h00','19h15','21h45']
-      } : null;
-
-      const cinemasHtml = seances ? `
-        <div class="popup-cinemas">
-          <div class="popup-cinemas-label">Cinémas les plus proches</div>
-          <div class="cinema-block open" id="cb-main">
-            <div class="cinema-block-header" onclick="document.getElementById('cb-main').classList.toggle('open')">
-              <div class="cinema-block-left">
-                <i class="ti ti-building"></i>
-                <div>
-                  <div class="cinema-block-name">${cinema.nom}</div>
-                  <div class="cinema-block-dist">${PLACES.formatDist(cinema.dist)}</div>
-                </div>
-              </div>
-              <div class="cinema-block-right">
-                <button class="btn-itineraire" onclick="event.stopPropagation();window.open('${PLACES.getMapsUrl(cinema)}','_blank')"><i class="ti ti-navigation"></i> Y aller</button>
-                <i class="ti ti-chevron-down chevron"></i>
-              </div>
-            </div>
-            <div class="seances-panel">
-              ${Object.entries(seances).map(([jour,horaires]) => `
-                <div class="seances-day">
-                  <div class="day-label">${jour}</div>
-                  <div class="horaires">
-                    ${horaires.map(h => `<button class="horaire-btn" onclick="openReservation('${film.title}','${cinema.nom}','${h}')">${h}</button>`).join('')}
-                  </div>
-                </div>`).join('')}
-            </div>
-          </div>
-        </div>` : `
-        <div style="padding:14px 18px;border-top:0.5px solid var(--gray-200);">
-          <a href="https://www.allocine.fr/recherche/?q=${encodeURIComponent(film.title)}" target="_blank"
-             style="display:inline-flex;align-items:center;gap:6px;background:var(--black);color:#fff;padding:9px 16px;border-radius:var(--radius-md);font-size:13px;font-weight:500;text-decoration:none;">
-            <i class="ti ti-external-link"></i> Voir les séances sur AlloCiné
-          </a>
-        </div>`;
-
-      popup.innerHTML = `
-        <div class="popup-top">
-          <div class="popup-poster" style="${poster ? 'padding:0;' : 'background:var(--gray-200);'}">
-            ${poster ? `<img src="${poster}" alt="${film.title}" style="width:100%;height:100%;object-fit:cover;" />` : `<i class="ti ti-photo"></i>`}
-          </div>
-          <div class="popup-header">
-            <span class="popup-badge">À l'affiche</span>
-            <div class="popup-title">${film.title}</div>
-            <div class="popup-tags">
-              ${genres.split(', ').slice(0,2).map(g=>`<span class="popup-tag">${g}</span>`).join('')}
-              ${duree ? `<span class="popup-tag">${duree}</span>` : ''}
-              <span class="popup-tag">★ ${note}/5</span>
-            </div>
-            <div class="popup-crew">
-              ${director ? `<div class="popup-crew-row"><strong>Réalisateur ·</strong> ${director.name}</div>` : ''}
-              <div class="popup-crew-row"><strong>Avec ·</strong> ${actors}</div>
-            </div>
-          </div>
-        </div>
-        <div class="popup-synopsis-block">
-          <div class="section-label">Synopsis</div>
-          <div class="popup-synopsis">${synopsis}</div>
-        </div>
-        ${cinemasHtml}
-        <button class="popup-close-btn" onclick="closeFilmPopup()">Fermer</button>`;
-    } catch(e) {
+      popup.innerHTML = buildCleanMoviePopup(film, imdbSynopsis);
+      overlay.classList.add('open');
+      document.body.style.overflow = 'hidden';
+    } catch (e) {
       popup.innerHTML = `<div style="padding:40px;text-align:center;color:var(--gray-400);">Impossible de charger ce film.<button class="popup-close-btn" onclick="closeFilmPopup()" style="display:block;margin:16px auto 0;">Fermer</button></div>`;
+      overlay.classList.add('open');
+      document.body.style.overflow = 'hidden';
     }
   }
 
