@@ -379,7 +379,9 @@ function synopsisCachePath() {
 }
 
 function readSynopsisCache() {
-  return readJson(synopsisCachePath(), {});
+  const frCache = readJson(dataPath('imdb-synopsis-fr-cache.json'), {});
+  const imdbCache = readJson(dataPath('imdb-synopsis-cache.json'), {});
+  return { ...imdbCache, ...frCache };
 }
 
 function saveSynopsisCacheEntry(imdbId, entry) {
