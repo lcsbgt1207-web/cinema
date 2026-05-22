@@ -383,9 +383,63 @@ function synopsisFrCachePath() {
 }
 
 function readSynopsisCache() {
-  const normal = readJson(synopsisCachePath(), {});
-  const fr = readJson(synopsisFrCachePath(), {});
-  return { ...normal, ...fr };
+  return readJson(synopsisCachePath(), {});
+}
+
+function readSynopsisFrCache() {
+  return readJson(synopsisFrCachePath(), {});
+}
+
+function extractCachedSynopsis(entry) {
+  if (!entry) return '';
+  if (typeof entry === 'string') return cleanSynopsis(entry);
+  if (typeof entry === 'object') {
+    return cleanSynopsis(entry.synopsis || entry.plot || entry.overview || entry.description || '');
+  }
+  return '';
+}
+
+function findCachedSynopsis(cache, imdbId) {
+  if (!/^tt\d+$/.test(String(imdbId || ''))) return null;
+
+  const directKeys = [
+    imdbId,
+    `t-${imdbId}`,
+    `${imdbId}-omdb-fallback-v2`,
+    `t-${imdbId}-omdb-fallback-v2`,
+    `omdb-short-${imdbId}`,
+    `t-omdb-short-${imdbId}`
+  ];
+
+  for (const key of directKeys) {
+    const synopsis = extractCachedSynopsis(cache?.[key]);
+    if (synopsis && !isBadSynopsisText(synopsis) && isGoodSynopsis(synopsis)) {
+      const entry = cache[key];
+      return { key, synopsis, source: typeof entry === 'object' ? (entry.source || 'cache') : 'cache' };
+    }
+  }
+
+  for (const [key, entry] of Object.entries(cache || {})) {
+    if (!String(key).includes(imdbId)) continue;
+    const synopsis = extractCachedSynopsis(entry);
+    if (synopsis && !isBadSynopsisText(synopsis) && isGoodSynopsis(synopsis)) {
+      return { key, synopsis, source: typeof entry === 'object' ? (entry.source || 'cache') : 'cache' };
+    }
+  }
+
+  return null;
+}
+
+function readBestCachedSynopsis(imdbId) {
+  // Priorité 1 : cache FR généré par npm run sync-imdb.
+  const fr = findCachedSynopsis(readSynopsisFrCache(), imdbId);
+  if (fr) return { ...fr, source: `imdb-fr-cache:${fr.source}` };
+
+  // Priorité 2 : ancien cache IMDb historique.
+  const legacy = findCachedSynopsis(readSynopsisCache(), imdbId);
+  if (legacy) return { ...legacy, source: `imdb-cache:${legacy.source}` };
+
+  return null;
 }
 
 function saveSynopsisCacheEntry(imdbId, entry) {
@@ -398,6 +452,21 @@ function saveSynopsisCacheEntry(imdbId, entry) {
     updatedAt: new Date().toISOString()
   };
   writeJson(synopsisCachePath(), cache);
+}
+
+async function fetchTmdbFrenchOverviewByImdbId(imdbId = '') {
+  if (!TMDB_API_KEY || !/^tt\d+$/.test(String(imdbId || ''))) return '';
+  try {
+    const findUrl = `${TMDB_BASE_URL}/find/${encodeURIComponent(imdbId)}?api_key=${TMDB_API_KEY}&language=fr-FR&external_source=imdb_id`;
+    const findResponse = await fetch(findUrl);
+    if (!findResponse.ok) return '';
+    const findData = await findResponse.json();
+    const movie = (findData?.movie_results || [])[0];
+    if (!movie?.id) return '';
+    return await fetchTmdbFrenchOverview(String(movie.id), movie.title || movie.original_title || '', movie.release_date ? String(movie.release_date).slice(0, 4) : '');
+  } catch {
+    return '';
+  }
 }
 
 async function resolveImdbId({ imdbId = '', tmdbId = '', title = '', originalTitle = '', year = '' }) {
@@ -523,30 +592,42 @@ app.get('/api/imdb-debug', async (req, res) => {
 
 app.get('/api/imdb-synopsis', async (req, res) => {
   try {
-    const resolvedId = await resolveImdbId({
+    const input = {
       imdbId: String(req.query.imdbId || '').trim(),
       tmdbId: String(req.query.tmdbId || '').trim(),
       title: String(req.query.title || '').trim(),
       originalTitle: String(req.query.originalTitle || '').trim(),
       year: String(req.query.year || '').trim()
-    });
+    };
 
-    if (!resolvedId) {
-      return res.json({ source: 'unavailable-no-imdb-id', imdbId: '', synopsis: '' });
+    const resolvedId = await resolveImdbId(input);
+
+    // 1) Cache local FR/IMDb rempli par npm run sync-imdb.
+    if (resolvedId) {
+      const cached = readBestCachedSynopsis(resolvedId);
+      if (cached?.synopsis) {
+        return res.json({
+          source: cached.source,
+          cacheKey: cached.key,
+          imdbId: resolvedId,
+          synopsis: cached.synopsis
+        });
+      }
     }
 
-    const refresh = String(req.query.refresh || '') === '1';
-    const cache = readSynopsisCache();
-    if (!refresh && cache[resolvedId]?.synopsis) {
-      return res.json({ source: `${cache[resolvedId].source || 'cache'}-cache`, imdbId: resolvedId, synopsis: cache[resolvedId].synopsis });
+    // 2) Secours TMDB FR, même si on n'a reçu que imdbId.
+    let tmdbSynopsis = await fetchTmdbFrenchOverview(input.tmdbId, input.title, input.year);
+    if (!tmdbSynopsis && resolvedId) {
+      tmdbSynopsis = await fetchTmdbFrenchOverviewByImdbId(resolvedId);
+    }
+    if (tmdbSynopsis && !isBadSynopsisText(tmdbSynopsis)) {
+      return res.json({ source: 'tmdb-fr-fallback', imdbId: resolvedId || '', synopsis: tmdbSynopsis });
     }
 
-    const result = await getOfficialSynopsis(resolvedId);
-    if (result.synopsis) saveSynopsisCacheEntry(resolvedId, result);
-
-    return res.json({ source: result.source, imdbId: resolvedId, synopsis: result.synopsis || '' });
+    // 3) Aucun scraping IMDb au clic : on évite les blocages anti-bot.
+    return res.json({ source: 'unavailable', imdbId: resolvedId || '', synopsis: '' });
   } catch (error) {
-    return res.json({ source: 'imdb-fetch-error', imdbId: '', synopsis: '' });
+    return res.json({ source: 'imdb-synopsis-error', message: error?.message || String(error), imdbId: '', synopsis: '' });
   }
 });
 
