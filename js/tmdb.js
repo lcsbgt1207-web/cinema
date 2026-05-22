@@ -69,14 +69,14 @@ const TMDB = {
     if (!imdbId && !title) return tmdbFallback;
 
     const cacheIdentity = imdbId || (tmdbId ? `tmdb-${tmdbId}` : `${title.toLowerCase()}-${year}`);
-    const cacheKey = `cinepro_synopsis_v70_cache_imdb_then_tmdb_${cacheIdentity}`;
+    const cacheKey = `cinepro_synopsis_v80_cache_omdb_then_tmdb_${cacheIdentity}`;
 
     try {
-      if (!localStorage.getItem('cinepro_synopsis_cache_cleaned_v70')) {
+      if (!localStorage.getItem('cinepro_synopsis_cache_cleaned_v80')) {
         Object.keys(localStorage)
           .filter(key => key.startsWith('cinepro_imdb_synopsis_') || key.startsWith('cinepro_synopsis_'))
           .forEach(key => localStorage.removeItem(key));
-        localStorage.setItem('cinepro_synopsis_cache_cleaned_v70', '1');
+        localStorage.setItem('cinepro_synopsis_cache_cleaned_v80', '1');
       }
       const cached = localStorage.getItem(cacheKey);
       if (cached && !isBadSynopsis(cached)) return cached;
@@ -91,19 +91,24 @@ const TMDB = {
       if (originalTitle) params.set('originalTitle', originalTitle);
       if (year) params.set('year', year);
 
-      params.set('mode', 'live-imdb-official-then-tmdb');
+      params.set('mode', 'cache-omdb-then-tmdb');
       params.set('live', '1');
-      // Au clic, le backend tente maintenant IMDb officiel d'abord, puis TMDB seulement si IMDb bloque.
+      // Au clic, le backend consulte le cache, tente OMDb si besoin, puis TMDB seulement en dernier secours.
       params.set('_', String(Date.now()));
       const res = await fetch(`http://localhost:3000/api/imdb-synopsis?${params.toString()}`, { cache: 'no-store' });
       if (!res.ok) return '';
 
       const data = await res.json();
       const synopsis = String(data?.synopsis || '').trim();
+      const source = String(data?.source || '').trim();
       const finalSynopsis = synopsis && !isBadSynopsis(synopsis) ? synopsis : tmdbFallback;
       if (!finalSynopsis || isBadSynopsis(finalSynopsis)) return '';
 
-      try { localStorage.setItem(cacheKey, finalSynopsis); } catch {}
+      // Important : on ne met pas en cache navigateur un fallback TMDB.
+      // Sinon un vieux synopsis TMDB peut rester affiché même après remplissage du cache OMDb.
+      if (source && source !== 'tmdb-fr-fallback') {
+        try { localStorage.setItem(cacheKey, finalSynopsis); } catch {}
+      }
       return finalSynopsis;
     } catch (error) {
       console.warn('Synopsis IMDb indisponible, fallback TMDB utilisé.', error);
