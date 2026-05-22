@@ -86,6 +86,27 @@
     .seance-pill { font-size: 12px; border: 0.5px solid var(--gray-200); border-radius: var(--radius-sm); padding: 5px 11px; cursor: pointer; background: var(--white); color: var(--black); transition: background var(--transition), color var(--transition); }
     .seance-pill:hover { background: var(--black); color: var(--white); border-color: var(--black); }
 
+    /* Popup Cinéma */
+    .cinema-popup-overlay { position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:1000;display:flex;align-items:flex-end;justify-content:center;opacity:0;pointer-events:none;transition:opacity 0.25s; }
+    .cinema-popup-overlay.open { opacity:1;pointer-events:all; }
+    .cinema-popup { background:var(--white);border-radius:20px 20px 0 0;width:100%;max-width:640px;max-height:88vh;overflow-y:auto;transform:translateY(100%);transition:transform 0.3s cubic-bezier(.32,.72,0,1); }
+    .cinema-popup-overlay.open .cinema-popup { transform:translateY(0); }
+    .cinema-popup-header { padding:20px 20px 14px;border-bottom:0.5px solid var(--gray-200);position:sticky;top:0;background:var(--white);z-index:2; }
+    .cinema-popup-name { font-size:18px;font-weight:600;color:var(--black);margin-bottom:4px; }
+    .cinema-popup-addr { font-size:12px;color:var(--gray-500);display:flex;align-items:center;gap:4px;margin-bottom:10px; }
+    .cinema-popup-chips { display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px; }
+    .cinema-popup-actions { display:flex;gap:8px; }
+    .cinema-popup-body { padding:16px 20px; }
+    .cinema-popup-films-label { font-size:11px;font-weight:500;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:12px; }
+    .cinema-popup-film-row { display:flex;gap:12px;padding:12px 0;border-bottom:0.5px solid var(--gray-100);align-items:center; }
+    .cinema-popup-film-row:last-child { border-bottom:none; }
+    .cinema-popup-film-poster { width:44px;height:62px;border-radius:6px;overflow:hidden;flex-shrink:0;background:var(--gray-100);border:0.5px solid var(--gray-200); }
+    .cinema-popup-film-poster img { width:100%;height:100%;object-fit:cover; }
+    .cinema-popup-film-info { flex:1; }
+    .cinema-popup-film-title { font-size:14px;font-weight:500;color:var(--black);margin-bottom:6px; }
+    .cinema-popup-film-horaires { display:flex;gap:5px;flex-wrap:wrap; }
+    .cinema-popup-close { position:absolute;top:16px;right:16px;background:var(--gray-100);border:none;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;color:var(--gray-500); }
+
     /* Loading / Error states */
     .state-box { padding: 48px 0; text-align: center; color: var(--gray-400); }
     .state-box i { font-size: 36px; display: block; margin-bottom: 12px; }
@@ -166,6 +187,12 @@
     <div id="film-cinemas-list"></div>
   </div>
 </main>
+
+<!-- OVERLAY CINÉMA -->
+<div class="cinema-popup-overlay" id="cinema-popup-overlay" onclick="closeCinemaPopupOnBg(event)">
+  <div class="cinema-popup" id="cinema-popup-content">
+  </div>
+</div>
 
 <!-- OVERLAY FILM -->
 <div class="overlay" id="film-overlay" onclick="closeOnBg(event)">
@@ -314,12 +341,13 @@
       function renderCinemaCard(c, ci) {
         const ouvertClass = c.ouvert === true ? 'chip-open' : c.ouvert === false ? 'chip-closed' : 'chip-unknown';
         const ouvertLabel = c.ouvert === true ? 'Ouvert' : c.ouvert === false ? 'Fermé' : 'Horaires inconnus';
-        return `<div class="cinema-item" style="animation-delay:${ci * 0.06}s" id="cinema-card-${ci}">
+        const cineDataStr = JSON.stringify({id:c.id,nom:c.nom,adresse:c.adresse,location:c.location,dist:c.dist,ouvert:c.ouvert}).replace(/"/g,'&quot;');
+        return `<div class="cinema-item" style="animation-delay:${ci * 0.06}s;cursor:pointer;" id="cinema-card-${ci}" onclick="openCinemaPopup(JSON.parse(this.dataset.c))" data-c="${cineDataStr}">
           <div class="cinema-item-top">
             <div class="cinema-item-left">
               <div class="cinema-rank-name">
                 <span class="cinema-rank">${ci + 1}.</span>
-                <span class="cinema-item-name">${c.nom}</span>
+                <span class="cinema-item-name" style="text-decoration:underline;text-underline-offset:3px;">${c.nom}</span>
               </div>
               <div class="cinema-item-addr"><i class="ti ti-map-pin"></i>${c.adresse}</div>
               <div class="cinema-chips">
@@ -327,7 +355,7 @@
                 <span class="chip ${ouvertClass}">${ouvertLabel}</span>
               </div>
             </div>
-            <div class="cinema-item-actions">
+            <div class="cinema-item-actions" onclick="event.stopPropagation()">
               <button class="btn-nav" onclick="window.open('${PLACES.getWazeUrl(c)}','_blank')">
                 <i class="ti ti-map-2"></i> Waze
               </button>
@@ -337,7 +365,7 @@
             </div>
           </div>
           <div class="cinema-films-label">Films à l'affiche</div>
-          <div class="cinema-films" id="films-cinema-${ci}">
+          <div class="cinema-films" id="films-cinema-${ci}" onclick="event.stopPropagation()">
             <div style="font-size:12px;color:var(--gray-400);padding:8px 0;display:flex;align-items:center;gap:6px;">
               <i class="ti ti-loader"></i> Chargement des films…
             </div>
@@ -757,6 +785,141 @@
     } catch(e) {
       popup.innerHTML = `<div style="padding:40px;text-align:center;color:var(--gray-400);">Impossible de charger ce film.<button class="popup-close-btn" onclick="closeFilmPopup()" style="display:block;margin:16px auto 0;">Fermer</button></div>`;
     }
+  }
+
+  // ── Popup Cinéma ──
+  async function openCinemaPopup(cinema) {
+    const overlay = document.getElementById('cinema-popup-overlay');
+    const popup   = document.getElementById('cinema-popup-content');
+    const ouvertClass = cinema.ouvert === true ? 'chip-open' : cinema.ouvert === false ? 'chip-closed' : 'chip-unknown';
+    const ouvertLabel = cinema.ouvert === true ? 'Ouvert' : cinema.ouvert === false ? 'Fermé' : 'Horaires inconnus';
+
+    popup.innerHTML = `
+      <div class="cinema-popup-header" style="position:relative;">
+        <button class="cinema-popup-close" onclick="closeCinemaPopup()"><i class="ti ti-x"></i></button>
+        <div class="cinema-popup-name">${cinema.nom}</div>
+        <div class="cinema-popup-addr"><i class="ti ti-map-pin"></i>${cinema.adresse}</div>
+        <div class="cinema-popup-chips">
+          <span class="chip chip-dist"><i class="ti ti-walk"></i>${PLACES.formatDist(cinema.dist)}</span>
+          <span class="chip ${ouvertClass}">${ouvertLabel}</span>
+        </div>
+        <div class="cinema-popup-actions">
+          <button class="btn-nav" onclick="window.open('${PLACES.getWazeUrl(cinema)}','_blank')">
+            <i class="ti ti-map-2"></i> Waze
+          </button>
+          <button class="btn-nav btn-nav-primary" onclick="window.open('${PLACES.getMapsUrl(cinema)}','_blank')">
+            <i class="ti ti-navigation"></i> Y aller
+          </button>
+        </div>
+      </div>
+      <div class="cinema-popup-body">
+        <div class="cinema-popup-films-label">Films à l'affiche</div>
+        <div id="cinema-popup-films">
+          <div style="font-size:12px;color:var(--gray-400);padding:16px 0;display:flex;align-items:center;gap:6px;">
+            <i class="ti ti-loader"></i> Chargement des films et séances…
+          </div>
+        </div>
+      </div>`;
+
+    overlay.classList.add('open');
+    document.body.style.overflow = 'hidden';
+
+    // Charger les vrais films + séances
+    try {
+      const searchParams = new URLSearchParams({
+        name: cinema.nom,
+        lat: cinema.location?.lat || '',
+        lng: cinema.location?.lng || ''
+      });
+      const searchR = await fetch(`${CINEPRO_API}/search-cinema?${searchParams}`);
+      const searchData = await searchR.json();
+
+      if (!searchData.id) {
+        document.getElementById('cinema-popup-films').innerHTML = `
+          <a href="https://www.allocine.fr/recherche/?q=${encodeURIComponent(cinema.nom)}" target="_blank"
+             style="font-size:13px;color:var(--black);font-weight:500;">Voir sur AlloCiné →</a>`;
+        return;
+      }
+
+      const todayStr = new Date().toISOString().split('T')[0];
+      const tomorrowStr = new Date(Date.now()+86400000).toISOString().split('T')[0];
+      const [r1, r2] = await Promise.all([
+        fetch(`${CINEPRO_API}/seances?id=${searchData.id}&date=${todayStr}`),
+        fetch(`${CINEPRO_API}/seances?id=${searchData.id}&date=${tomorrowStr}`)
+      ]);
+      const d1 = await r1.json();
+      const d2 = r2.ok ? await r2.json() : { seances: [] };
+
+      const films = d1.seances || [];
+      if (!films.length) {
+        document.getElementById('cinema-popup-films').innerHTML = `
+          <a href="https://www.allocine.fr/recherche/?q=${encodeURIComponent(cinema.nom)}" target="_blank"
+             style="font-size:13px;color:var(--black);font-weight:500;">Voir sur AlloCiné →</a>`;
+        return;
+      }
+
+      // Construire les films avec posters + horaires aujourd'hui et demain
+      const filmsHtml = await Promise.all(films.slice(0,10).map(async f => {
+        const titre = f.title || f.name || '';
+        // Horaires aujourd'hui
+        const hToday = (f.showtimes||[])
+          .filter(s => s.startsAt?.startsWith(todayStr))
+          .map(s => { const h = new Date(s.startsAt); return h.getHours().toString().padStart(2,'0')+'h'+h.getMinutes().toString().padStart(2,'0'); })
+          .filter((v,i,a)=>a.indexOf(v)===i).sort().slice(0,6);
+
+        // Horaires demain depuis d2
+        const filmDemain = (d2.seances||[]).find(fd => normTitre(fd.title||fd.name||'') === normTitre(titre));
+        const hTomorrow = (filmDemain?.showtimes||[])
+          .filter(s => s.startsAt?.startsWith(tomorrowStr))
+          .map(s => { const h = new Date(s.startsAt); return h.getHours().toString().padStart(2,'0')+'h'+h.getMinutes().toString().padStart(2,'0'); })
+          .filter((v,i,a)=>a.indexOf(v)===i).sort().slice(0,6);
+
+        // Poster TMDB
+        let posterHtml = `<i class="ti ti-photo" style="font-size:20px;color:var(--gray-300);margin:auto;display:flex;"></i>`;
+        let tmdbId = null;
+        try {
+          const tmdbResults = await TMDB.searchMovie(titre);
+          if (tmdbResults.length) {
+            const poster = TMDB.posterUrl(tmdbResults[0].poster_path, 'w92');
+            tmdbId = tmdbResults[0].id;
+            if (poster) posterHtml = `<img src="${poster}" alt="${titre}" style="width:100%;height:100%;object-fit:cover;" />`;
+          }
+        } catch(e) {}
+
+        const horairesBtnToday = hToday.map(h =>
+          `<button class="seance-pill" onclick="openReservation('${titre.replace(/'/g,"\'")}','${cinema.nom.replace(/'/g,"\'")}','${h}')">${h}</button>`
+        ).join('');
+        const horairesBtnTomorrow = hTomorrow.map(h =>
+          `<button class="seance-pill" onclick="openReservation('${titre.replace(/'/g,"\'")}','${cinema.nom.replace(/'/g,"\'")}','${h}')">${h}</button>`
+        ).join('');
+
+        const clickFn = tmdbId
+          ? `openFilmPopup(${tmdbId}, ${JSON.stringify({id:cinema.id,nom:cinema.nom,adresse:cinema.adresse,location:cinema.location,dist:cinema.dist,ouvert:cinema.ouvert}).replace(/"/g,"'")})`
+          : `openFilmPopupByTitle('${titre.replace(/'/g,"\'")}', ${JSON.stringify({id:cinema.id,nom:cinema.nom,adresse:cinema.adresse,location:cinema.location,dist:cinema.dist,ouvert:cinema.ouvert}).replace(/"/g,"'")})`;
+
+        return `<div class="cinema-popup-film-row">
+          <div class="cinema-popup-film-poster" style="cursor:pointer;" onclick="${clickFn}">${posterHtml}</div>
+          <div class="cinema-popup-film-info">
+            <div class="cinema-popup-film-title" style="cursor:pointer;" onclick="${clickFn}">${titre}</div>
+            ${hToday.length ? `<div style="margin-bottom:4px;"><span style="font-size:10px;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.3px;margin-right:6px;">Aujourd'hui</span><div class="cinema-popup-film-horaires">${horairesBtnToday}</div></div>` : ''}
+            ${hTomorrow.length ? `<div><span style="font-size:10px;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.3px;margin-right:6px;">Demain</span><div class="cinema-popup-film-horaires">${horairesBtnTomorrow}</div></div>` : ''}
+            ${!hToday.length && !hTomorrow.length ? `<span style="font-size:12px;color:var(--gray-400);">Pas de séance trouvée</span>` : ''}
+          </div>
+        </div>`;
+      }));
+
+      document.getElementById('cinema-popup-films').innerHTML = filmsHtml.join('');
+    } catch(e) {
+      document.getElementById('cinema-popup-films').innerHTML = `<div style="font-size:13px;color:var(--gray-400);">Erreur de chargement.</div>`;
+    }
+  }
+
+  function closeCinemaPopup() {
+    document.getElementById('cinema-popup-overlay').classList.remove('open');
+    document.body.style.overflow = '';
+  }
+  function closeCinemaPopupOnBg(e) {
+    if (e.target === document.getElementById('cinema-popup-overlay')) closeCinemaPopup();
   }
 
   function closeFilmPopup() { document.getElementById('film-overlay').classList.remove('open'); document.body.style.overflow=''; }
