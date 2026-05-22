@@ -1,307 +1,377 @@
-/*
-  CinéProche — Catalogue proche — ZIP 2.3
-
-  Objectif unique : DEBUG.
-  On ne change pas encore le Catalogue visuel.
-  On veut comprendre pourquoi un cinéma proche retourne 0 film.
-
-  Test console :
-  getNearbyRankedMovies({ address: 'Cergy', radius: 15000 })
+/* CinéProche — Catalogue proche — ZIP 2.5
+   Objectif unique :
+   - corriger l'assemblage des films récupérés par /seances
+   - accepter plusieurs formats d'objets film
+   - éviter l'erreur "Cannot read properties of undefined (reading 'title')"
+   - garder le test console getNearbyRankedMovies(...)
 */
 
-const NEARBY_CATALOGUE_API = window.CINEPRO_API || 'https://cinepro-api-yal8.onrender.com';
+(function () {
+  'use strict';
 
-function normalizeNearbyTitle(value) {
-  return String(value || '')
-    .toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim();
-}
+  const NEARBY_CATALOGUE_API = 'https://cinepro-api-yal8.onrender.com';
 
-function getLocalFilmsSafe() {
-  if (Array.isArray(window.FILMS)) return window.FILMS;
-  if (typeof FILMS !== 'undefined' && Array.isArray(FILMS)) return FILMS;
-  return [];
-}
-
-function findLocalFilmByTitle(title) {
-  const key = normalizeNearbyTitle(title);
-  if (!key) return null;
-
-  return getLocalFilmsSafe().find(f => {
-    return normalizeNearbyTitle(f.titre || f.title) === key ||
-           normalizeNearbyTitle(f.original || f.original_title) === key;
-  }) || null;
-}
-
-function getBestNearbyRating(localFilm) {
-  if (!localFilm) return null;
-
-  const imdb = Number(localFilm.imdb);
-  const lb = Number(localFilm.lb);
-  const tmdb = Number(localFilm.tmdb || localFilm.vote_average);
-
-  if (Number.isFinite(imdb) && imdb > 0) return { source: 'IMDb', value: imdb };
-  if (Number.isFinite(lb) && lb > 0) return { source: 'Letterboxd', value: lb * 2 };
-  if (Number.isFinite(tmdb) && tmdb > 0) return { source: 'TMDB', value: tmdb };
-
-  return null;
-}
-
-function fetchWithTimeout(url, options = {}, timeoutMs = 15000) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  return fetch(url, { ...options, signal: controller.signal })
-    .finally(() => clearTimeout(timer));
-}
-
-function safeJsonParse(text) {
-  try { return JSON.parse(text); } catch { return null; }
-}
-
-async function fetchDebugJson(url, label) {
-  console.log(`[Catalogue proche][DEBUG] Appel ${label} :`, url);
-
-  const response = await fetchWithTimeout(url, {}, 15000);
-  const text = await response.text();
-  const json = safeJsonParse(text);
-
-  console.log(`[Catalogue proche][DEBUG] Réponse ${label} :`, {
-    status: response.status,
-    ok: response.ok,
-    contentType: response.headers.get('content-type'),
-    json,
-    rawTextPreview: text.slice(0, 1000)
-  });
-
-  if (!response.ok) {
-    throw new Error(`${label} HTTP ${response.status}`);
+  function normalizeNearbyTitle(value) {
+    return String(value || '')
+      .toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
   }
 
-  return json ?? { rawText: text };
-}
-
-function extractCinemaId(data) {
-  if (!data || typeof data !== 'object') return null;
-
-  // Formats possibles selon le backend.
-  return data.id ||
-         data.allocineId ||
-         data.cinemaId ||
-         data.theaterId ||
-         data?.cinema?.id ||
-         data?.result?.id ||
-         data?.results?.[0]?.id ||
-         data?.results?.[0]?.allocineId ||
-         null;
-}
-
-function extractShowtimesArray(data) {
-  if (!data || typeof data !== 'object') return [];
-
-  const candidates = [
-    data.seances,
-    data.showtimes,
-    data.movies,
-    data.films,
-    data.results,
-    data.data,
-    data?.cinema?.seances,
-    data?.cinema?.films
-  ];
-
-  for (const value of candidates) {
-    if (Array.isArray(value)) return value;
+  function getGlobalFilms() {
+    if (Array.isArray(window.FILMS)) return window.FILMS;
+    try {
+      if (Array.isArray(FILMS)) return FILMS;
+    } catch (_) {}
+    return [];
   }
 
-  return [];
-}
+  function findLocalFilmByTitle(title) {
+    const key = normalizeNearbyTitle(title);
+    if (!key) return null;
 
-function extractShowtimeHours(showtimes = []) {
-  const hours = new Set();
+    return getGlobalFilms().find(f => {
+      return normalizeNearbyTitle(f?.titre) === key ||
+             normalizeNearbyTitle(f?.title) === key ||
+             normalizeNearbyTitle(f?.name) === key ||
+             normalizeNearbyTitle(f?.original) === key ||
+             normalizeNearbyTitle(f?.originalTitle) === key ||
+             normalizeNearbyTitle(f?.original_title) === key;
+    }) || null;
+  }
 
-  for (const showtime of showtimes || []) {
-    const startsAt = showtime?.startsAt || showtime?.date || showtime?.time || showtime?.horaire || '';
-    if (!startsAt) continue;
+  function getBestNearbyRating(localFilm, rawMovie) {
+    const sources = [
+      { source: 'IMDb', value: Number(localFilm?.imdb ?? rawMovie?.imdb ?? rawMovie?.imdbRating) },
+      { source: 'Letterboxd', value: Number(localFilm?.lb ?? localFilm?.letterboxd ?? rawMovie?.lb ?? rawMovie?.letterboxd) * 2 },
+      { source: 'TMDB', value: Number(localFilm?.tmdb ?? localFilm?.vote_average ?? rawMovie?.tmdb ?? rawMovie?.vote_average) },
+      { source: 'Allociné', value: Number(rawMovie?.rating ?? rawMovie?.note ?? rawMovie?.score) }
+    ];
 
-    const date = new Date(startsAt);
-    if (Number.isNaN(date.getTime())) {
-      if (typeof startsAt === 'string') hours.add(startsAt);
-      continue;
+    for (const item of sources) {
+      if (Number.isFinite(item.value) && item.value > 0) return item;
+    }
+    return null;
+  }
+
+  function firstString(...values) {
+    for (const value of values) {
+      if (typeof value === 'string' && value.trim()) return value.trim();
+      if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+    }
+    return '';
+  }
+
+  function getDeep(obj, path) {
+    try {
+      return path.split('.').reduce((acc, key) => acc?.[key], obj);
+    } catch (_) {
+      return undefined;
+    }
+  }
+
+  function extractMovieObject(item) {
+    if (!item || typeof item !== 'object') return null;
+
+    const candidates = [
+      item.movie,
+      item.film,
+      item.filmShow,
+      item.show,
+      item.entity,
+      item.work,
+      item.movieShow,
+      item.data?.movie,
+      item.data?.film,
+      item.production,
+      item
+    ];
+
+    for (const candidate of candidates) {
+      if (candidate && typeof candidate === 'object') {
+        const title = extractMovieTitle(candidate);
+        if (title) return candidate;
+      }
     }
 
-    const h = String(date.getHours()).padStart(2, '0');
-    const m = String(date.getMinutes()).padStart(2, '0');
-    hours.add(`${h}h${m}`);
+    return item;
   }
 
-  return Array.from(hours).sort();
-}
+  function extractMovieTitle(item) {
+    if (!item || typeof item !== 'object') return '';
 
-function normalizeShowtimeItem(item) {
-  const title = item?.title || item?.name || item?.titre || item?.movieTitle || item?.film || item?.movie?.title || item?.movie?.name || '';
-  return {
-    ...item,
-    title,
-    horaires: item?.horaires || item?.times || item?.showtimes || extractShowtimeHours(item?.sessions || item?.seances || [])
-  };
-}
+    return firstString(
+      item.title,
+      item.titre,
+      item.name,
+      item.nom,
+      item.label,
+      item.originalTitle,
+      item.original_title,
+      item.movieTitle,
+      item.filmTitle,
+      item.fullTitle,
+      item.displayTitle,
+      getDeep(item, 'movie.title'),
+      getDeep(item, 'movie.name'),
+      getDeep(item, 'movie.titre'),
+      getDeep(item, 'film.title'),
+      getDeep(item, 'film.name'),
+      getDeep(item, 'film.titre'),
+      getDeep(item, 'show.title'),
+      getDeep(item, 'show.name'),
+      getDeep(item, 'entity.title'),
+      getDeep(item, 'entity.name'),
+      getDeep(item, 'data.title'),
+      getDeep(item, 'data.name')
+    );
+  }
 
-async function getCinemaAllocineId(cinema) {
-  const params = new URLSearchParams({
-    name: cinema.nom || '',
-    address: cinema.adresse || '',
-    lat: cinema.location?.lat || '',
-    lng: cinema.location?.lng || ''
-  });
+  function extractPoster(item, rawItem) {
+    return firstString(
+      item?.poster,
+      item?.posterUrl,
+      item?.poster_path,
+      item?.image,
+      item?.imageUrl,
+      item?.cover,
+      item?.thumbnail,
+      rawItem?.poster,
+      rawItem?.image,
+      rawItem?.movie?.poster,
+      rawItem?.film?.poster
+    );
+  }
 
-  const url = `${NEARBY_CATALOGUE_API}/search-cinema?${params.toString()}`;
-  const data = await fetchDebugJson(url, `search-cinema pour ${cinema.nom}`);
-  const id = extractCinemaId(data);
+  function extractShowtimes(item) {
+    if (!item || typeof item !== 'object') return [];
 
-  console.log(`[Catalogue proche][DEBUG] ID extrait pour ${cinema.nom} :`, id);
-  return { id, raw: data };
-}
+    const possibleArrays = [
+      item.horaires,
+      item.times,
+      item.showtimes,
+      item.seances,
+      item.sessions,
+      item.scr,
+      item.version?.times
+    ];
 
-async function getCinemaShowtimes(cinema) {
-  console.groupCollapsed(`[Catalogue proche][DEBUG] Cinéma testé : ${cinema.nom}`);
-  console.log('[Catalogue proche][DEBUG] Objet cinéma envoyé :', cinema);
-
-  try {
-    const found = await getCinemaAllocineId(cinema);
-
-    if (!found.id) {
-      console.warn(`[Catalogue proche][DEBUG] Aucun ID cinéma trouvé pour : ${cinema.nom}`);
-      console.warn('[Catalogue proche][DEBUG] Réponse brute search-cinema :', found.raw);
-      return [];
+    for (const arr of possibleArrays) {
+      if (Array.isArray(arr)) return arr;
     }
+
+    if (typeof item.time === 'string') return [item.time];
+    if (typeof item.horaire === 'string') return [item.horaire];
+
+    return [];
+  }
+
+  function normalizeShowtimeItem(rawItem) {
+    const movieObject = extractMovieObject(rawItem);
+    const title = extractMovieTitle(movieObject) || extractMovieTitle(rawItem);
+
+    if (!title) {
+      return null;
+    }
+
+    return {
+      title,
+      normalizedKey: normalizeNearbyTitle(title),
+      rawMovie: movieObject || rawItem,
+      rawItem,
+      poster: extractPoster(movieObject, rawItem),
+      horaires: extractShowtimes(rawItem)
+    };
+  }
+
+  async function fetchJsonWithDebug(url, label) {
+    console.log(`[Catalogue proche][DEBUG] Appel ${label} :`, url);
+
+    const response = await fetch(url);
+    const contentType = response.headers.get('content-type') || '';
+    let json = null;
+    let text = '';
+
+    if (contentType.includes('application/json')) {
+      json = await response.json();
+    } else {
+      text = await response.text();
+    }
+
+    console.log(`[Catalogue proche][DEBUG] Réponse ${label} :`, {
+      status: response.status,
+      ok: response.ok,
+      contentType,
+      json,
+      textPreview: text ? text.slice(0, 300) : ''
+    });
+
+    if (!response.ok) throw new Error(`${label} ${response.status}`);
+    return json;
+  }
+
+  async function getCinemaAllocineId(cinema) {
+    const params = new URLSearchParams({
+      name: cinema?.nom || '',
+      lat: cinema?.location?.lat || '',
+      lng: cinema?.location?.lng || ''
+    });
+
+    const data = await fetchJsonWithDebug(`${NEARBY_CATALOGUE_API}/search-cinema?${params}`, `search-cinema pour ${cinema?.nom}`);
+    const id = data?.id || data?.cinema_id || data?.cinemaId || data?.allocineId || data?.theater?.id || null;
+
+    if (id) {
+      console.log(`[Catalogue proche][DEBUG] ID extrait pour ${cinema?.nom} :`, id);
+    } else {
+      console.warn(`[Catalogue proche][DEBUG] Aucun ID cinéma trouvé pour ${cinema?.nom}.`);
+    }
+
+    return id;
+  }
+
+  function extractSeancesArray(data) {
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.seances)) return data.seances;
+    if (Array.isArray(data?.sessions)) return data.sessions;
+    if (Array.isArray(data?.showtimes)) return data.showtimes;
+    if (Array.isArray(data?.movies)) return data.movies;
+    if (Array.isArray(data?.films)) return data.films;
+    if (Array.isArray(data?.data)) return data.data;
+    return [];
+  }
+
+  async function getCinemaShowtimes(cinema) {
+    const allocineId = await getCinemaAllocineId(cinema);
+    if (!allocineId) return [];
 
     const today = new Date().toISOString().split('T')[0];
-    const url = `${NEARBY_CATALOGUE_API}/seances?id=${encodeURIComponent(found.id)}&date=${today}`;
-    const data = await fetchDebugJson(url, `seances pour ${cinema.nom}`);
-    const rawFilms = extractShowtimesArray(data);
+    const data = await fetchJsonWithDebug(`${NEARBY_CATALOGUE_API}/seances?id=${encodeURIComponent(allocineId)}&date=${today}`, `seances pour ${cinema?.nom}`);
 
-    console.log(`[Catalogue proche][DEBUG] Tableau extrait pour ${cinema.nom} :`, rawFilms);
+    const rawShowtimes = extractSeancesArray(data);
+    console.log(`[Catalogue proche][DEBUG] Tableau extrait pour ${cinema?.nom} :`, rawShowtimes);
 
-    const films = rawFilms
+    if (rawShowtimes[0]) {
+      console.log(`[Catalogue proche][DEBUG] Premier objet brut pour ${cinema?.nom} :`, rawShowtimes[0]);
+      console.log(`[Catalogue proche][DEBUG] Clés premier objet pour ${cinema?.nom} :`, Object.keys(rawShowtimes[0] || {}));
+    }
+
+    const normalized = rawShowtimes
       .map(normalizeShowtimeItem)
-      .filter(item => item.title);
+      .filter(Boolean);
 
-    if (!films.length) {
-      console.warn(`[Catalogue proche][DEBUG] 0 film après normalisation pour ${cinema.nom}.`);
-      console.warn('[Catalogue proche][DEBUG] Réponse brute seances :', data);
+    if (rawShowtimes.length && !normalized.length) {
+      console.warn(`[Catalogue proche][DEBUG] ${rawShowtimes.length} objet(s) reçu(s), mais aucun titre lisible pour ${cinema?.nom}.`);
     }
 
-    return films;
-  } finally {
-    console.groupEnd();
-  }
-}
-
-async function getNearbyRankedMovies(options = {}) {
-  if (!window.PLACES && typeof PLACES === 'undefined') {
-    throw new Error('PLACES n’est pas chargé. Vérifie js/places.js.');
+    return normalized;
   }
 
-  const places = window.PLACES || PLACES;
-  const config = window.CONFIG || (typeof CONFIG !== 'undefined' ? CONFIG : {});
-  const radius = options.radius || config.SEARCH_RADIUS || 15000;
-  const maxCinemas = options.maxCinemas || 8;
+  async function getNearbyRankedMovies(options = {}) {
+    if (!window.PLACES) {
+      throw new Error('PLACES n’est pas chargé. Vérifie js/places.js.');
+    }
 
-  if (!places.geocoder || !places.placesService) {
-    places.init();
-  }
+    const radius = options.radius || window.CONFIG?.SEARCH_RADIUS || 15000;
+    let location = options.location || null;
 
-  let location = options.location || null;
+    if (!location && options.address) {
+      const geocoded = await window.PLACES.geocodeAddress(options.address);
+      location = geocoded.location;
+    }
 
-  if (!location && options.address) {
-    const geocoded = await places.geocodeAddress(options.address);
-    location = geocoded.location;
-  }
+    if (!location) {
+      location = await window.PLACES.geolocate();
+    }
 
-  if (!location) {
-    location = await places.geolocate();
-  }
+    console.log('[Catalogue proche] ZIP 2.5 actif.');
+    console.log('[Catalogue proche] Position utilisée :', location);
 
-  console.log('[Catalogue proche] ZIP 2.3 DEBUG actif.');
-  console.log('[Catalogue proche] Position utilisée :', location);
+    const cinemas = await window.PLACES.findNearbycinemas(location, radius);
+    console.log(`[Catalogue proche] ${cinemas.length} cinéma(s) trouvé(s).`, cinemas);
 
-  const cinemas = await places.findNearbycinemas(location, radius);
-  console.log(`[Catalogue proche] ${cinemas.length} cinéma(s) trouvé(s).`, cinemas);
-  console.log(`[Catalogue proche] Test debug sur ${Math.min(cinemas.length, maxCinemas)} cinéma(s).`);
+    const maxCinemas = Number.isFinite(Number(options.maxCinemas)) ? Number(options.maxCinemas) : 8;
+    console.log(`[Catalogue proche] Test debug sur ${Math.min(cinemas.length, maxCinemas)} cinéma(s).`);
 
-  const moviesByKey = new Map();
+    const moviesByKey = new Map();
 
-  for (const cinema of cinemas.slice(0, maxCinemas)) {
-    try {
-      console.log(`[Catalogue proche] Recherche films pour ${cinema.nom}...`);
-      const showtimes = await getCinemaShowtimes(cinema);
-      console.log(`[Catalogue proche] ${cinema.nom} : ${showtimes.length} film(s) trouvé(s).`, showtimes);
+    for (const cinema of cinemas.slice(0, maxCinemas)) {
+      try {
+        console.log(`[Catalogue proche] Recherche films pour ${cinema.nom}...`);
+        const showtimes = await getCinemaShowtimes(cinema);
 
-      for (const item of showtimes) {
-        const title = item.title || item.name || item.titre || '';
-        const key = normalizeNearbyTitle(title);
-        if (!key) continue;
+        console.log(`[Catalogue proche] ${cinema.nom} : ${showtimes.length} film(s) trouvé(s).`, showtimes);
 
-        const localFilm = findLocalFilmByTitle(title);
-        const rating = getBestNearbyRating(localFilm);
+        for (const item of showtimes) {
+          const title = item.title;
+          const key = item.normalizedKey || normalizeNearbyTitle(title);
+          if (!key) continue;
 
-        if (!moviesByKey.has(key)) {
-          moviesByKey.set(key, {
-            title,
-            localFilm,
-            ratingValue: rating?.value ?? null,
-            ratingSource: rating?.source ?? null,
-            cinemas: [],
-            rawShowtimes: []
-          });
+          const localFilm = findLocalFilmByTitle(title);
+          const rating = getBestNearbyRating(localFilm, item.rawMovie);
+
+          if (!moviesByKey.has(key)) {
+            moviesByKey.set(key, {
+              title,
+              localFilm,
+              poster: localFilm?.poster || item.poster || '',
+              ratingValue: rating?.value ?? null,
+              ratingSource: rating?.source ?? null,
+              cinemas: [],
+              rawShowtimes: []
+            });
+          }
+
+          const movie = moviesByKey.get(key);
+
+          if (!movie.cinemas.some(c => c.nom === cinema.nom)) {
+            movie.cinemas.push({
+              nom: cinema.nom,
+              adresse: cinema.adresse,
+              distanceKm: cinema.dist,
+              horaires: item.horaires || []
+            });
+          }
+
+          movie.rawShowtimes.push(item.rawItem || item);
         }
-
-        const movie = moviesByKey.get(key);
-        movie.cinemas.push({
-          nom: cinema.nom,
-          adresse: cinema.adresse,
-          distanceKm: cinema.dist,
-          horaires: item.horaires || []
-        });
-        movie.rawShowtimes.push(item);
+      } catch (error) {
+        console.warn(`[Catalogue proche][DEBUG] Impossible de charger les films pour ${cinema.nom} :`, error?.message || error);
       }
+    }
+
+    const ranked = Array.from(moviesByKey.values()).sort((a, b) => {
+      if (a.ratingValue === null && b.ratingValue === null) {
+        return a.title.localeCompare(b.title, 'fr');
+      }
+      if (a.ratingValue === null) return 1;
+      if (b.ratingValue === null) return -1;
+      return b.ratingValue - a.ratingValue;
+    });
+
+    console.log(`[Catalogue proche] Résultat étape 2.5 : ${ranked.length} film(s) proche(s) assemblé(s).`);
+
+    console.table(ranked.map((movie, index) => ({
+      rang: index + 1,
+      film: movie.title,
+      note: movie.ratingValue ?? '—',
+      source: movie.ratingSource ?? '—',
+      cinemas: movie.cinemas.map(c => c.nom).join(', ')
+    })));
+
+    return ranked;
+  }
+
+  function initNearbyCatalogueGoogleMaps() {
+    try {
+      window.PLACES?.init();
+      console.log('[Catalogue proche] Google Maps/Places prêt. Test possible avec :');
+      console.log("getNearbyRankedMovies({ address: 'Cergy', radius: 15000 })");
     } catch (error) {
-      console.warn(`[Catalogue proche][DEBUG] Impossible de charger les films pour ${cinema.nom} :`, error.message || error);
+      console.warn('[Catalogue proche] Initialisation impossible :', error?.message || error);
     }
   }
 
-  const ranked = Array.from(moviesByKey.values()).sort((a, b) => {
-    if (a.ratingValue === null && b.ratingValue === null) return a.title.localeCompare(b.title, 'fr');
-    if (a.ratingValue === null) return 1;
-    if (b.ratingValue === null) return -1;
-    return b.ratingValue - a.ratingValue;
-  });
-
-  console.log(`[Catalogue proche] Résultat étape 2.3 : ${ranked.length} film(s) proche(s) assemblé(s).`);
-  console.table(ranked.map((movie, index) => ({
-    rang: index + 1,
-    film: movie.title,
-    note: movie.ratingValue ?? '—',
-    source: movie.ratingSource ?? '—',
-    cinemas: movie.cinemas.map(c => c.nom).join(', ')
-  })));
-
-  return ranked;
-}
-
-function initNearbyCatalogueGoogleMaps() {
-  try {
-    const places = window.PLACES || (typeof PLACES !== 'undefined' ? PLACES : null);
-    if (!places) throw new Error('PLACES absent');
-    places.init();
-    console.log('[Catalogue proche] Google Maps/Places prêt. Test possible avec :');
-    console.log("getNearbyRankedMovies({ address: 'Cergy', radius: 15000 })");
-  } catch (error) {
-    console.warn('[Catalogue proche] Initialisation impossible :', error.message || error);
-  }
-}
-
-window.getNearbyRankedMovies = getNearbyRankedMovies;
-window.initNearbyCatalogueGoogleMaps = initNearbyCatalogueGoogleMaps;
+  window.getNearbyRankedMovies = getNearbyRankedMovies;
+  window.initNearbyCatalogueGoogleMaps = initNearbyCatalogueGoogleMaps;
+})();
