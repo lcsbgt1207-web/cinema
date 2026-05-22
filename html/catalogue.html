@@ -306,7 +306,7 @@
         : `<i class="ti ti-photo"></i>`;
 
       return `
-      <tr onclick="openCatalogueFilmPopup(${f.id})">
+      <tr class="film-row" data-film-id="${f.id}">
         <td><button class="fav-btn ${favs.has(f.id) ? 'active' : ''}" onclick="event.stopPropagation(); toggleFav(${f.id}, this)">
           <i class="ti ti-bookmark"></i></button></td>
         <td class="td-title">
@@ -517,23 +517,48 @@
     }
   }
 
-  function openCatalogueFilmPopup(id) {
-    const film = FILMS.find(f => f.id === id) || catalogue.find(f => f.id === id);
-    if (!film) return;
+  function normalizeFilmId(value) {
+    const numberValue = Number(value);
+    return Number.isFinite(numberValue) ? numberValue : value;
+  }
 
-    if (typeof buildPopupHTML === 'function') {
-      const popup = document.getElementById('film-popup');
-      const overlay = document.getElementById('film-overlay');
-      if (!popup || !overlay) return;
-      popup.innerHTML = buildPopupHTML(film);
-      overlay.classList.add('open');
-      document.body.style.overflow = 'hidden';
+  function getCatalogueFilmById(id) {
+    const normalizedId = normalizeFilmId(id);
+    return catalogue.find(f => normalizeFilmId(f.id) === normalizedId)
+      || STATIC_CATALOGUE.find(f => normalizeFilmId(f.id) === normalizedId)
+      || FILMS.find(f => normalizeFilmId(f.id) === normalizedId);
+  }
+
+  function openCatalogueFilmPopup(id) {
+    const film = getCatalogueFilmById(id);
+    if (!film) {
+      console.warn('Film introuvable pour la popup :', id);
       return;
     }
 
-    openFilmPopup(id);
+    const popup = document.getElementById('film-popup');
+    const overlay = document.getElementById('film-overlay');
+    if (!popup || !overlay) return;
+
+    if (typeof buildPopupHTML === 'function') {
+      popup.innerHTML = buildPopupHTML(film);
+    } else if (typeof openFilmPopup === 'function') {
+      openFilmPopup(film.id);
+      return;
+    } else {
+      console.warn('Aucune fonction de popup disponible.');
+      return;
+    }
+
+    overlay.classList.add('open');
+    document.body.style.overflow = 'hidden';
   }
 
+  document.addEventListener('click', function(event) {
+    const row = event.target.closest('.film-row[data-film-id]');
+    if (!row) return;
+    openCatalogueFilmPopup(row.dataset.filmId);
+  });
 
   async function initCatalogue() {
     // 1) Afficher immédiatement le catalogue local, pour éviter une page vide si une API plante.
