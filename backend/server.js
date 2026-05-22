@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
+import * as cheerio from 'cheerio';
 
 dotenv.config();
 
@@ -26,155 +27,140 @@ function decodeHtml(value = '') {
     .trim();
 }
 
+function stripHtml(value = '') {
+  return decodeHtml(String(value).replace(/<[^>]+>/g, ' '));
+}
+
 function cleanSynopsis(value = '') {
-  return decodeHtml(value)
+  return stripHtml(value)
     .replace(/\s*See full summary\s*»?\s*$/i, '')
     .replace(/\s*Voir le résumé complet\s*»?\s*$/i, '')
+    .replace(/\s*Add a plot.*$/i, '')
+    .replace(/\s*Ajouter un résumé.*$/i, '')
+    .replace(/\s*IMDb\s*$/i, '')
+    .replace(/\s+/g, ' ')
     .trim();
 }
 
-function parsePossiblyEscapedJson(value = '') {
-  const text = String(value || '').trim();
-  if (!text) return null;
-  try { return JSON.parse(text); } catch {}
-  try { return JSON.parse(decodeHtml(text)); } catch {}
-  return null;
+function isGoodSynopsis(text = '') {
+  const clean = cleanSynopsis(text);
+  if (clean.length < 45 || clean.length > 1200) return false;
+  if (!/[.!?…]/.test(clean)) return false;
+  if (/^(cast|crew|details|release|ratings|photos|videos|official sites)$/i.test(clean)) return false;
+  return true;
 }
 
-function walkJsonForSynopsis(node, results = []) {
-  if (!node || results.length > 25) return results;
+function collectSynopsisCandidatesFromJson(value, candidates = [], parentKey = '') {
+  if (!value) return candidates;
 
-  if (typeof node === 'string') {
-    const cleaned = cleanSynopsis(node);
-    if (cleaned.length > 40) results.push(cleaned);
-    return results;
-  }
-
-  if (Array.isArray(node)) {
-    for (const item of node) walkJsonForSynopsis(item, results);
-    return results;
-  }
-
-  if (typeof node === 'object') {
-    const preferredKeys = ['plotText', 'plot', 'description', 'summary', 'text', 'plainText'];
-    for (const key of preferredKeys) {
-      const value = node[key];
-      if (!value) continue;
-
-      if (typeof value === 'string') {
-        const cleaned = cleanSynopsis(value);
-        if (cleaned.length > 40) results.push(cleaned);
-      } else if (typeof value === 'object') {
-        if (typeof value.plainText === 'string') {
-          const cleaned = cleanSynopsis(value.plainText);
-          if (cleaned.length > 40) results.push(cleaned);
-        }
-        if (typeof value.text === 'string') {
-          const cleaned = cleanSynopsis(value.text);
-          if (cleaned.length > 40) results.push(cleaned);
-        }
-        walkJsonForSynopsis(value, results);
-      }
+  if (typeof value === 'string') {
+    const key = String(parentKey || '').toLowerCase();
+    if (/description|plot|synopsis|summary|storyline|plain/.test(key) && isGoodSynopsis(value)) {
+      candidates.push(value);
     }
+    return candidates;
+  }
 
-    for (const [key, value] of Object.entries(node)) {
-      if (preferredKeys.includes(key)) continue;
-      if (value && typeof value === 'object') walkJsonForSynopsis(value, results);
+  if (Array.isArray(value)) {
+    value.forEach(item => collectSynopsisCandidatesFromJson(item, candidates, parentKey));
+    return candidates;
+  }
+
+  if (typeof value === 'object') {
+    for (const [key, child] of Object.entries(value)) {
+      collectSynopsisCandidatesFromJson(child, candidates, key);
     }
   }
 
-  return results;
+  return candidates;
 }
 
-function pickBestSynopsis(candidates = [], title = '') {
-  const seen = new Set();
-  const cleaned = candidates
-    .map(cleanSynopsis)
-    .filter(text => text.length > 45)
-    .filter(text => {
-      const key = text.toLowerCase();
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    })
-    .filter(text => !/^with\s+/i.test(text))
-    .filter(text => !/^(réalisé|directed)\s+by/i.test(text))
-    .filter(text => !/(photos|videos|cast|crew|reviews|ratings)/i.test(text));
-
+function pickBestSynopsis(candidates = []) {
+  const cleaned = [...new Set(candidates.map(cleanSynopsis).filter(isGoodSynopsis))];
   if (!cleaned.length) return '';
 
-  const titleLower = normalizeSpaces(title).toLowerCase();
+  // On privilégie un synopsis IMDb complet, mais pas un très long résumé technique.
   return cleaned
-    .map(text => {
-      let score = 0;
-      const len = text.length;
-      if (len >= 80 && len <= 700) score += 100;
-      if (len > 700) score += 30;
-      if (titleLower && text.toLowerCase().includes(titleLower)) score -= 15;
-      if (/[.!?]$/.test(text)) score += 10;
-      return { text, score };
-    })
-    .sort((a, b) => b.score - a.score || b.text.length - a.text.length)[0].text;
+    .sort((a, b) => {
+      const aScore = (a.length > 90 ? 100 : 0) + (a.length < 500 ? 20 : 0) + a.length / 100;
+      const bScore = (b.length > 90 ? 100 : 0) + (b.length < 500 ? 20 : 0) + b.length / 100;
+      return bScore - aScore;
+    })[0];
 }
 
-function normalizeSpaces(value = '') {
-  return String(value || '').replace(/\s+/g, ' ').trim();
-}
-
-function extractImdbSynopsis(html = '', title = '') {
-  const candidates = [];
-
-  const jsonLdMatches = html.matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
-  for (const match of jsonLdMatches) {
-    const json = parsePossiblyEscapedJson(match[1]);
-    if (json) walkJsonForSynopsis(json, candidates);
-  }
-
-  const nextData = html.match(/<script[^>]+id=["']__NEXT_DATA__["'][^>]*>([\s\S]*?)<\/script>/i);
-  if (nextData?.[1]) {
-    const json = parsePossiblyEscapedJson(nextData[1]);
-    if (json) walkJsonForSynopsis(json, candidates);
-  }
-
-  // Les pages IMDb récentes contiennent souvent la vraie intrigue dans des blocs JSON inline.
-  const inlinePatterns = [
-    /"plotText"\s*:\s*\{\s*"plainText"\s*:\s*"((?:\\"|[^"])*)"/gi,
-    /"plotText"\s*:\s*\{\s*"text"\s*:\s*"((?:\\"|[^"])*)"/gi,
-    /"description"\s*:\s*"((?:\\"|[^"])*)"/gi,
-    /"plot"\s*:\s*\{[^{}]*"plainText"\s*:\s*"((?:\\"|[^"])*)"/gi
-  ];
-
-  for (const regex of inlinePatterns) {
-    for (const match of html.matchAll(regex)) {
-      try {
-        candidates.push(JSON.parse(`"${match[1]}"`));
-      } catch {
-        candidates.push(match[1]);
-      }
+async function fetchHtml(url) {
+  const response = await fetch(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+      'Accept-Language': 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'Cache-Control': 'no-cache',
+      'Pragma': 'no-cache'
     }
-  }
+  });
 
-  const metaDescription = html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["'][^>]*>/i)
-    || html.match(/<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["'][^>]*>/i)
-    || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+name=["']description["'][^>]*>/i)
-    || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:description["'][^>]*>/i);
-  if (metaDescription?.[1]) candidates.push(metaDescription[1]);
-
-  const plotSelectors = [
-    /data-testid=["']plot-xl["'][^>]*>([\s\S]*?)<\/span>/i,
-    /data-testid=["']plot["'][^>]*>([\s\S]*?)<\/span>/i,
-    /<div[^>]+data-testid=["']sub-section-summaries["'][^>]*>[\s\S]*?<li[^>]*>[\s\S]*?<div[^>]*>([\s\S]*?)<\/div>/i
-  ];
-
-  for (const regex of plotSelectors) {
-    const match = html.match(regex);
-    if (match?.[1]) candidates.push(match[1].replace(/<[^>]+>/g, ' '));
-  }
-
-  return pickBestSynopsis(candidates, title);
+  if (!response.ok) return '';
+  return response.text();
 }
 
+function extractImdbSynopsis(html = '') {
+  const candidates = [];
+  const $ = cheerio.load(html);
 
+  // 1) Pages /plotsummary : le résumé IMDb est souvent dans ces blocs.
+  [
+    '[data-testid="sub-section-summaries"] .ipc-html-content-inner-div',
+    '[data-testid="sub-section-summaries"] li',
+    'li[data-testid="list-item"] .ipc-html-content-inner-div',
+    '.ipc-metadata-list__item .ipc-html-content-inner-div',
+    '[data-testid="plot-xl"]',
+    '[data-testid="plot-l"]',
+    '[data-testid="plot"]',
+    'section[data-testid="Storyline"] .ipc-html-content-inner-div'
+  ].forEach(selector => {
+    $(selector).each((_, el) => {
+      const text = $(el).text();
+      if (isGoodSynopsis(text)) candidates.push(text);
+    });
+  });
+
+  // 2) JSON-LD et __NEXT_DATA__ : plus stable quand IMDb change le HTML.
+  $('script[type="application/ld+json"]').each((_, el) => {
+    try {
+      const json = JSON.parse($(el).contents().text());
+      collectSynopsisCandidatesFromJson(json, candidates);
+    } catch {}
+  });
+
+  $('#__NEXT_DATA__, script#__NEXT_DATA__').each((_, el) => {
+    try {
+      const json = JSON.parse($(el).contents().text());
+      collectSynopsisCandidatesFromJson(json, candidates);
+    } catch {}
+  });
+
+  // 3) Dernier recours : meta description IMDb.
+  const meta = $('meta[name="description"]').attr('content') || $('meta[property="og:description"]').attr('content');
+  if (isGoodSynopsis(meta)) candidates.push(meta);
+
+  return pickBestSynopsis(candidates);
+}
+
+async function fetchOmdbPlot(imdbId) {
+  const apiKey = process.env.OMDB_API_KEY || process.env.VITE_OMDB_API_KEY || '';
+  if (!apiKey || !/^tt\d+$/.test(imdbId)) return '';
+
+  try {
+    const params = new URLSearchParams({ apikey: apiKey, i: imdbId, plot: 'full', r: 'json' });
+    const response = await fetch(`https://www.omdbapi.com/?${params.toString()}`);
+    if (!response.ok) return '';
+    const data = await response.json();
+    const plot = String(data?.Plot || '').trim();
+    return plot && plot !== 'N/A' ? cleanSynopsis(plot) : '';
+  } catch {
+    return '';
+  }
+}
 
 app.get('/', (req, res) => {
   res.json({ message: 'Backend CinéProche actif', routes: ['/api/films-letterboxd', '/api/imdb-synopsis'] });
@@ -187,6 +173,7 @@ app.get('/api/imdb-synopsis', async (req, res) => {
     return res.status(400).json({ source: 'invalid', synopsis: '' });
   }
 
+  // Priorité : IMDb. OMDb n'est utilisé qu'en secours si une clé existe côté backend.
   const urls = [
     `https://www.imdb.com/fr/title/${imdbId}/plotsummary/`,
     `https://www.imdb.com/title/${imdbId}/plotsummary/`,
@@ -196,21 +183,19 @@ app.get('/api/imdb-synopsis', async (req, res) => {
 
   for (const url of urls) {
     try {
-      const response = await fetch(url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36',
-          'Accept-Language': 'fr-FR,fr;q=0.9,en;q=0.8',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
-        }
-      });
+      const html = await fetchHtml(url);
+      if (!html) continue;
 
-      if (!response.ok) continue;
-      const html = await response.text();
       const synopsis = extractImdbSynopsis(html);
       if (synopsis) {
         return res.json({ source: 'imdb', imdbId, synopsis });
       }
     } catch {}
+  }
+
+  const omdbPlot = await fetchOmdbPlot(imdbId);
+  if (omdbPlot) {
+    return res.json({ source: 'omdb-imdb-plot', imdbId, synopsis: omdbPlot });
   }
 
   res.json({ source: 'unavailable', imdbId, synopsis: '' });

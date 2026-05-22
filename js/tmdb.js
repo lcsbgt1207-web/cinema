@@ -59,7 +59,7 @@ const TMDB = {
     const imdbId = film?.external_ids?.imdb_id || film?.imdb_id || film?.imdbID || '';
     if (!imdbId) return '';
 
-    const cacheKey = `cinepro_imdb_synopsis_${imdbId}`;
+    const cacheKey = `cinepro_imdb_synopsis_v3_${imdbId}`;
     try {
       const cached = localStorage.getItem(cacheKey);
       if (cached) return cached;
@@ -68,6 +68,7 @@ const TMDB = {
     try {
       const params = new URLSearchParams({ imdbId });
       if (film?.title) params.set('title', film.title);
+      if (film?.release_date) params.set('year', String(film.release_date).slice(0, 4));
       const res = await fetch(`http://localhost:3000/api/imdb-synopsis?${params.toString()}`);
       if (!res.ok) return '';
       const data = await res.json();
