@@ -417,83 +417,6 @@ app.get('/', (req, res) => {
 });
 
 
-
-function isFrenchImdbSynopsis(text = '') {
-  const clean = cleanSynopsis(text);
-  if (!isGoodSynopsis(clean)) return false;
-  if (!looksFrench(clean)) return false;
-  // On évite les textes typiques TMDB/OMDb traduits ou les meta descriptions techniques.
-  if (/directed by|with [A-Z]|chronicles the|the story of/i.test(clean)) return false;
-  return true;
-}
-
-function pickFrenchOfficialSynopsis(candidates = []) {
-  const cleaned = [...new Set(candidates.map(cleanSynopsis).filter(isFrenchImdbSynopsis))];
-  if (!cleaned.length) return '';
-  return cleaned
-    .sort((a, b) => {
-      const aLen = a.length;
-      const bLen = b.length;
-      // Le synopsis visible IMDb est généralement court : ~120-450 caractères.
-      const score = len => (len >= 80 ? 100 : 0) + (len <= 500 ? 50 : 0) - Math.abs(len - 240) / 8;
-      return score(bLen) - score(aLen);
-    })[0];
-}
-
-function extractImdbFrenchOfficialSynopsis(html = '') {
-  const candidates = [];
-  const $ = cheerio.load(html);
-
-  // Sélecteurs de la fiche IMDb FR, y compris les variantes récentes du DOM.
-  [
-    '[data-testid="plot-xl"]',
-    '[data-testid="plot-l"]',
-    '[data-testid="plot"]',
-    '[data-testid="storyline-plot-summary"]',
-    'section[data-testid="Storyline"] [data-testid="plot"]',
-    'section[data-testid="Storyline"] .ipc-html-content-inner-div',
-    '[data-testid="sub-section-summaries"] .ipc-html-content-inner-div',
-    '[data-testid="sub-section-summaries"] li'
-  ].forEach(selector => {
-    $(selector).each((_, el) => {
-      const text = $(el).text();
-      if (isFrenchImdbSynopsis(text)) candidates.push(text);
-    });
-  });
-
-  // JSON-LD : quand l'URL /fr/title/... est bien servie en français, description contient le synopsis IMDb FR.
-  $('script[type="application/ld+json"]').each((_, el) => {
-    try {
-      const json = JSON.parse($(el).contents().text());
-      const items = Array.isArray(json) ? json : [json];
-      for (const item of items) {
-        if (isFrenchImdbSynopsis(item?.description)) candidates.push(item.description);
-      }
-    } catch {}
-  });
-
-  // Next/GraphQL embarqué : on récupère uniquement les champs plausibles, puis on filtre strictement le français.
-  const rawPatterns = [
-    /\"plotText\"\s*:\s*\{\s*\"plainText\"\s*:\s*\"((?:\\.|[^\"\\]){40,1200})\"/g,
-    /\"plot\"\s*:\s*\{[^{}]*\"plotText\"[^{}]*\"plainText\"\s*:\s*\"((?:\\.|[^\"\\]){40,1200})\"/g,
-    /\"description\"\s*:\s*\"((?:\\.|[^\"\\]){40,1200})\"/g,
-    /\"plainText\"\s*:\s*\"((?:\\.|[^\"\\]){40,1200})\"/g
-  ];
-
-  for (const pattern of rawPatterns) {
-    let match;
-    while ((match = pattern.exec(html)) !== null) {
-      const text = decodeJsonString(match[1]);
-      if (isFrenchImdbSynopsis(text)) candidates.push(text);
-    }
-  }
-
-  const meta = $('meta[name="description"]').attr('content') || $('meta[property="og:description"]').attr('content');
-  if (isFrenchImdbSynopsis(meta) && !/^.+?:\s*réalisé par/i.test(meta)) candidates.push(meta);
-
-  return pickFrenchOfficialSynopsis(candidates);
-}
-
 app.get('/api/imdb-synopsis', async (req, res) => {
   let imdbId = String(req.query.imdbId || '').trim();
   const title = String(req.query.title || '').trim();
@@ -502,38 +425,50 @@ app.get('/api/imdb-synopsis', async (req, res) => {
   const tmdbId = String(req.query.tmdbId || '').trim();
 
   if (imdbId && !/^tt\d+$/.test(imdbId)) imdbId = '';
+
+  // Source autorisée pour trouver l'identifiant : TMDB external_ids ou suggestion IMDb.
+  // Source NON autorisée pour le synopsis : OMDb / TMDB / traduction automatique.
   if (!imdbId && tmdbId) imdbId = await fetchTmdbExternalId(tmdbId);
-  if (!imdbId) {
-    const lookupTitle = originalTitle || title;
-    if (lookupTitle) imdbId = await findImdbIdBySuggestion(lookupTitle, year);
-  }
+  const lookupTitle = originalTitle || title;
+  if (!imdbId && lookupTitle) imdbId = await findImdbIdBySuggestion(lookupTitle, year);
 
   if (!imdbId) {
-    return res.json({ source: 'unavailable-no-imdb-id', imdbId: '', synopsis: '' });
+    return res.json({
+      source: 'unavailable-no-imdb-id',
+      imdbId: '',
+      synopsis: ''
+    });
   }
 
-  // Correction importante : on ne prend PLUS OMDb et on ne traduit PLUS l'anglais.
-  // On veut uniquement le synopsis français fourni par IMDb sur /fr/title/...
-  const urls = [
-    `https://www.imdb.com/fr/title/${imdbId}/`,
-    `https://www.imdb.com/fr/title/${imdbId}/plotsummary/`
-  ];
+  // IMPORTANT : on veut le synopsis IMDb français officiel visible sur la fiche IMDb FR.
+  // On ne prend PAS OMDb, on ne traduit PAS l'anglais, et on ne prend PAS /plotsummary
+  // car /plotsummary donne souvent de longs résumés utilisateurs.
+  const url = `https://www.imdb.com/fr/title/${imdbId}/`;
 
-  for (const url of urls) {
-    try {
-      const html = await fetchHtml(url);
-      if (!html) continue;
-      const synopsis = extractImdbFrenchOfficialSynopsis(html);
-      if (synopsis) {
-        return res.json({ source: 'imdb-fr-official', imdbId, synopsis });
-      }
-    } catch (error) {
-      console.warn('IMDb FR synopsis indisponible pour', imdbId, error?.message || error);
+  try {
+    const html = await fetchHtml(url);
+    const synopsis = extractImdbMainSynopsis(html);
+
+    if (synopsis && looksFrench(synopsis)) {
+      return res.json({
+        source: 'imdb-fr-main-plot',
+        imdbId,
+        synopsis
+      });
     }
-  }
 
-  // Pas de fallback TMDB, pas de fallback OMDb, pas de traduction Google : sinon ce n'est plus IMDb FR.
-  return res.json({ source: 'unavailable-imdb-fr', imdbId, synopsis: '' });
+    return res.json({
+      source: synopsis ? 'imdb-fr-plot-not-french' : 'imdb-fr-plot-missing',
+      imdbId,
+      synopsis: ''
+    });
+  } catch (error) {
+    return res.json({
+      source: 'imdb-fr-fetch-error',
+      imdbId,
+      synopsis: ''
+    });
+  }
 });
 
 app.get('/api/films-letterboxd', (req, res) => {
