@@ -633,3 +633,15 @@ img { max-width: 100%; display: block; }
 
 /* cinema-update: popup-layout-like-reference-20260520-2207 */
 
+
+
+/* Pagination partagée — style Catalogue */
+.pagination-bottom { margin-top: 18px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+.page-state { font-size: 13px; color: var(--gray-500); width: 100%; }
+.pagination-controls { display: flex; align-items: center; gap: 8px; }
+.page-btn { width: 38px; height: 38px; border: 0.5px solid var(--gray-200); border-radius: 8px; background: var(--white); color: var(--black); cursor:pointer; font-size: 13px; transition: all var(--transition); display:inline-flex; align-items:center; justify-content:center; }
+.page-btn:hover { border-color: var(--black); }
+.page-btn.active { background: var(--black); color: var(--white); border-color: var(--black); }
+.page-btn:disabled { opacity: .35; cursor: not-allowed; border-color: var(--gray-200); }
+.page-ellipsis { height: 38px; min-width: 22px; display: inline-flex; align-items: center; justify-content: center; color: var(--gray-400); font-size: 14px; user-select: none; }
+.page-size-select { height: 38px; border: 0.5px solid var(--gray-200); border-radius: 8px; padding: 0 34px 0 12px; background: var(--white); color: var(--gray-600); font-size: 13px; }

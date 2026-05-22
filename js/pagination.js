@@ -1,88 +1,97 @@
 /* ═══════════════════════════════════════
    CinéProche — Pagination partagée
+   Style aligné sur le Catalogue
    ═══════════════════════════════════════ */
 
 const PAGINATION = {
-
-  // Crée un composant pagination
-  // items = tableau complet, perPage = nb par page, renderFn = fonction qui affiche les items
-  create({ items, perPage, containerId, renderFn, scrollTo = null }) {
+  create({ items, perPage = 8, pageSizes = [8, 12, 25], containerId, renderFn, scrollTo = null }) {
     let currentPage = 1;
-    const totalPages = () => Math.ceil(items.length / perPage);
+    let currentPerPage = Number(perPage) || 8;
+    const allItems = Array.isArray(items) ? items : [];
+
+    function totalPages() {
+      return Math.max(1, Math.ceil(allItems.length / currentPerPage));
+    }
 
     function getPage(page) {
-      const start = (page - 1) * perPage;
-      return items.slice(start, start + perPage);
+      const start = (page - 1) * currentPerPage;
+      return allItems.slice(start, start + currentPerPage);
+    }
+
+    function getVisiblePages(total) {
+      if (total <= 4) return Array.from({ length: total }, (_, index) => index + 1);
+
+      const start = currentPage <= 2 ? 1 : currentPage;
+      const pages = [];
+      for (let page = start; page <= Math.min(start + 2, total); page++) {
+        pages.push(page);
+      }
+
+      if (!pages.includes(total)) {
+        if (pages[pages.length - 1] < total - 1) pages.push('ellipsis');
+        pages.push(total);
+      }
+
+      return pages;
     }
 
     function buildPager() {
       const total = totalPages();
-      if (total <= 1) return '';
+      const pages = getVisiblePages(total);
 
-      let pages = [];
-      if (total <= 4) {
-        pages = Array.from({ length: total }, (_, index) => index + 1);
-      } else {
-        const startPage = currentPage <= 2 ? 1 : currentPage;
-        for (let page = startPage; page <= Math.min(startPage + 2, total); page++) {
-          pages.push(page);
-        }
-        if (!pages.includes(total)) {
-          if (pages[pages.length - 1] < total - 1) pages.push('ellipsis');
-          pages.push(total);
-        }
-      }
-
-      let html = '<div class="catalogue-bottom nouveautes-bottom">';
-      html += `<div class="page-state">Page ${currentPage} sur ${total}</div>`;
-      html += '<div class="pagination-controls">';
-      html += `<button class="page-btn" ${currentPage === 1 ? 'disabled' : ''} onclick="PAGINATION._go('${containerId}', ${currentPage - 1})"><i class="ti ti-chevron-left"></i></button>`;
-
-      html += pages.map(page => page === 'ellipsis'
-        ? `<span class="page-ellipsis">…</span>`
-        : `<button class="page-btn ${page === currentPage ? 'active' : ''}" onclick="PAGINATION._go('${containerId}', ${page})">${page}</button>`
-      ).join('');
-
-      html += `<button class="page-btn" ${currentPage === total ? 'disabled' : ''} onclick="PAGINATION._go('${containerId}', ${currentPage + 1})"><i class="ti ti-chevron-right"></i></button>`;
-      html += '</div>';
-      html += `<select class="page-size-select" onchange="PAGINATION._changePageSize('${containerId}', this.value)">
-        <option value="8" ${perPage === 8 ? 'selected' : ''}>8 par page</option>
-        <option value="12" ${perPage === 12 ? 'selected' : ''}>12 par page</option>
-        <option value="25" ${perPage === 25 ? 'selected' : ''}>25 par page</option>
-      </select>`;
-      html += '</div>';
-      return html;
+      return `
+        <div class="catalogue-bottom pagination-bottom">
+          <div class="page-state">Page ${currentPage} sur ${total}</div>
+          <div class="pagination-controls">
+            <button class="page-btn" ${currentPage === 1 ? 'disabled' : ''} onclick="PAGINATION._go('${containerId}', ${currentPage - 1})"><i class="ti ti-chevron-left"></i></button>
+            ${pages.map(page => page === 'ellipsis'
+              ? `<span class="page-ellipsis">…</span>`
+              : `<button class="page-btn ${page === currentPage ? 'active' : ''}" onclick="PAGINATION._go('${containerId}', ${page})">${page}</button>`
+            ).join('')}
+            <button class="page-btn" ${currentPage === total ? 'disabled' : ''} onclick="PAGINATION._go('${containerId}', ${currentPage + 1})"><i class="ti ti-chevron-right"></i></button>
+          </div>
+          <select class="page-size-select" onchange="PAGINATION._setPageSize('${containerId}', this.value)">
+            ${pageSizes.map(size => `<option value="${size}" ${Number(size) === currentPerPage ? 'selected' : ''}>${size} par page</option>`).join('')}
+          </select>
+        </div>`;
     }
 
     function render(page) {
-      currentPage = page;
-      const pageItems = getPage(page);
-      renderFn(pageItems, buildPager());
+      const total = totalPages();
+      currentPage = Math.min(Math.max(Number(page) || 1, 1), total);
+      const startIndex = (currentPage - 1) * currentPerPage;
+      const pageItems = getPage(currentPage);
+      renderFn(pageItems, buildPager(), { currentPage, totalPages: total, perPage: currentPerPage, startIndex, totalItems: allItems.length });
       if (scrollTo) {
         const el = document.getElementById(scrollTo);
         if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
     }
 
-    // Stocker l'instance pour les callbacks
     PAGINATION._instances = PAGINATION._instances || {};
-    PAGINATION._instances[containerId] = { render, totalPages, items, get perPage() { return perPage; }, setPageSize(value) { perPage = Number(value) || 8; render(1); } };
+    PAGINATION._instances[containerId] = {
+      render,
+      setPageSize(value) {
+        currentPerPage = Number(value) || 8;
+        currentPage = 1;
+        render(1);
+      },
+      totalPages,
+      items: allItems
+    };
 
-    // Premier rendu
     render(1);
   },
 
   _go(containerId, page) {
-    const inst = this._instances[containerId];
+    const inst = this._instances?.[containerId];
     if (!inst) return;
-    const total = inst.totalPages();
-    if (page < 1 || page > total) return;
     inst.render(page);
   },
 
-  _changePageSize(containerId, value) {
-    const inst = this._instances[containerId];
-    if (!inst || typeof inst.setPageSize !== 'function') return;
+  _setPageSize(containerId, value) {
+    const inst = this._instances?.[containerId];
+    if (!inst) return;
     inst.setPageSize(value);
   },
 

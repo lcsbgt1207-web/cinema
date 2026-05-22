@@ -202,8 +202,9 @@ if [ -f "$PROJECT_DIR/backend/package.json" ]; then
     echo "Installation automatique des dépendances backend..."
     npm install || echo "npm install échoué, la mise à jour locale reste valide."
 
-    echo "Scraping Letterboxd ignoré pour accélérer la mise à jour."
-    echo "Pour mettre à jour les notes manuellement : cd ~/Desktop/cinema/backend && npm run scrape"
+    echo "Scraping Letterboxd ignoré."
+    echo "Pour mettre à jour les notes Letterboxd manuellement :"
+    echo "cd ~/Desktop/cinema/backend && npm run scrape"
     cd "$PROJECT_DIR" || pause_exit 1
   else
     echo "Node.js/npm non détecté : étape backend ignorée."
