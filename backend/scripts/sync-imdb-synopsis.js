@@ -12,6 +12,8 @@ const PROJECT_DIR = path.resolve(BACKEND_DIR, '..');
 const DATA_DIR = path.join(BACKEND_DIR, 'data');
 const CACHE_PATH = path.join(DATA_DIR, 'imdb-synopsis-cache.json');
 const TRANSLATION_CACHE_PATH = path.join(DATA_DIR, 'translation-cache.json');
+const LEGACY_FR_CACHE_PATH = path.join(DATA_DIR, 'imdb-synopsis-fr-cache.json');
+const LEGACY_SYNOPSIS_FR_CACHE_PATH = path.join(DATA_DIR, 'synopsis-fr-cache.json');
 
 const TMDB_API_KEY = process.env.TMDB_API_KEY || process.env.VITE_TMDB_API_KEY || '16d984ea5d9a771088779b56497e0890';
 const OMDB_API_KEY = process.env.OMDB_API_KEY || process.env.VITE_OMDB_API_KEY || '';
@@ -182,6 +184,24 @@ function wait(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 async function main() {
   fs.mkdirSync(DATA_DIR, { recursive: true });
   const cache = readJson(CACHE_PATH, {});
+  const legacyFrCache = {
+    ...readJson(LEGACY_FR_CACHE_PATH, {}),
+    ...readJson(LEGACY_SYNOPSIS_FR_CACHE_PATH, {})
+  };
+  for (const [key, value] of Object.entries(legacyFrCache)) {
+    const id = String(key).match(/tt\d+/)?.[0] || '';
+    const text = typeof value === 'string' ? value : (value?.synopsis || value?.plot || value?.overview || '');
+    const clean = cleanSynopsis(text);
+    if (id && !cache[id] && isGoodSynopsis(clean) && !isBadSynopsisText(clean)) {
+      cache[id] = {
+        imdbId: id,
+        synopsis: clean,
+        source: 'imdb-omdb-legacy-fr-cache',
+        originalSource: 'ancien cache OMDb/traduction par imdbId',
+        updatedAt: new Date().toISOString()
+      };
+    }
+  }
   const translationCache = readJson(TRANSLATION_CACHE_PATH, {});
   for (const [id, entry] of Object.entries(cache)) {
     if (!entry?.synopsis || isBadSynopsisText(entry.synopsis)) delete cache[id];
@@ -191,7 +211,7 @@ async function main() {
   }
   const films = await collectFilms();
   console.log(`Synchronisation cache synopsis : ${films.length} films à vérifier.`);
-  console.log('Priorité ZIP 2 : OMDb par imdbId → traduction FR → backend/data/imdb-synopsis-cache.json. TMDB reste le secours au clic.');
+  console.log('Priorité ZIP 2 : OMDb par imdbId → traduction FR → cache. TMDB reste le secours au clic.');
   let added = 0, skipped = 0, missing = 0, tmdbKnown = 0;
   for (const film of films) {
     const existing = cleanSynopsis(cache[film.imdbId]?.synopsis || '');
