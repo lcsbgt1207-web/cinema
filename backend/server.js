@@ -89,6 +89,7 @@ function cleanSynopsis(value = '') {
 
 function isGoodSynopsis(text = '') {
   const clean = cleanSynopsis(text);
+  if (isBadSynopsisText(clean)) return false;
   if (clean.length < 35 || clean.length > 900) return false;
   if (!/[.!?…]/.test(clean)) return false;
   if (/^(cast|crew|details|release|ratings|photos|videos|official sites)$/i.test(clean)) return false;
@@ -101,6 +102,36 @@ function looksFrench(text = '') {
   const frenchHits = (value.match(/\b(le|la|les|des|une|un|dans|avec|pour|qui|que|est|sont|son|sa|ses|leur|leurs|été|après|avant|mais|plus|tout|toute|alors|lorsque|tandis)\b/g) || []).length;
   const englishHits = (value.match(/\b(the|and|with|from|after|before|his|her|their|into|while|when|who|that|this|story|life|must|find)\b/g) || []).length;
   return frenchHits >= 3 && frenchHits >= englishHits;
+}
+
+
+function isBadSynopsisText(text = '') {
+  const value = cleanSynopsis(text).toLowerCase();
+
+  if (!value) return true;
+
+  return (
+    value.includes('javascript est désactivé') ||
+    value.includes('javascript est desactive') ||
+    value.includes('enable javascript') ||
+    value.includes('you need to enable javascript') ||
+    value.includes('afin de continuer, nous devons vérifier') ||
+    value.includes("nous devons vérifier que vous n'êtes pas un robot") ||
+    value.includes("nous devons verifier que vous n'etes pas un robot") ||
+    value.includes("vous n'êtes pas un robot") ||
+    value.includes("vous n'etes pas un robot") ||
+    value.includes('not a robot') ||
+    value.includes('verify you are human') ||
+    value.includes('we need to make sure') ||
+    value.includes('continue, we need to make sure') ||
+    value.includes('captcha') ||
+    value.includes('robot') ||
+    value.includes('access denied') ||
+    value.includes('request blocked') ||
+    value.includes('réessayez plus tard') ||
+    value.includes('reessayez plus tard') ||
+    value.includes('try again later')
+  );
 }
 
 function pickShortOfficial(candidates = [], preferFrench = false) {
@@ -241,6 +272,58 @@ async function fetchTmdbExternalId(tmdbId) {
   }
 }
 
+
+async function fetchTmdbFrenchOverview(tmdbId = '', title = '', year = '') {
+  if (!TMDB_API_KEY) return '';
+  try {
+    let movieId = String(tmdbId || '').trim();
+
+    if (!movieId && title) {
+      const params = new URLSearchParams({
+        api_key: TMDB_API_KEY,
+        language: 'fr-FR',
+        region: 'FR',
+        query: title
+      });
+      if (/^\d{4}$/.test(String(year))) params.set('year', String(year));
+
+      const searchRes = await fetch(`${TMDB_BASE_URL}/search/movie?${params.toString()}`);
+      if (searchRes.ok) {
+        const searchData = await searchRes.json();
+        const wanted = normalizeSearchTitle(title);
+        const wantedYear = /^\d{4}$/.test(String(year)) ? Number(year) : null;
+
+        const best = (searchData?.results || [])
+          .map(item => {
+            const itemTitle = normalizeSearchTitle(item?.title || item?.original_title || '');
+            const itemYear = item?.release_date ? Number(String(item.release_date).slice(0, 4)) : null;
+            let score = 0;
+            if (itemTitle === wanted) score += 100;
+            if (itemTitle.includes(wanted) || wanted.includes(itemTitle)) score += 25;
+            if (wantedYear && itemYear === wantedYear) score += 80;
+            if (wantedYear && itemYear && Math.abs(itemYear - wantedYear) <= 1) score += 25;
+            return { item, score };
+          })
+          .sort((a, b) => b.score - a.score)[0];
+
+        if (best && best.score >= 60) movieId = String(best.item.id || '');
+      }
+    }
+
+    if (!movieId) return '';
+
+    const url = `${TMDB_BASE_URL}/movie/${encodeURIComponent(movieId)}?api_key=${TMDB_API_KEY}&language=fr-FR`;
+    const response = await fetch(url);
+    if (!response.ok) return '';
+
+    const data = await response.json();
+    const overview = cleanSynopsis(data?.overview || '');
+    return overview && !isBadSynopsisText(overview) && isGoodSynopsis(overview) ? overview : '';
+  } catch {
+    return '';
+  }
+}
+
 async function findImdbIdBySuggestion(title, year = '') {
   if (!title) return '';
   const cleaned = normalizeSearchTitle(title).replace(/ /g, '_');
@@ -357,7 +440,7 @@ async function getOfficialSynopsis(imdbId) {
   for (const url of frUrls) {
     const html = await fetchHtml(url, 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7');
     const fr = extractMainPageSynopsis(html, true);
-    if (fr && looksFrench(fr)) {
+    if (fr && looksFrench(fr) && !isBadSynopsisText(fr)) {
       return { source: 'imdb-fr-official', synopsis: fr };
     }
   }
@@ -365,14 +448,14 @@ async function getOfficialSynopsis(imdbId) {
   // 2) Page IMDb anglaise officielle puis traduction française.
   const enHtml = await fetchHtml(`https://www.imdb.com/title/${imdbId}/`, 'en-US,en;q=0.9,fr-FR;q=0.7');
   const en = extractMainPageSynopsis(enHtml, false);
-  if (en) {
+  if (en && !isBadSynopsisText(en)) {
     const translated = await translateSynopsisToFrench(en, `imdb-official-en-${imdbId}`);
     return { source: looksFrench(translated) ? 'imdb-en-official-translated-fr' : 'imdb-en-official', synopsis: translated };
   }
 
   // 3) Dernier secours : OMDb court traduit, uniquement si IMDb ne fournit rien.
   const omdb = await fetchOmdbShortPlot(imdbId);
-  if (omdb) {
+  if (omdb && !isBadSynopsisText(omdb)) {
     const translated = await translateSynopsisToFrench(omdb, `omdb-short-${imdbId}`);
     return { source: looksFrench(translated) ? 'omdb-short-translated-fr' : 'omdb-short', synopsis: translated };
   }
@@ -382,83 +465,6 @@ async function getOfficialSynopsis(imdbId) {
 
 app.get('/', (req, res) => {
   res.json({ message: 'Backend CinéProche actif', routes: ['/api/films-letterboxd', '/api/imdb-synopsis'] });
-});
-
-
-
-app.get('/api/imdb-debug', async (req, res) => {
-  try {
-    const input = {
-      imdbId: String(req.query.imdbId || '').trim(),
-      tmdbId: String(req.query.tmdbId || '').trim(),
-      title: String(req.query.title || '').trim(),
-      originalTitle: String(req.query.originalTitle || '').trim(),
-      year: String(req.query.year || '').trim()
-    };
-
-    const resolvedId = await resolveImdbId(input);
-    const cache = readSynopsisCache();
-    const cacheEntry = resolvedId ? cache[resolvedId] : null;
-    const cachedSynopsis = cleanSynopsis(cacheEntry?.synopsis || '');
-    const cacheStatus = {
-      file: 'backend/data/imdb-synopsis-cache.json',
-      totalEntries: Object.keys(cache || {}).length,
-      hasEntryForResolvedId: Boolean(cacheEntry),
-      source: cacheEntry?.source || '',
-      synopsisLength: cachedSynopsis.length,
-      synopsisPreview: cachedSynopsis ? cachedSynopsis.slice(0, 220) : '',
-      isBadSynopsis: cachedSynopsis ? isBadSynopsisText(cachedSynopsis) : false
-    };
-
-    const imdbFrAttempts = [];
-    let bestImdbFr = '';
-    if (resolvedId) {
-      const urls = [
-        `https://www.imdb.com/fr/title/${resolvedId}/`,
-        `https://www.imdb.com/title/${resolvedId}/?ref_=tt_stry_pl&locale=fr_FR`
-      ];
-
-      for (const url of urls) {
-        const html = await fetchHtml(url, 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7');
-        const htmlSample = cleanSynopsis(html.slice(0, 900));
-        const blocked = isBadSynopsisText(htmlSample) || /javascript est désactivé|javascript est desactive|enable javascript|robot|captcha|verify you are human/i.test(html);
-        const extracted = extractMainPageSynopsis(html, true);
-        if (!bestImdbFr && extracted && looksFrench(extracted) && !isBadSynopsisText(extracted)) bestImdbFr = extracted;
-        imdbFrAttempts.push({
-          url,
-          htmlLength: html.length,
-          looksBlocked: blocked,
-          extractedLength: extracted.length,
-          extractedLooksFrench: extracted ? looksFrench(extracted) : false,
-          extractedIsBad: extracted ? isBadSynopsisText(extracted) : false,
-          extractedPreview: extracted ? extracted.slice(0, 220) : ''
-        });
-      }
-    }
-
-    const tmdbSynopsis = await fetchTmdbFrenchOverview(input.tmdbId, input.title, input.year);
-    let decision = 'unavailable';
-    if (cachedSynopsis && !isBadSynopsisText(cachedSynopsis) && /^imdb/i.test(String(cacheEntry?.source || ''))) decision = 'would-use-imdb-cache';
-    else if (bestImdbFr) decision = 'would-use-live-imdb-fr';
-    else if (tmdbSynopsis) decision = 'would-use-tmdb-fr-fallback';
-
-    res.json({
-      source: 'imdb-debug-v1',
-      input,
-      resolvedId,
-      cache: cacheStatus,
-      imdbFrAttempts,
-      tmdbFr: {
-        available: Boolean(tmdbSynopsis),
-        synopsisLength: tmdbSynopsis.length,
-        synopsisPreview: tmdbSynopsis ? tmdbSynopsis.slice(0, 220) : ''
-      },
-      decision,
-      nextStep: 'Si decision vaut would-use-tmdb-fr-fallback, le cache IMDb est vide ou IMDb FR est bloqué/non extrait. ZIP 2 servira à remplir ce cache.'
-    });
-  } catch (error) {
-    res.json({ source: 'imdb-debug-error', message: error?.message || String(error) });
-  }
 });
 
 app.get('/api/imdb-synopsis', async (req, res) => {
@@ -478,7 +484,12 @@ app.get('/api/imdb-synopsis', async (req, res) => {
     const refresh = String(req.query.refresh || '') === '1';
     const cache = readSynopsisCache();
     if (!refresh && cache[resolvedId]?.synopsis) {
-      return res.json({ source: `${cache[resolvedId].source || 'cache'}-cache`, imdbId: resolvedId, synopsis: cache[resolvedId].synopsis });
+      const cached = cleanSynopsis(cache[resolvedId].synopsis);
+      if (!isBadSynopsisText(cached)) {
+        return res.json({ source: `${cache[resolvedId].source || 'cache'}-cache`, imdbId: resolvedId, synopsis: cached });
+      }
+      delete cache[resolvedId];
+      writeJson(synopsisCachePath(), cache);
     }
 
     const result = await getOfficialSynopsis(resolvedId);
