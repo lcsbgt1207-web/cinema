@@ -109,10 +109,10 @@
       </a>
       <div class="header-right">
         <nav class="nav">
-          <a href="nouveautes.html"><i class="ti ti-sparkles"></i><span>Nouveautés</span></a>
-          <a href="catalogue.html"><i class="ti ti-layout-grid"></i><span>Catalogue</span></a>
-          <a href="agenda.html"><i class="ti ti-calendar"></i><span>Mon agenda</span></a>
-          <a href="#contact"><i class="ti ti-mail"></i><span>Contact</span></a>
+          <a href="nouveautes.html">Nouveautés</a>
+          <a href="catalogue.html">Catalogue</a>
+          <a href="agenda.html">Mon agenda</a>
+          <a href="#contact">Contact</a>
         </nav>
         <button class="btn-user" onclick="window.location.href='profil.html'"><i class="ti ti-user"></i></button>
       </div>
@@ -410,18 +410,11 @@
       // Chercher cinémas proches si position dispo
       if (PLACES.userLocation) {
         const cinemas = await PLACES.findNearbycinemas(PLACES.userLocation);
-        const seancesFactices = { "Aujourd'hui": ['14h00','17h30','20h15'], 'Demain': ['13h45','16h30','21h00'] };
-
         if (cinemas.length) {
-          document.getElementById('film-cinemas-list').innerHTML = cinemas.slice(0, 5).map((c, ci) => {
-            const seancesHTML = Object.entries(seancesFactices).map(([jour, horaires]) => `
-              <div class="seances-day-row">
-                <span class="seances-day-label">${jour}</span>
-                <div class="seances-pills">
-                  ${horaires.map(h => `<button class="seance-pill" onclick="openReservation('${film.title}','${c.nom}','${h}')">${h}</button>`).join('')}
-                </div>
-              </div>`).join('');
-            return `<div class="film-cinema-row" style="animation-delay:${ci*0.06}s">
+          const cinemasList = cinemas.slice(0, 5);
+          // Afficher d'abord avec loader
+          document.getElementById('film-cinemas-list').innerHTML = cinemasList.map((c, ci) => `
+            <div class="film-cinema-row" id="fcr-${ci}" style="animation-delay:${ci*0.06}s">
               <div class="film-cinema-top">
                 <div>
                   <div class="film-cinema-name">${ci+1}. ${c.nom}</div>
@@ -432,9 +425,14 @@
                   <button class="btn-nav btn-nav-primary" onclick="window.open('${PLACES.getMapsUrl(c)}','_blank')"><i class="ti ti-navigation"></i> Y aller</button>
                 </div>
               </div>
-              <div>${seancesHTML}</div>
-            </div>`;
-          }).join('');
+              <div id="seances-fcr-${ci}" style="font-size:12px;color:var(--gray-400);padding:4px 0;">Chargement des séances…</div>
+            </div>`).join('');
+          // Charger les séances en parallèle
+          cinemasList.forEach(async (c, ci) => {
+            const seances = await fetchSeancesForCinema(c.nom, film.title, c.adresse);
+            const el = document.getElementById('seances-fcr-'+ci);
+            if (el) el.outerHTML = '<div>'+formatSeancesHTML(seances, film.title, c.nom)+'</div>';
+          });
         } else {
           document.getElementById('film-cinemas-list').innerHTML = `
             <div style="padding:16px 0;font-size:13px;color:var(--gray-500);">
@@ -457,98 +455,203 @@
     }
   }
 
-  // ── Popup film unifiée, même mise en page que le catalogue ──
 
-  function escapeHTML(value) {
-    return String(value ?? '')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
+  // ── API CinéProche — Récupération séances AlloCiné ──
+  const CINEPRO_API = 'https://cinepro-api-yal8.onrender.com';
+  const seancesCache = {};
+
+  const VILLES_COORDS = {
+    'ville-87860':[43.53,5.45],'ville-96943':[44.84,-0.58],'ville-85268':[43.55,7.02],
+    'ville-110514':[45.78,3.09],'ville-91241':[47.32,5.04],'ville-98857':[45.19,5.72],
+    'ville-107951':[50.63,3.06],'ville-113315':[45.75,4.85],'ville-87914':[43.30,5.37],
+    'ville-124868':[43.74,7.42],'ville-97612':[43.61,3.88],'ville-101187':[47.22,-1.55],
+    'ville-85327':[43.71,7.26],'ville-115755':[48.86,2.35],'ville-98024':[48.12,-1.68],
+    'ville-112664':[48.57,7.75],'ville-96373':[43.60,1.44],'ville-98662':[47.39,0.69]
+  };
+  async function findVilleAllocine(lat, lng) {
+    if (!lat || !lng) return 'ville-115755';
+    let best = 'ville-115755', dist = Infinity;
+    for (const [id, [vlat, vlng]] of Object.entries(VILLES_COORDS)) {
+      const d = Math.sqrt((lat-vlat)**2+(lng-vlng)**2);
+      if (d < dist) { dist = d; best = id; }
+    }
+    return best;
   }
 
-  async function getPopupSynopsis(film) {
+  // Normalise un titre pour la comparaison : minuscules, sans accents, sans ponctuation
+  function normTitre(t) {
+    return (t||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
+  }
+
+  async function fetchSeancesForCinema(nomCinema, filmTitre, adresseCinema) {
+    const cacheKey = nomCinema + '||' + (filmTitre||'');
+    if (seancesCache[cacheKey]) return seancesCache[cacheKey];
     try {
-      const imdbSynopsis = await TMDB.getImdbSynopsis(film);
-      return imdbSynopsis || 'Chargement du synopsis IMDb…';
-    } catch {
-      return 'Chargement du synopsis IMDb…';
+      // ── NOUVEAU : on utilise /search-cinema avec nom + adresse pour trouver l'ID AlloCiné précis ──
+      const searchParams = new URLSearchParams({
+        name: nomCinema,
+        address: adresseCinema || ''
+      });
+      const searchR = await fetch(`${CINEPRO_API}/search-cinema?${searchParams}`);
+      if (!searchR.ok) return null;
+      const searchData = await searchR.json();
+      if (!searchData.id) return null;
+      const found = { id: searchData.id, name: searchData.name };
+
+      // Récupérer les séances
+      const todayStr = new Date().toISOString().split('T')[0];
+      const tomorrowStr = new Date(Date.now()+86400000).toISOString().split('T')[0];
+      const s = await fetch(`${CINEPRO_API}/seances?id=${found.id}&date=${todayStr}`);
+      if (!s.ok) return null;
+      const seancesData = await s.json();
+      const result = {};
+
+      // ── CORRECTION : on filtre par titre de film avant d'extraire les horaires ──
+      function extraireHoraires(seances, dateStr, titreCible) {
+        const set = new Set();
+        const titreNorm = normTitre(titreCible);
+        seances?.forEach(film => {
+          // Si un titre cible est fourni, on ne prend que le film correspondant
+          if (titreCible) {
+            const filmNorm = normTitre(film.title || film.name || '');
+            // Correspondance souple : les mots importants du titre cible sont dans le titre du film
+            const mots = titreNorm.split(' ').filter(w => w.length > 2);
+            const correspond = mots.length > 0 && mots.filter(w => filmNorm.includes(w)).length >= Math.ceil(mots.length * 0.6);
+            if (!correspond) return; // ← on ignore les autres films
+          }
+          film.showtimes?.forEach(sh => {
+            if (!sh.startsAt || !sh.startsAt.startsWith(dateStr)) return;
+            const h = new Date(sh.startsAt);
+            // Filtre de bon sens : séances entre 9h et 23h30 seulement
+            const heure = h.getHours();
+            if (heure < 9 || heure > 23) return;
+            set.add(h.getHours().toString().padStart(2,'0')+'h'+h.getMinutes().toString().padStart(2,'0'));
+          });
+        });
+        return [...set].sort().slice(0,8);
+      }
+
+      const h1 = extraireHoraires(seancesData.seances, todayStr, filmTitre);
+      if (h1.length) result["Aujourd'hui"] = h1;
+      try {
+        const s2 = await fetch(`${CINEPRO_API}/seances?id=${found.id}&date=${tomorrowStr}`);
+        if (s2.ok) {
+          const d2 = await s2.json();
+          const h2 = extraireHoraires(d2.seances, tomorrowStr, filmTitre);
+          if (h2.length) result['Demain'] = h2;
+        }
+      } catch(e) {}
+      seancesCache[cacheKey] = Object.keys(result).length ? result : null;
+      return seancesCache[cacheKey];
+    } catch(e) {
+      console.warn('Erreur séances:', e);
+      return null;
     }
   }
 
-  function setPopupSynopsisText(popup, text) {
-    const synopsisNode = popup.querySelector('.popup-synopsis');
-    if (!synopsisNode) return;
-    synopsisNode.textContent = text || 'Aucun synopsis IMDb disponible pour ce film.';
+  function formatSeancesHTML(seances, filmTitle, cinemaName, fallback=true) {
+    if (!seances || !Object.keys(seances).length) {
+      if (!fallback) return '';
+      return `<div style="padding:8px 0;"><a href="https://www.allocine.fr/recherche/?q=${encodeURIComponent(filmTitle||cinemaName)}" target="_blank" style="font-size:12px;color:var(--gray-500);">Voir sur AlloCiné →</a></div>`;
+    }
+    return Object.entries(seances).map(([jour, horaires]) => `
+      <div class="seances-day-row">
+        <span class="seances-day-label">${jour}</span>
+        <div class="seances-pills">
+          ${horaires.map(h => `<button class="seance-pill" onclick="openReservation('${(filmTitle||'').replace(/'/g,"\'")}','${cinemaName.replace(/'/g,"\'")}','${h}')">${h}</button>`).join('')}
+        </div>
+      </div>`).join('');
   }
 
-  function buildUnifiedFilmPopupHTML({ film, poster, director, actors, duree, synopsis, genres }) {
-    const year = film.release_date ? String(film.release_date).slice(0, 4) : '';
-    const genre = Array.isArray(genres) && genres.length ? genres[0] : 'Cinéma';
-    const original = film.original_title && film.original_title !== film.title ? film.original_title : '';
-    const posterHTML = poster
-      ? `<img src="${escapeHTML(poster)}" alt="Affiche du film ${escapeHTML(film.title)}" loading="lazy">`
-      : `<i class="ti ti-photo"></i>`;
-
-    return `
-      <div class="film-popup-layout">
-        <div class="film-popup-poster">${posterHTML}</div>
-        <div class="film-popup-main">
-          <div class="film-popup-title-zone">
-            <h2>${escapeHTML(film.title)}</h2>
-            ${original ? `<div style="font-size:12px;color:var(--gray-400);margin-top:6px;">${escapeHTML(original)}</div>` : ''}
-          </div>
-          <div class="film-popup-meta-zone">
-            <span class="popup-tag">${escapeHTML(genre)}</span>
-            ${duree ? `<span class="popup-tag">${escapeHTML(duree)}</span>` : ''}
-            ${year ? `<span class="popup-tag">${escapeHTML(year)}</span>` : ''}
-          </div>
-          <div class="film-popup-crew-zone">
-            <div class="popup-crew-row"><strong>Réalisateur ·</strong> ${escapeHTML(director || 'Non renseigné')}</div>
-            <div class="popup-crew-row"><strong>Avec ·</strong> ${escapeHTML(actors || 'Non renseigné')}</div>
-          </div>
-          <div class="film-popup-synopsis-zone">
-            <div class="section-label">Synopsis</div>
-            <div class="popup-synopsis">${escapeHTML(synopsis)}</div>
-          </div>
-        </div>
-        <div class="film-popup-seances-zone">
-          <div class="section-label">Séances</div>
-          <div class="empty-seances">
-            Aucune séance réelle n’est encore branchée pour ce film. Cette zone sera connectée plus tard au scraping des cinémas indépendants, avec le cinéma, l’horaire, la VF/VO et le lien de réservation.
-          </div>
-        </div>
-      </div>
-      <button class="popup-close-btn" onclick="closeFilmPopup()">Fermer</button>`;
-  }
-
+  // ── Popup film ──
   async function openFilmPopup(tmdbId, cinema) {
     const overlay = document.getElementById('film-overlay');
     const popup   = document.getElementById('film-popup');
     currentCinemaForFilm = cinema;
-
+    popup.innerHTML = `<div style="padding:60px;text-align:center;color:var(--gray-400);"><i class="ti ti-loader" style="font-size:28px;display:block;margin-bottom:10px;"></i>Chargement…</div>`;
+    overlay.classList.add('open');
+    document.body.style.overflow = 'hidden';
     try {
-      const film     = await TMDB.getMovie(tmdbId);
-      const poster   = TMDB.posterUrl(film.poster_path, 'w342');
-      const director = film.credits?.crew?.find(c => c.job === 'Director')?.name || '';
-      const actors   = film.credits?.cast?.slice(0,4).map(a=>a.name).join(', ') || '';
-      const duree    = TMDB.formatDuration(film.runtime);
-      const genres   = film.genres?.map(g=>g.name) || [];
-      const synopsis = await getPopupSynopsis(film);
+      const film = await TMDB.getMovie(tmdbId);
+      const poster = TMDB.posterUrl(film.poster_path, 'w342');
+      const director = film.credits?.crew?.find(c => c.job === 'Director');
+      const actors = film.credits?.cast?.slice(0,3).map(a=>a.name).join(', ') || '—';
+      const duree = TMDB.formatDuration(film.runtime);
+      const note = film.vote_average ? (film.vote_average/2).toFixed(1) : '—';
+      const genres = film.genres?.map(g=>g.name).join(', ') || '';
 
-      popup.innerHTML = buildUnifiedFilmPopupHTML({ film, poster, director, actors, duree, synopsis, genres });
-      overlay.classList.add('open');
-      document.body.style.overflow = 'hidden';
+      const cinemasHtml = cinema ? `
+        <div class="popup-cinemas">
+          <div class="popup-cinemas-label">Cinémas les plus proches</div>
+          <div class="cinema-block open" id="cb-main">
+            <div class="cinema-block-header" onclick="document.getElementById('cb-main').classList.toggle('open')">
+              <div class="cinema-block-left">
+                <i class="ti ti-building"></i>
+                <div>
+                  <div class="cinema-block-name">${cinema.nom}</div>
+                  <div class="cinema-block-dist">${PLACES.formatDist(cinema.dist)}</div>
+                </div>
+              </div>
+              <div class="cinema-block-right">
+                <button class="btn-itineraire" onclick="event.stopPropagation();window.open('${PLACES.getMapsUrl(cinema)}','_blank')"><i class="ti ti-navigation"></i> Y aller</button>
+                <i class="ti ti-chevron-down chevron"></i>
+              </div>
+            </div>
+            <div class="seances-panel" id="popup-seances-panel">
+              <div style="font-size:12px;color:var(--gray-400);padding:8px 0;">Chargement des séances…</div>
+            </div>
+          </div>
+        </div>` : `
+        <div style="padding:14px 18px;border-top:0.5px solid var(--gray-200);">
+          <a href="https://www.allocine.fr/recherche/?q=${encodeURIComponent(film.title)}" target="_blank"
+             style="display:inline-flex;align-items:center;gap:6px;background:var(--black);color:#fff;padding:9px 16px;border-radius:var(--radius-md);font-size:13px;font-weight:500;text-decoration:none;">
+            <i class="ti ti-external-link"></i> Voir les séances sur AlloCiné
+          </a>
+        </div>`;
 
-      // Mise à jour finale avec la vraie source IMDb/OMDb.
-      TMDB.getImdbSynopsis(film)
-        .then((imdbSynopsis) => setPopupSynopsisText(popup, imdbSynopsis))
-        .catch(() => setPopupSynopsisText(popup, 'Aucun synopsis IMDb disponible pour ce film.'));
+      popup.innerHTML = `
+        <div class="popup-top">
+          <div class="popup-poster" style="${poster ? 'padding:0;' : 'background:var(--gray-200);'}">
+            ${poster ? `<img src="${poster}" alt="${film.title}" style="width:100%;height:100%;object-fit:cover;" />` : `<i class="ti ti-photo"></i>`}
+          </div>
+          <div class="popup-header">
+            <span class="popup-badge">À l'affiche</span>
+            <div class="popup-title">${film.title}</div>
+            <div class="popup-tags">
+              ${genres.split(', ').slice(0,2).map(g=>`<span class="popup-tag">${g}</span>`).join('')}
+              ${duree ? `<span class="popup-tag">${duree}</span>` : ''}
+              <span class="popup-tag">★ ${note}/5</span>
+            </div>
+            <div class="popup-crew">
+              ${director ? `<div class="popup-crew-row"><strong>Réalisateur ·</strong> ${director.name}</div>` : ''}
+              <div class="popup-crew-row"><strong>Avec ·</strong> ${actors}</div>
+            </div>
+          </div>
+        </div>
+        <div class="popup-synopsis-block">
+          <div class="section-label">Synopsis</div>
+          <div class="popup-synopsis">${film.overview || 'Synopsis non disponible.'}</div>
+        </div>
+        ${cinemasHtml}
+        <button class="popup-close-btn" onclick="closeFilmPopup()">Fermer</button>`;
+      // Charger les vraies séances en async
+      if (cinema) {
+        fetchSeancesForCinema(cinema.nom, film.title, cinema.adresse).then(seances => {
+          const panel = document.getElementById('popup-seances-panel');
+          if (panel) {
+            const html = Object.entries(seances || {}).map(([jour,horaires]) => `
+              <div class="seances-day">
+                <div class="day-label">${jour}</div>
+                <div class="horaires">
+                  ${horaires.map(h => `<button class="horaire-btn" onclick="openReservation('${film.title.replace(/'/g,"\'")}','${cinema.nom.replace(/'/g,"\'")}','${h}')">${h}</button>`).join('')}
+                </div>
+              </div>`).join('');
+            panel.innerHTML = html || `<div style="padding:8px 0;"><a href="https://www.allocine.fr/recherche/?q=${encodeURIComponent(film.title)}" target="_blank" style="font-size:12px;color:var(--gray-500);">Voir sur AlloCiné →</a></div>`;
+          }
+        });
+      }
     } catch(e) {
       popup.innerHTML = `<div style="padding:40px;text-align:center;color:var(--gray-400);">Impossible de charger ce film.<button class="popup-close-btn" onclick="closeFilmPopup()" style="display:block;margin:16px auto 0;">Fermer</button></div>`;
-      overlay.classList.add('open');
-      document.body.style.overflow = 'hidden';
     }
   }
 
