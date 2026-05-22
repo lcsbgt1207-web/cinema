@@ -20,37 +20,36 @@ const PAGINATION = {
       if (total <= 1) return '';
 
       let pages = [];
-      // Toujours afficher première page
-      pages.push(1);
-      // Pages autour de la page courante
-      for (let i = Math.max(2, currentPage - 1); i <= Math.min(total - 1, currentPage + 1); i++) {
-        pages.push(i);
-      }
-      // Toujours afficher dernière page
-      if (total > 1) pages.push(total);
-      // Dédupliquer
-      pages = [...new Set(pages)].sort((a, b) => a - b);
-
-      let html = '<div class="pager">';
-      // Bouton précédent
-      html += `<button class="pager-btn ${currentPage === 1 ? 'disabled' : ''}" onclick="PAGINATION._go('${containerId}', ${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>
-        <i class="ti ti-chevron-left"></i>
-      </button>`;
-
-      // Pages avec ellipses
-      let prev = 0;
-      for (const p of pages) {
-        if (p - prev > 1) html += '<span class="pager-ellipsis">…</span>';
-        html += `<button class="pager-btn ${p === currentPage ? 'active' : ''}" onclick="PAGINATION._go('${containerId}', ${p})">${p}</button>`;
-        prev = p;
+      if (total <= 4) {
+        pages = Array.from({ length: total }, (_, index) => index + 1);
+      } else {
+        const startPage = currentPage <= 2 ? 1 : currentPage;
+        for (let page = startPage; page <= Math.min(startPage + 2, total); page++) {
+          pages.push(page);
+        }
+        if (!pages.includes(total)) {
+          if (pages[pages.length - 1] < total - 1) pages.push('ellipsis');
+          pages.push(total);
+        }
       }
 
-      // Bouton suivant
-      html += `<button class="pager-btn ${currentPage === total ? 'disabled' : ''}" onclick="PAGINATION._go('${containerId}', ${currentPage + 1})" ${currentPage === total ? 'disabled' : ''}>
-        <i class="ti ti-chevron-right"></i>
-      </button>`;
+      let html = '<div class="catalogue-bottom nouveautes-bottom">';
+      html += `<div class="page-state">Page ${currentPage} sur ${total}</div>`;
+      html += '<div class="pagination-controls">';
+      html += `<button class="page-btn" ${currentPage === 1 ? 'disabled' : ''} onclick="PAGINATION._go('${containerId}', ${currentPage - 1})"><i class="ti ti-chevron-left"></i></button>`;
 
-      html += `<span class="pager-info">Page ${currentPage} / ${total}</span>`;
+      html += pages.map(page => page === 'ellipsis'
+        ? `<span class="page-ellipsis">…</span>`
+        : `<button class="page-btn ${page === currentPage ? 'active' : ''}" onclick="PAGINATION._go('${containerId}', ${page})">${page}</button>`
+      ).join('');
+
+      html += `<button class="page-btn" ${currentPage === total ? 'disabled' : ''} onclick="PAGINATION._go('${containerId}', ${currentPage + 1})"><i class="ti ti-chevron-right"></i></button>`;
+      html += '</div>';
+      html += `<select class="page-size-select" onchange="PAGINATION._changePageSize('${containerId}', this.value)">
+        <option value="8" ${perPage === 8 ? 'selected' : ''}>8 par page</option>
+        <option value="12" ${perPage === 12 ? 'selected' : ''}>12 par page</option>
+        <option value="25" ${perPage === 25 ? 'selected' : ''}>25 par page</option>
+      </select>`;
       html += '</div>';
       return html;
     }
@@ -67,7 +66,7 @@ const PAGINATION = {
 
     // Stocker l'instance pour les callbacks
     PAGINATION._instances = PAGINATION._instances || {};
-    PAGINATION._instances[containerId] = { render, totalPages, items, perPage };
+    PAGINATION._instances[containerId] = { render, totalPages, items, get perPage() { return perPage; }, setPageSize(value) { perPage = Number(value) || 8; render(1); } };
 
     // Premier rendu
     render(1);
@@ -79,6 +78,12 @@ const PAGINATION = {
     const total = inst.totalPages();
     if (page < 1 || page > total) return;
     inst.render(page);
+  },
+
+  _changePageSize(containerId, value) {
+    const inst = this._instances[containerId];
+    if (!inst || typeof inst.setPageSize !== 'function') return;
+    inst.setPageSize(value);
   },
 
   _instances: {}

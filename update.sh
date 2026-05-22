@@ -203,15 +203,15 @@ if [ -f "$PROJECT_DIR/backend/package.json" ]; then
     npm install || echo "npm install échoué, la mise à jour locale reste valide."
 
     echo "Scraping Letterboxd ignoré pour accélérer la mise à jour."
-    echo "Pour mettre à jour les notes Letterboxd manuellement :"
-    echo "cd ~/Desktop/cinema/backend && npm run scrape"
+    echo "Pour mettre à jour les notes manuellement : cd ~/Desktop/cinema/backend && npm run scrape"
     cd "$PROJECT_DIR" || pause_exit 1
   else
     echo "Node.js/npm non détecté : étape backend ignorée."
   fi
 fi
 
-# IMPORTANT : on push seulement à la toute fin, après la mise à jour locale.
+# IMPORTANT : on push seulement à la toute fin, après le scraper.
+# Comme ça, backend/data/letterboxd-films.json ne reste plus en modification locale.
 push_git_after_everything
 
 echo "======================================"
