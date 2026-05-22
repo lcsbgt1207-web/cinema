@@ -381,8 +381,13 @@
         renderFn: (pageCinemas, pagerHtml) => {
           list.innerHTML = pageCinemas.map((c, ci) => renderCinemaCard(c, ci)).join('');
           document.getElementById('cinemas-pager').innerHTML = pagerHtml;
-          // Charger les vrais films AlloCiné pour chaque cinéma en parallèle
-          pageCinemas.forEach((c, ci) => loadFilmsForCinema(c, ci));
+          // Charger les vrais films AlloCiné séquentiellement avec délai
+          (async () => {
+            for (let ci = 0; ci < pageCinemas.length; ci++) {
+              loadFilmsForCinema(pageCinemas[ci], ci);
+              await new Promise(r => setTimeout(r, 800));
+            }
+          })();
         }
       });
 
