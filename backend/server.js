@@ -42,6 +42,43 @@ function cleanSynopsis(value = '') {
     .trim();
 }
 
+function normalizeText(value = '') {
+  return String(value)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function pageMatchesRequestedFilm(html = '', requestedTitle = '', requestedYear = '') {
+  const title = normalizeText(requestedTitle);
+  if (!title) return true;
+
+  const $ = cheerio.load(html);
+  let pageTitle = '';
+  let pageYear = '';
+
+  $('script[type="application/ld+json"]').each((_, el) => {
+    if (pageTitle) return;
+    try {
+      const json = JSON.parse($(el).contents().text());
+      if (json?.name) pageTitle = String(json.name);
+      if (json?.datePublished) pageYear = String(json.datePublished).slice(0, 4);
+    } catch {}
+  });
+
+  if (!pageTitle) {
+    pageTitle = $('h1').first().text() || $('title').first().text();
+  }
+
+  const normalizedPageTitle = normalizeText(pageTitle);
+  const titleOk = normalizedPageTitle === title || normalizedPageTitle.includes(title) || title.includes(normalizedPageTitle);
+  const yearOk = !requestedYear || !pageYear || String(pageYear) === String(requestedYear);
+
+  return titleOk && yearOk;
+}
+
 function isGoodSynopsis(text = '') {
   const clean = cleanSynopsis(text);
   if (clean.length < 45 || clean.length > 1200) return false;
@@ -169,11 +206,16 @@ app.get('/', (req, res) => {
 
 app.get('/api/imdb-synopsis', async (req, res) => {
   const imdbId = String(req.query.imdbId || '').trim();
+  const requestedTitle = String(req.query.title || '').trim();
+  const requestedYear = String(req.query.year || '').trim();
+
   if (!/^tt\d+$/.test(imdbId)) {
     return res.status(400).json({ source: 'invalid', synopsis: '' });
   }
 
   // Priorité : IMDb. OMDb n'est utilisé qu'en secours si une clé existe côté backend.
+  // Sécurité : même avec un ID IMDb, on vérifie le titre/année si le front les envoie.
+  // Cela évite d'associer un synopsis à un mauvais film.
   const urls = [
     `https://www.imdb.com/fr/title/${imdbId}/plotsummary/`,
     `https://www.imdb.com/title/${imdbId}/plotsummary/`,
@@ -185,6 +227,7 @@ app.get('/api/imdb-synopsis', async (req, res) => {
     try {
       const html = await fetchHtml(url);
       if (!html) continue;
+      if (!pageMatchesRequestedFilm(html, requestedTitle, requestedYear)) continue;
 
       const synopsis = extractImdbSynopsis(html);
       if (synopsis) {

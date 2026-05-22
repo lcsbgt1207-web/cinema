@@ -54,18 +54,19 @@ const TMDB = {
 
 
   // Synopsis IMDb via le backend local CinéProche.
-  // On l'utilise en priorité dans les popups Nouveautés / Résultats.
+  // Important : on associe toujours le synopsis avec l'ID IMDb, jamais avec
+  // l'ordre des films ou seulement le titre. Cela évite qu'un film récupère
+  // le synopsis d'un autre film, comme Obsession / Le Réveil de la Momie.
   async getImdbSynopsis(film) {
     const imdbId = film?.external_ids?.imdb_id || film?.imdb_id || film?.imdbID || '';
-    const titleKey = String(film?.title || film?.name || '').trim().toLowerCase();
-    const verifiedImdbSynopsis = {
-      'obsession': "La jeune fille d'un journaliste disparaît dans le désert sans laisser de trace. Huit ans plus tard, son retour transforme ce qui devait être des retrouvailles joyeuses en cauchemar.",
-      'le réveil de la momie': "La jeune fille d'un journaliste disparaît dans le désert sans laisser de trace. Huit ans plus tard, son retour transforme ce qui devait être des retrouvailles joyeuses en cauchemar."
-    };
-    if (verifiedImdbSynopsis[titleKey]) return verifiedImdbSynopsis[titleKey];
-    if (!imdbId) return '';
+    if (!/^tt\d+$/.test(String(imdbId))) return '';
 
-    const cacheKey = `cinepro_imdb_synopsis_v4_${imdbId}`;
+    const title = String(film?.title || film?.name || film?.titre || '').trim();
+    const year = film?.release_date
+      ? String(film.release_date).slice(0, 4)
+      : (film?.annee ? String(film.annee) : '');
+
+    const cacheKey = `cinepro_imdb_synopsis_v6_${imdbId}`;
     try {
       const cached = localStorage.getItem(cacheKey);
       if (cached) return cached;
@@ -73,17 +74,20 @@ const TMDB = {
 
     try {
       const params = new URLSearchParams({ imdbId });
-      if (film?.title) params.set('title', film.title);
-      if (film?.release_date) params.set('year', String(film.release_date).slice(0, 4));
+      if (title) params.set('title', title);
+      if (year) params.set('year', year);
+
       const res = await fetch(`http://localhost:3000/api/imdb-synopsis?${params.toString()}`);
       if (!res.ok) return '';
+
       const data = await res.json();
       const synopsis = String(data?.synopsis || '').trim();
       if (!synopsis) return '';
+
       try { localStorage.setItem(cacheKey, synopsis); } catch {}
       return synopsis;
     } catch (error) {
-      console.warn('Synopsis IMDb indisponible, fallback TMDB utilisé.', error);
+      console.warn('Synopsis IMDb indisponible, fallback local/TMDB utilisé.', error);
       return '';
     }
   },
