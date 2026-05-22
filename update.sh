@@ -205,14 +205,16 @@ if [ -f "$PROJECT_DIR/backend/package.json" ]; then
     echo "Scraping Letterboxd ignoré."
     echo "Pour mettre à jour les notes Letterboxd manuellement :"
     echo "cd ~/Desktop/cinema/backend && npm run scrape"
+
+    echo "Préchargement du cache des synopsis IMDb FR..."
+    npm run sync-imdb || echo "Synchronisation IMDb échouée, TMDB FR restera utilisé en secours."
     cd "$PROJECT_DIR" || pause_exit 1
   else
     echo "Node.js/npm non détecté : étape backend ignorée."
   fi
 fi
 
-# IMPORTANT : on push seulement à la toute fin, après le scraper.
-# Comme ça, backend/data/letterboxd-films.json ne reste plus en modification locale.
+# IMPORTANT : on push seulement à la toute fin, après la synchronisation des caches.
 push_git_after_everything
 
 echo "======================================"

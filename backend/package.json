@@ -7,7 +7,8 @@
   "scripts": {
     "start": "node server.js",
     "scrape": "node scrapers/letterboxd.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "sync-imdb": "node scripts/sync-imdb-synopsis.js"
   },
   "dependencies": {
     "axios": "^1.7.9",

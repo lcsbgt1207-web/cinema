@@ -660,6 +660,39 @@ function buildPopupHTML(film) {
   `;
 }
 
+
+async function loadCachedSynopsisForCatalogue(film) {
+  const imdbId = String(film?.imdbID || film?.imdbId || '').trim();
+  const title = String(film?.titre || film?.title || '').trim();
+  const originalTitle = String(film?.original || film?.original_title || '').trim();
+  const year = String(film?.annee || film?.year || '').trim();
+  const localFallback = String(film?.synopsis || '').trim();
+  if (!imdbId && !title) return localFallback;
+
+  try {
+    const params = new URLSearchParams();
+    if (imdbId) params.set('imdbId', imdbId);
+    if (title) params.set('title', title);
+    if (originalTitle) params.set('originalTitle', originalTitle);
+    if (year) params.set('year', year);
+    params.set('mode', 'cache-imdb-then-local');
+    params.set('_', String(Date.now()));
+
+    const response = await fetch(`http://localhost:3000/api/imdb-synopsis?${params.toString()}`, { cache: 'no-store' });
+    if (!response.ok) return localFallback;
+    const data = await response.json();
+    const synopsis = String(data?.synopsis || '').trim();
+    return synopsis || localFallback;
+  } catch {
+    return localFallback;
+  }
+}
+
+function setCataloguePopupSynopsis(popup, text) {
+  const node = popup?.querySelector?.('.popup-synopsis');
+  if (node) node.textContent = text || 'Aucun synopsis disponible pour ce film.';
+}
+
 function toggleCinemaBlock(id) {
   document.getElementById(id).classList.toggle('open');
 }
@@ -673,6 +706,11 @@ function openFilmPopup(filmId) {
   popup.innerHTML = buildPopupHTML(film);
   overlay.classList.add('open');
   document.body.style.overflow = 'hidden';
+
+  // Catalogue aussi : cache IMDb local d'abord, puis synopsis local data.js.
+  loadCachedSynopsisForCatalogue(film).then((synopsis) => {
+    setCataloguePopupSynopsis(popup, synopsis || film.synopsis || 'Aucun synopsis disponible pour ce film.');
+  });
 }
 
 function closeFilmPopup() {

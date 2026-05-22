@@ -69,14 +69,14 @@ const TMDB = {
     if (!imdbId && !title) return tmdbFallback;
 
     const cacheIdentity = imdbId || (tmdbId ? `tmdb-${tmdbId}` : `${title.toLowerCase()}-${year}`);
-    const cacheKey = `cinepro_synopsis_v60_imdb_cache_then_imdb_fr_then_tmdb_fr_${cacheIdentity}`;
+    const cacheKey = `cinepro_synopsis_v70_cache_imdb_then_tmdb_${cacheIdentity}`;
 
     try {
-      if (!localStorage.getItem('cinepro_synopsis_cache_cleaned_v60')) {
+      if (!localStorage.getItem('cinepro_synopsis_cache_cleaned_v70')) {
         Object.keys(localStorage)
           .filter(key => key.startsWith('cinepro_imdb_synopsis_') || key.startsWith('cinepro_synopsis_'))
           .forEach(key => localStorage.removeItem(key));
-        localStorage.setItem('cinepro_synopsis_cache_cleaned_v60', '1');
+        localStorage.setItem('cinepro_synopsis_cache_cleaned_v70', '1');
       }
       const cached = localStorage.getItem(cacheKey);
       if (cached && !isBadSynopsis(cached)) return cached;
@@ -91,22 +91,18 @@ const TMDB = {
       if (originalTitle) params.set('originalTitle', originalTitle);
       if (year) params.set('year', year);
 
-      params.set('mode', 'exact-imdb-fr');
+      params.set('mode', 'cache-imdb-then-tmdb');
+      // Pas de live=1 ici : au clic, le backend lit le cache IMDb local puis TMDB FR.
       params.set('_', String(Date.now()));
       const res = await fetch(`http://localhost:3000/api/imdb-synopsis?${params.toString()}`, { cache: 'no-store' });
       if (!res.ok) return '';
 
       const data = await res.json();
       const synopsis = String(data?.synopsis || '').trim();
-      const source = String(data?.source || '').toLowerCase();
       const finalSynopsis = synopsis && !isBadSynopsis(synopsis) ? synopsis : tmdbFallback;
       if (!finalSynopsis || isBadSynopsis(finalSynopsis)) return '';
 
-      // On ne stocke dans le navigateur que les vrais IMDb/cache IMDb.
-      // Les fallback TMDB doivent rester temporaires pour permettre à IMDb de repasser devant plus tard.
-      if (source.includes('imdb') && !source.includes('tmdb') && !source.includes('omdb')) {
-        try { localStorage.setItem(cacheKey, finalSynopsis); } catch {}
-      }
+      try { localStorage.setItem(cacheKey, finalSynopsis); } catch {}
       return finalSynopsis;
     } catch (error) {
       console.warn('Synopsis IMDb indisponible, fallback TMDB utilisé.', error);
