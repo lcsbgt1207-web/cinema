@@ -19,43 +19,23 @@ app.use(express.json());
 const TMDB_API_KEY = process.env.TMDB_API_KEY || process.env.VITE_TMDB_API_KEY || '16d984ea5d9a771088779b56497e0890';
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 
-const CACHE_DIR = path.join(__dirname, 'cache');
-const IMDB_SYNOPSIS_CACHE_FILE = path.join(CACHE_DIR, 'imdb-synopsis-cache.json');
-
-function ensureCacheDir() {
-  if (!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR, { recursive: true });
-}
-
-function readSynopsisCache() {
-  try {
-    ensureCacheDir();
-    if (!fs.existsSync(IMDB_SYNOPSIS_CACHE_FILE)) return {};
-    return JSON.parse(fs.readFileSync(IMDB_SYNOPSIS_CACHE_FILE, 'utf-8'));
-  } catch {
-    return {};
+const KNOWN_IMDB_ID_BY_TITLE_YEAR = [
+  {
+    imdbId: 'tt32612507',
+    year: '2026',
+    titles: ["lee cronin's the mummy", 'lee cronins the mummy', 'le reveil de la momie', 'le réveil de la momie']
   }
-}
+];
 
-function writeSynopsisCache(cache) {
-  try {
-    ensureCacheDir();
-    fs.writeFileSync(IMDB_SYNOPSIS_CACHE_FILE, JSON.stringify(cache, null, 2), 'utf-8');
-  } catch {}
-}
-
-function getCachedSynopsis(cacheKey) {
-  if (!cacheKey) return null;
-  const cache = readSynopsisCache();
-  const hit = cache[cacheKey];
-  if (!hit || !hit.synopsis) return null;
-  return hit;
-}
-
-function setCachedSynopsis(cacheKey, payload) {
-  if (!cacheKey || !payload?.synopsis) return;
-  const cache = readSynopsisCache();
-  cache[cacheKey] = { ...payload, cachedAt: new Date().toISOString() };
-  writeSynopsisCache(cache);
+function findKnownImdbId(title = '', originalTitle = '', year = '') {
+  const candidates = [normalizeSearchTitle(title), normalizeSearchTitle(originalTitle)].filter(Boolean);
+  const wantedYear = String(year || '').trim();
+  for (const item of KNOWN_IMDB_ID_BY_TITLE_YEAR) {
+    if (item.year && wantedYear && item.year !== wantedYear) continue;
+    const aliases = item.titles.map(normalizeSearchTitle);
+    if (candidates.some(candidate => aliases.includes(candidate))) return item.imdbId;
+  }
+  return '';
 }
 
 function normalizeSearchTitle(value = '') {
@@ -336,10 +316,6 @@ app.get('/api/imdb-synopsis', async (req, res) => {
 
   if (imdbId && !/^tt\d+$/.test(imdbId)) imdbId = '';
 
-  const initialCacheKey = imdbId ? `imdb-${imdbId}` : (tmdbId ? `tmdb-${tmdbId}` : `title-${normalizeSearchTitle(originalTitle || title)}-${year}`);
-  const initialCache = getCachedSynopsis(initialCacheKey);
-  if (initialCache) return res.json({ ...initialCache, cache: true });
-
   // Priorité absolue au vrai identifiant IMDb :
   // 1) imdb_id fourni par TMDB côté front
   // 2) tmdbId -> external_ids côté backend
@@ -347,41 +323,23 @@ app.get('/api/imdb-synopsis', async (req, res) => {
   // 4) suggestion IMDb par titre + année
   if (!imdbId && tmdbId) imdbId = await fetchTmdbExternalId(tmdbId);
 
-  const resolvedCacheKey = imdbId ? `imdb-${imdbId}` : initialCacheKey;
-  const resolvedCache = getCachedSynopsis(resolvedCacheKey);
-  if (resolvedCache) return res.json({ ...resolvedCache, cache: true });
-
   const lookupTitle = originalTitle || title;
   const omdbByTitle = !imdbId && lookupTitle ? await fetchOmdbByTitle(lookupTitle, year) : null;
   if (!imdbId && omdbByTitle?.imdbId) imdbId = omdbByTitle.imdbId;
 
+  if (!imdbId) imdbId = findKnownImdbId(title, originalTitle, year);
+
   if (!imdbId && lookupTitle) imdbId = await findImdbIdBySuggestion(lookupTitle, year);
 
-  async function sendAndCache(payload) {
-    const finalKey = payload.imdbId ? `imdb-${payload.imdbId}` : initialCacheKey;
-    if (payload.synopsis) {
-      setCachedSynopsis(finalKey, payload);
-      if (tmdbId) setCachedSynopsis(`tmdb-${tmdbId}`, payload);
-      if (initialCacheKey && initialCacheKey !== finalKey) setCachedSynopsis(initialCacheKey, payload);
-    }
-    return res.json(payload);
-  }
-
   if (!imdbId) {
-    return sendAndCache({
+    return res.json({
       source: omdbByTitle?.synopsis ? 'omdb-title-plot' : 'unavailable',
       imdbId: '',
       synopsis: omdbByTitle?.synopsis || ''
     });
   }
 
-  // Priorité : OMDb si OMDB_API_KEY est configurée, car IMDb bloque souvent le scraping.
-  const omdbPlotFirst = await fetchOmdbPlot(imdbId);
-  if (omdbPlotFirst) {
-    return sendAndCache({ source: 'omdb-imdb-plot', imdbId, synopsis: omdbPlotFirst });
-  }
-
-  // Secours : vraie page IMDb quand OMDb n'est pas configuré ou ne répond pas.
+  // Priorité : vraie page IMDb. OMDb n'est utilisé qu'en secours.
   const urls = [
     `https://www.imdb.com/fr/title/${imdbId}/plotsummary/`,
     `https://www.imdb.com/title/${imdbId}/plotsummary/`,
@@ -396,13 +354,18 @@ app.get('/api/imdb-synopsis', async (req, res) => {
 
       const synopsis = extractImdbSynopsis(html);
       if (synopsis) {
-        return sendAndCache({ source: 'imdb', imdbId, synopsis });
+        return res.json({ source: 'imdb', imdbId, synopsis });
       }
     } catch {}
   }
 
+  const omdbPlot = await fetchOmdbPlot(imdbId);
+  if (omdbPlot) {
+    return res.json({ source: 'omdb-imdb-plot', imdbId, synopsis: omdbPlot });
+  }
+
   if (omdbByTitle?.synopsis) {
-    return sendAndCache({ source: 'omdb-title-plot', imdbId, synopsis: omdbByTitle.synopsis });
+    return res.json({ source: 'omdb-title-plot', imdbId, synopsis: omdbByTitle.synopsis });
   }
 
   res.json({ source: 'unavailable', imdbId, synopsis: '' });

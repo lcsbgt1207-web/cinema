@@ -66,7 +66,7 @@ const TMDB = {
     if (!imdbId && !title) return '';
 
     const cacheIdentity = imdbId || (tmdbId ? `tmdb-${tmdbId}` : `${title.toLowerCase()}-${year}`);
-    const cacheKey = `cinepro_imdb_synopsis_v12_${cacheIdentity}`;
+    const cacheKey = `cinepro_imdb_synopsis_v14_${cacheIdentity}`;
 
     try {
       const cached = localStorage.getItem(cacheKey);
