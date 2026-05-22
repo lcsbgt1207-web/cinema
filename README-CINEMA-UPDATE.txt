@@ -1,16 +1,13 @@
-Mise à jour cinéma — synopsis IMDb / OMDb
+ZIP 2.9.2
 
-Ce zip ajoute une correction durable pour /api/imdb-synopsis :
-- cache local par imdbId ;
-- support OMDb via OMDB_API_KEY ;
-- plus de fallback silencieux TMDB quand IMDb/OMDb est indisponible ;
-- message clair côté réponse API si aucune clé OMDb n'est configurée.
+Correctif urgent du Catalogue proche :
+- extraction robuste des IDs cinéma dans la réponse /search-cinema ;
+- extraction profonde des tableaux de séances dans la réponse /seances ;
+- conservation des badges Classé IMDb / TMDB / À enrichir ;
+- variable window.NEARBY_CATALOGUE_MISSING_DRAFT disponible pour les films absents.
 
-Utilisation :
-1. Dézippe cinema-updates.zip sur ton Bureau.
-2. Lance comme d'habitude : cd ~/Desktop && ./update.sh
-3. Ajoute ta clé OMDb dans le fichier .env du backend :
-   OMDB_API_KEY=ta_cle_omdb
-4. Redémarre le backend.
+Test :
+getNearbyRankedMovies({ address: 'Cergy', radius: 15000 })
 
-La clé OMDb est gratuite sur https://www.omdbapi.com/apikey.aspx
+Tu dois voir dans la console :
+[Catalogue proche] ZIP 2.9.2 actif.
