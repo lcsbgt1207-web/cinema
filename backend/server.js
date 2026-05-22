@@ -167,11 +167,11 @@ function pickBestSynopsis(candidates = []) {
     })[0];
 }
 
-async function fetchHtml(url, language = 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7') {
+async function fetchHtml(url) {
   const response = await fetch(url, {
     headers: {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
-      'Accept-Language': language,
+      'Accept-Language': 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7',
       'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
       'Cache-Control': 'no-cache',
       'Pragma': 'no-cache'
@@ -308,6 +308,23 @@ async function fetchOmdbPlot(imdbId) {
   }
 }
 
+
+async function fetchOmdbShortPlot(imdbId) {
+  const apiKey = process.env.OMDB_API_KEY || process.env.VITE_OMDB_API_KEY || '';
+  if (!apiKey || !/^tt\d+$/.test(imdbId)) return '';
+
+  try {
+    const params = new URLSearchParams({ apikey: apiKey, i: imdbId, plot: 'short', r: 'json' });
+    const response = await fetch(`https://www.omdbapi.com/?${params.toString()}`);
+    if (!response.ok) return '';
+    const data = await response.json();
+    const plot = String(data?.Plot || '').trim();
+    return plot && plot !== 'N/A' ? cleanSynopsis(plot) : '';
+  } catch {
+    return '';
+  }
+}
+
 async function fetchOmdbByTitle(title, year = '') {
   const apiKey = process.env.OMDB_API_KEY || process.env.VITE_OMDB_API_KEY || '';
   if (!apiKey || !title) return null;
@@ -427,8 +444,8 @@ app.get('/api/imdb-synopsis', async (req, res) => {
 
   if (imdbId && !/^tt\d+$/.test(imdbId)) imdbId = '';
 
-  // On utilise TMDB / suggestion IMDb UNIQUEMENT pour retrouver le bon identifiant IMDb.
-  // Le texte du synopsis ne vient pas de TMDB.
+  // On utilise TMDB seulement pour trouver l'identifiant IMDb fiable.
+  // Le synopsis affiché ne vient jamais de TMDB.
   if (!imdbId && tmdbId) imdbId = await fetchTmdbExternalId(tmdbId);
   const lookupTitle = originalTitle || title;
   if (!imdbId && lookupTitle) imdbId = await findImdbIdBySuggestion(lookupTitle, year);
@@ -438,47 +455,48 @@ app.get('/api/imdb-synopsis', async (req, res) => {
   }
 
   try {
-    // 1) Priorité absolue : page IMDb française officielle.
-    const frHtml = await fetchHtml(
-      `https://www.imdb.com/fr/title/${imdbId}/`,
-      'fr-FR,fr;q=0.95,en-US;q=0.6,en;q=0.5'
-    );
+    // 1) Priorité absolue : fiche IMDb française, synopsis court de la page principale.
+    const frHtml = await fetchHtml(`https://www.imdb.com/fr/title/${imdbId}/`);
     const frSynopsis = extractImdbMainSynopsis(frHtml);
 
     if (frSynopsis && looksFrench(frSynopsis)) {
-      return res.json({ source: 'imdb-fr-official-short', imdbId, synopsis: frSynopsis });
+      return res.json({ source: 'imdb-fr-main-plot', imdbId, synopsis: frSynopsis });
     }
 
-    // 2) Si IMDb n'a pas de synopsis FR : on prend le court synopsis officiel anglais IMDb.
-    // Puis on le traduit en français. C'est le fallback demandé.
-    const enHtml = await fetchHtml(
-      `https://www.imdb.com/title/${imdbId}/`,
-      'en-US,en;q=0.95,fr-FR;q=0.4,fr;q=0.3'
-    );
-    const enSynopsis = extractImdbMainSynopsis(enHtml) || frSynopsis;
+    // 2) Si IMDb FR ne fournit pas de synopsis français, on prend le synopsis court IMDb anglais
+    // de la fiche principale, puis on le traduit en français. On n'utilise pas /plotsummary.
+    let enSynopsis = '';
+    if (frSynopsis && !looksFrench(frSynopsis)) {
+      enSynopsis = frSynopsis;
+    }
+
+    if (!enSynopsis) {
+      const enHtml = await fetchHtml(`https://www.imdb.com/title/${imdbId}/`);
+      enSynopsis = extractImdbMainSynopsis(enHtml);
+    }
 
     if (enSynopsis) {
-      const translated = await translateSynopsisToFrench(enSynopsis, `${imdbId}-official-short-v2`);
+      const translated = await translateSynopsisToFrench(enSynopsis, `imdb-main-${imdbId}`);
       return res.json({
-        source: looksFrench(translated) ? 'imdb-en-official-short-translated-fr' : 'imdb-en-official-short',
+        source: looksFrench(translated) ? 'imdb-en-main-plot-translated-fr' : 'imdb-en-main-plot',
         imdbId,
         synopsis: translated
       });
     }
 
-    // 3) Dernier secours : OMDb, uniquement s'il n'y a rien sur IMDb.
-    // OMDb sert seulement de secours pour les films sans synopsis public récupérable sur IMDb.
-    const omdbPlot = await fetchOmdbPlot(imdbId);
-    if (omdbPlot) {
-      const translated = await translateSynopsisToFrench(omdbPlot, `${imdbId}-omdb-fallback-v2`);
+    // 3) Dernier secours : OMDb court, traduit. Ce n'est utilisé que si IMDb ne donne rien.
+    // On demande plot=short pour éviter les longs résumés que tu ne veux pas.
+    const omdbShort = await fetchOmdbShortPlot(imdbId);
+    if (omdbShort) {
+      const translated = await translateSynopsisToFrench(omdbShort, `omdb-short-${imdbId}`);
       return res.json({
-        source: looksFrench(translated) ? 'omdb-fallback-translated-fr' : 'omdb-fallback',
+        source: looksFrench(translated) ? 'omdb-short-translated-fr' : 'omdb-short',
         imdbId,
         synopsis: translated
       });
     }
 
-    return res.json({ source: 'unavailable-no-synopsis', imdbId, synopsis: '' });
+    return res.json({ source: 'imdb-plot-missing', imdbId, synopsis: '' });
   } catch (error) {
     return res.json({ source: 'imdb-fetch-error', imdbId, synopsis: '' });
   }

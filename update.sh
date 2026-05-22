@@ -211,8 +211,7 @@ if [ -f "$PROJECT_DIR/backend/package.json" ]; then
   fi
 fi
 
-# IMPORTANT : on push seulement à la toute fin, après le scraper.
-# Comme ça, backend/data/letterboxd-films.json ne reste plus en modification locale.
+# IMPORTANT : on push seulement à la toute fin, après la mise à jour locale.
 push_git_after_everything
 
 echo "======================================"
