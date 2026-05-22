@@ -191,11 +191,11 @@ async function main() {
   }
   const films = await collectFilms();
   console.log(`Synchronisation cache synopsis : ${films.length} films à vérifier.`);
-  console.log('Priorité ZIP 2 : OMDb par imdbId → traduction FR → cache. TMDB reste le secours au clic.');
+  console.log('Priorité : cache local construit via OMDb par imdbId → traduction FR. TMDB reste uniquement le secours au clic.');
   let added = 0, skipped = 0, missing = 0, tmdbKnown = 0;
   for (const film of films) {
     const existing = cleanSynopsis(cache[film.imdbId]?.synopsis || '');
-    if (existing && !isBadSynopsisText(existing) && /^imdb/i.test(String(cache[film.imdbId]?.source || ''))) { skipped++; continue; }
+    if (existing && !isBadSynopsisText(existing) && /^(imdb|omdb)/i.test(String(cache[film.imdbId]?.source || ''))) { skipped++; continue; }
     process.stdout.write(`Cache IMDb ${film.imdbId} — ${film.title || film.originalTitle || ''}... `);
     const omdbPlot = await fetchOmdbShortPlot(film.imdbId);
     if (omdbPlot) {
@@ -208,7 +208,7 @@ async function main() {
           originalTitle: film.originalTitle || '',
           year: film.year || '',
           synopsis: synopsisFr,
-          source: looksFrench(synopsisFr) ? 'imdb-omdb-short-translated-fr' : 'imdb-omdb-short',
+          source: looksFrench(synopsisFr) ? 'omdb-short-translated-fr' : 'omdb-short',
           originalSource: 'OMDb by imdbId',
           updatedAt: new Date().toISOString()
         };
