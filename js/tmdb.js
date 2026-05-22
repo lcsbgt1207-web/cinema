@@ -23,7 +23,7 @@ const TMDB = {
 
   // Détails d'un film
   async getMovie(id) {
-    const url = `${CONFIG.TMDB_BASE_URL}/movie/${id}?api_key=${CONFIG.TMDB_API_KEY}&language=${CONFIG.LANGUAGE}&append_to_response=credits,release_dates`;
+    const url = `${CONFIG.TMDB_BASE_URL}/movie/${id}?api_key=${CONFIG.TMDB_API_KEY}&language=${CONFIG.LANGUAGE}&append_to_response=credits,release_dates,external_ids`;
     const res = await fetch(url);
     return await res.json();
   },
@@ -50,6 +50,35 @@ const TMDB = {
     const res = await fetch(url);
     const data = await res.json();
     return data.results || [];
+  },
+
+
+  // Synopsis IMDb via le backend local CinéProche.
+  // On l'utilise en priorité dans les popups Nouveautés / Résultats.
+  async getImdbSynopsis(film) {
+    const imdbId = film?.external_ids?.imdb_id || film?.imdb_id || film?.imdbID || '';
+    if (!imdbId) return '';
+
+    const cacheKey = `cinepro_imdb_synopsis_${imdbId}`;
+    try {
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) return cached;
+    } catch {}
+
+    try {
+      const params = new URLSearchParams({ imdbId });
+      if (film?.title) params.set('title', film.title);
+      const res = await fetch(`http://localhost:3000/api/imdb-synopsis?${params.toString()}`);
+      if (!res.ok) return '';
+      const data = await res.json();
+      const synopsis = String(data?.synopsis || '').trim();
+      if (!synopsis) return '';
+      try { localStorage.setItem(cacheKey, synopsis); } catch {}
+      return synopsis;
+    } catch (error) {
+      console.warn('Synopsis IMDb indisponible, fallback TMDB utilisé.', error);
+      return '';
+    }
   },
 
   // URL de l'affiche
