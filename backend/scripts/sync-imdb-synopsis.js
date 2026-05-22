@@ -10,7 +10,7 @@ const __dirname = path.dirname(__filename);
 const BACKEND_DIR = path.resolve(__dirname, '..');
 const PROJECT_DIR = path.resolve(BACKEND_DIR, '..');
 const DATA_DIR = path.join(BACKEND_DIR, 'data');
-const CACHE_PATH = path.join(DATA_DIR, 'synopsis-cache.json');
+const CACHE_PATH = path.join(DATA_DIR, 'imdb-synopsis-cache.json');
 const TRANSLATION_CACHE_PATH = path.join(DATA_DIR, 'translation-cache.json');
 
 const TMDB_API_KEY = process.env.TMDB_API_KEY || process.env.VITE_TMDB_API_KEY || '16d984ea5d9a771088779b56497e0890';
@@ -191,11 +191,11 @@ async function main() {
   }
   const films = await collectFilms();
   console.log(`Synchronisation cache synopsis : ${films.length} films à vérifier.`);
-  console.log('Priorité : cache local construit via OMDb par imdbId → traduction FR. TMDB reste uniquement le secours au clic.');
+  console.log('Priorité ZIP 2 : OMDb par imdbId → traduction FR → backend/data/imdb-synopsis-cache.json. TMDB reste le secours au clic.');
   let added = 0, skipped = 0, missing = 0, tmdbKnown = 0;
   for (const film of films) {
     const existing = cleanSynopsis(cache[film.imdbId]?.synopsis || '');
-    if (existing && !isBadSynopsisText(existing) && /^(imdb|omdb)/i.test(String(cache[film.imdbId]?.source || ''))) { skipped++; continue; }
+    if (existing && !isBadSynopsisText(existing) && /^imdb/i.test(String(cache[film.imdbId]?.source || ''))) { skipped++; continue; }
     process.stdout.write(`Cache IMDb ${film.imdbId} — ${film.title || film.originalTitle || ''}... `);
     const omdbPlot = await fetchOmdbShortPlot(film.imdbId);
     if (omdbPlot) {
@@ -208,7 +208,7 @@ async function main() {
           originalTitle: film.originalTitle || '',
           year: film.year || '',
           synopsis: synopsisFr,
-          source: looksFrench(synopsisFr) ? 'omdb-short-translated-fr' : 'omdb-short',
+          source: looksFrench(synopsisFr) ? 'imdb-omdb-short-translated-fr' : 'imdb-omdb-short',
           originalSource: 'OMDb by imdbId',
           updatedAt: new Date().toISOString()
         };

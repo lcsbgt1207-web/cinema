@@ -615,10 +615,21 @@ app.get('/api/imdb-synopsis', async (req, res) => {
       }
     }
 
-    // 2) Plus de scraping IMDb en direct ici.
-    // IMDb bloque souvent les requêtes serveur : le site doit rester fiable.
-    // La source principale devient le cache local généré par : npm run sync-imdb.
-    // Si le film n'existe vraiment pas dans le cache, TMDB FR sert uniquement de secours.
+    // 2) Tentative IMDb officielle en direct.
+    // Important : ce n'est PAS OMDb. On tente d'abord imdb.com/fr/title/tt...
+    // Si IMDb bloque la requête, on ne casse pas le site : on passe ensuite à TMDB.
+    if (resolvedId) {
+      const official = await getOfficialSynopsis(resolvedId);
+      if (official?.synopsis && /^imdb/i.test(String(official.source || '')) && !isBadSynopsisText(official.synopsis)) {
+        saveSynopsisCacheEntry(resolvedId, official);
+        return res.json({
+          source: official.source,
+          cacheKey: resolvedId,
+          imdbId: resolvedId,
+          synopsis: official.synopsis
+        });
+      }
+    }
 
     // 3) Secours TMDB FR, même si on n'a reçu que imdbId.
     let tmdbSynopsis = await fetchTmdbFrenchOverview(input.tmdbId, input.title, input.year);
