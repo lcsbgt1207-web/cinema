@@ -10,7 +10,7 @@ const __dirname = path.dirname(__filename);
 const BACKEND_DIR = path.resolve(__dirname, '..');
 const PROJECT_DIR = path.resolve(BACKEND_DIR, '..');
 const DATA_DIR = path.join(BACKEND_DIR, 'data');
-const CACHE_PATH = path.join(DATA_DIR, 'imdb-synopsis-cache.json');
+const CACHE_PATH = path.join(DATA_DIR, 'synopsis-cache.json');
 const TRANSLATION_CACHE_PATH = path.join(DATA_DIR, 'translation-cache.json');
 
 const TMDB_API_KEY = process.env.TMDB_API_KEY || process.env.VITE_TMDB_API_KEY || '16d984ea5d9a771088779b56497e0890';
