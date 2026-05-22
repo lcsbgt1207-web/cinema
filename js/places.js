@@ -1,4 +1,4 @@
-/* CinéProche — Service Google Places v4 */
+/* CinéProche — Service Google Places v5 */
 
 const PLACES = {
   map: null, placesService: null, geocoder: null, userLocation: null,
@@ -34,7 +34,6 @@ const PLACES = {
     });
   },
 
-  // Recherche sur un rayon donné — retourne une Promise
   _searchRadius(location, radius) {
     return new Promise((resolve) => {
       if (!this.placesService) { resolve([]); return; }
@@ -58,20 +57,15 @@ const PLACES = {
   },
 
   async findNearbycinemas(location, radius = 15000) {
-    // Toujours chercher sur 5km en priorité + sur le rayon choisi
-    // Fusionner les résultats pour garantir les plus proches
     const CLOSE_RADIUS = Math.min(5000, radius);
-    
     let results;
     if (radius <= 5000) {
       results = await this._searchRadius(location, radius);
     } else {
-      // Deux recherches en parallèle
       const [closeResults, farResults] = await Promise.all([
         this._searchRadius(location, CLOSE_RADIUS),
         this._searchRadius(location, radius)
       ]);
-      // Fusionner en dédupliquant par place_id
       const seen = new Set();
       results = [];
       for (const r of [...closeResults, ...farResults]) {
@@ -79,35 +73,66 @@ const PLACES = {
       }
     }
 
-    // Filtres
+    // ── MOTS À EXCLURE ABSOLUMENT ──
     const EXCLUDE = [
-      'carrefour','leclerc','fnac','cultura','super u','intermarché',
-      'spectacles','billetterie','ticket',
-      'drive','drive-in','plein air','plein-air','open air','itinérant','itinerant','toiles','cinétoile',
-      'restaurant','brasserie','bistrot','thai','pizza','burger','sushi','kebab','traiteur',
-      'hotel','hôtel','auberge','supermarché','supermarche','boutique','magasin',
-      'coiffeur','pharmacie','boulangerie','tabac',
-      'karting','bowling','escape','laser','paintball',
-      'festival','temporaire','éphémère','estival','association',
-      'hallucinecran','halluciné'
+      // Commerce / service
+      'carrefour','leclerc','fnac','cultura','super u','intermarché','auchan','lidl','casino',
+      'coiffeur','coiffure','wecasa','barbier','salon','beauty','nail','spa','massage',
+      'pharmacie','optique','dentiste','médecin','docteur',
+      'boulangerie','pâtisserie','restaurant','brasserie','bistrot','café','bar','pub',
+      'kebab','pizza','sushi','thai','burger','traiteur','snack','épicerie',
+      'hotel','hôtel','auberge','gîte','chambre',
+      'boutique','magasin','vêtement','chaussure','librairie','tabac','presse',
+      'supermarché','supermarche','hypermarché',
+      // Lieux culturels non-cinéma
+      'théâtre','theatre','opéra','opera','concert','musique','danse','cirque',
+      'musée','musee','exposition','galerie','bibliothèque',
+      'spectacles','billetterie','salle de spectacle',
+      'laboratoire','labo','diffusion','production','studio de',
+      'association','collectif','atelier','cours de',
+      'polygone','étoilé','etoile',
+      // Plein air / drive
+      'drive','drive-in','plein air','plein-air','open air','itinérant','itinerant',
+      'toiles','cinétoile','festival','temporaire','éphémère','estival',
+      // Loisirs
+      'karting','bowling','escape','laser','paintball','trampoline','accrobranche',
+      'aqua','parc','zoo','jardin',
+      // Faux positifs connus
+      'hallucinecran','halluciné','dodeskaden'
     ];
+
+    // ── MOTS QUI GARANTISSENT QUE C'EST UN VRAI CINÉMA ──
     const REQUIRE = [
-      'ciné','cine','cinema','cinéma','ugc','pathé','pathe',
-      'gaumont','mk2','rex','megarama','kinépolis','kinepolis',
-      'multiplexe','imax','odéon','odeon','lumière','lumiere',
-      'majestic','palace','louxor','champo','balzac','wepler',
-      'studio','utopia','ariel','espace','forum','méga','mega',
-      'conti','beaumont','brady','select'
+      'ciné','cine','cinema','cinéma',
+      'ugc','pathé','pathe','gaumont','mk2','megarama','kinépolis','kinepolis',
+      'imax','multiplexe',
+      'odéon','odeon','lumière','lumiere','majestic','palace','louxor',
+      'champo','balzac','wepler','brady','select','conti','beaumont',
+      'utopia','ariel','studio 28','grand rex','rex','entrepôt','entrepot',
+      'magic','ciné-club','cineclub'
     ];
 
     const filtered = results.filter(place => {
       const name = place.name.toLowerCase();
       const types = place.types || [];
+
+      // 1. Exclure si contient un mot interdit
       if (EXCLUDE.some(k => name.includes(k))) return false;
+
+      // 2. Accepter immédiatement si contient un mot cinéma reconnu
       if (REQUIRE.some(k => name.includes(k))) return true;
-      const suspectTypes = ['supermarket','store','food','restaurant','lodging','bar'];
+
+      // 3. Rejeter si types suspects
+      const suspectTypes = ['supermarket','store','food','restaurant','lodging','bar',
+                            'beauty_salon','hair_care','health','doctor','pharmacy'];
       if (suspectTypes.some(t => types.includes(t))) return false;
-      return types.includes('movie_theater');
+
+      // 4. N'accepter que si Google confirme movie_theater ET rating > 0
+      // (évite les lieux mal catégorisés)
+      if (!types.includes('movie_theater')) return false;
+      if (place.rating && place.rating < 2.0) return false;
+
+      return true;
     });
 
     const cinemas = filtered.map(place => ({
