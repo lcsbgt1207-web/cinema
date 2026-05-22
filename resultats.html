@@ -469,8 +469,16 @@
   }
 
   async function getPopupSynopsis(film) {
-    const imdbSynopsis = await TMDB.getImdbSynopsis(film);
-    return imdbSynopsis || film.overview || 'Synopsis indisponible pour le moment.';
+    try {
+      const imdbPromise = TMDB.getImdbSynopsis(film);
+      const fastSynopsis = await Promise.race([
+        imdbPromise,
+        new Promise(resolve => setTimeout(() => resolve(''), 1200))
+      ]);
+      return fastSynopsis || film.overview || 'Synopsis indisponible pour le moment.';
+    } catch {
+      return film.overview || 'Synopsis indisponible pour le moment.';
+    }
   }
 
   function buildUnifiedFilmPopupHTML({ film, poster, director, actors, duree, synopsis, genres }) {
@@ -525,16 +533,19 @@
       const actors   = film.credits?.cast?.slice(0,4).map(a=>a.name).join(', ') || '';
       const duree    = TMDB.formatDuration(film.runtime);
       const genres   = film.genres?.map(g=>g.name) || [];
-      const synopsis = film.overview || 'Synopsis indisponible pour le moment.';
+      const synopsis = await getPopupSynopsis(film);
 
       popup.innerHTML = buildUnifiedFilmPopupHTML({ film, poster, director, actors, duree, synopsis, genres });
       overlay.classList.add('open');
       document.body.style.overflow = 'hidden';
 
+      // Si le backend IMDb répond après l'ouverture, on remplace proprement le synopsis TMDB.
       TMDB.getImdbSynopsis(film).then((imdbSynopsis) => {
         if (!imdbSynopsis) return;
         const synopsisNode = popup.querySelector('.popup-synopsis');
-        if (synopsisNode) synopsisNode.textContent = imdbSynopsis;
+        if (synopsisNode && synopsisNode.textContent.trim() !== imdbSynopsis.trim()) {
+          synopsisNode.textContent = imdbSynopsis;
+        }
       }).catch(() => {});
     } catch(e) {
       popup.innerHTML = `<div style="padding:40px;text-align:center;color:var(--gray-400);">Impossible de charger ce film.<button class="popup-close-btn" onclick="closeFilmPopup()" style="display:block;margin:16px auto 0;">Fermer</button></div>`;

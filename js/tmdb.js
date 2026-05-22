@@ -59,12 +59,14 @@ const TMDB = {
   async getImdbSynopsis(film) {
     const imdbId = String(film?.external_ids?.imdb_id || film?.imdb_id || film?.imdbID || '').trim();
     const title = String(film?.title || film?.name || film?.original_title || '').trim();
+    const originalTitle = String(film?.original_title || '').trim();
+    const tmdbId = String(film?.id || film?.tmdbID || '').trim();
     const year = film?.release_date ? String(film.release_date).slice(0, 4) : String(film?.year || '').trim();
 
     if (!imdbId && !title) return '';
 
-    const cacheIdentity = imdbId || `${title.toLowerCase()}-${year}`;
-    const cacheKey = `cinepro_imdb_synopsis_v8_${cacheIdentity}`;
+    const cacheIdentity = imdbId || (tmdbId ? `tmdb-${tmdbId}` : `${title.toLowerCase()}-${year}`);
+    const cacheKey = `cinepro_imdb_synopsis_v12_${cacheIdentity}`;
 
     try {
       const cached = localStorage.getItem(cacheKey);
@@ -74,7 +76,9 @@ const TMDB = {
     try {
       const params = new URLSearchParams();
       if (imdbId) params.set('imdbId', imdbId);
+      if (tmdbId) params.set('tmdbId', tmdbId);
       if (title) params.set('title', title);
+      if (originalTitle) params.set('originalTitle', originalTitle);
       if (year) params.set('year', year);
 
       const res = await fetch(`http://localhost:3000/api/imdb-synopsis?${params.toString()}`);

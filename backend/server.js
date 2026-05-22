@@ -16,6 +16,85 @@ const __dirname = path.dirname(__filename);
 app.use(cors());
 app.use(express.json());
 
+const TMDB_API_KEY = process.env.TMDB_API_KEY || process.env.VITE_TMDB_API_KEY || '16d984ea5d9a771088779b56497e0890';
+const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
+
+function normalizeSearchTitle(value = '') {
+  return String(value)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function decodeJsonString(value = '') {
+  try {
+    return JSON.parse('"' + String(value).replace(/"/g, '\\"') + '"');
+  } catch {
+    return String(value)
+      .replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+      .replace(/\\n/g, ' ')
+      .replace(/\\"/g, '"')
+      .replace(/\\\//g, '/');
+  }
+}
+
+async function fetchTmdbExternalId(tmdbId) {
+  if (!tmdbId || !TMDB_API_KEY) return '';
+  try {
+    const url = `${TMDB_BASE_URL}/movie/${encodeURIComponent(tmdbId)}?api_key=${TMDB_API_KEY}&language=fr-FR&append_to_response=external_ids`;
+    const response = await fetch(url);
+    if (!response.ok) return '';
+    const data = await response.json();
+    const imdbId = String(data?.external_ids?.imdb_id || data?.imdb_id || '').trim();
+    return /^tt\d+$/.test(imdbId) ? imdbId : '';
+  } catch {
+    return '';
+  }
+}
+
+async function findImdbIdBySuggestion(title, year = '') {
+  if (!title) return '';
+  const cleaned = normalizeSearchTitle(title).replace(/ /g, '_');
+  if (!cleaned) return '';
+
+  try {
+    const first = cleaned[0];
+    const url = `https://v3.sg.media-imdb.com/suggestion/${first}/${encodeURIComponent(cleaned)}.json`;
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36',
+        'Accept': 'application/json,text/plain,*/*'
+      }
+    });
+    if (!response.ok) return '';
+    const data = await response.json();
+    const wanted = normalizeSearchTitle(title);
+    const wantedYear = /^\d{4}$/.test(String(year)) ? Number(year) : null;
+
+    const best = (data?.d || [])
+      .filter(item => /^tt\d+$/.test(String(item?.id || '')) && (item?.qid === 'movie' || item?.qid === 'tvMovie' || !item?.qid))
+      .map(item => {
+        const itemTitle = normalizeSearchTitle(item?.l || '');
+        const itemYear = Number(item?.y || 0) || null;
+        let score = 0;
+        if (itemTitle === wanted) score += 100;
+        if (itemTitle.includes(wanted) || wanted.includes(itemTitle)) score += 25;
+        if (wantedYear && itemYear === wantedYear) score += 80;
+        if (wantedYear && itemYear && Math.abs(itemYear - wantedYear) <= 1) score += 25;
+        return { item, score };
+      })
+      .sort((a, b) => b.score - a.score)[0];
+
+    return best && best.score >= 60 ? String(best.item.id) : '';
+  } catch {
+    return '';
+  }
+}
+
+
 function decodeHtml(value = '') {
   return String(value)
     .replace(/&quot;/g, '"')
@@ -139,7 +218,24 @@ function extractImdbSynopsis(html = '') {
     } catch {}
   });
 
-  // 3) Dernier recours : meta description IMDb.
+  // 3) Données Next.js/GraphQL compressées dans le HTML.
+  // IMDb change souvent son DOM, mais ces champs restent généralement présents.
+  const rawPatterns = [
+    /\"plotText\"\s*:\s*\{\s*\"plainText\"\s*:\s*\"((?:\\.|[^\"\\]){40,1400})\"/g,
+    /\"plot\"\s*:\s*\{[^{}]*\"plotText\"[^{}]*\"plainText\"\s*:\s*\"((?:\\.|[^\"\\]){40,1400})\"/g,
+    /\"description\"\s*:\s*\"((?:\\.|[^\"\\]){40,1400})\"/g,
+    /\"plainText\"\s*:\s*\"((?:\\.|[^\"\\]){40,1400})\"/g
+  ];
+
+  for (const pattern of rawPatterns) {
+    let match;
+    while ((match = pattern.exec(html)) !== null) {
+      const text = decodeJsonString(match[1]);
+      if (isGoodSynopsis(text)) candidates.push(text);
+    }
+  }
+
+  // 4) Dernier recours : meta description IMDb.
   const meta = $('meta[name="description"]').attr('content') || $('meta[property="og:description"]').attr('content');
   if (isGoodSynopsis(meta)) candidates.push(meta);
 
@@ -195,14 +291,24 @@ app.get('/', (req, res) => {
 app.get('/api/imdb-synopsis', async (req, res) => {
   let imdbId = String(req.query.imdbId || '').trim();
   const title = String(req.query.title || '').trim();
+  const originalTitle = String(req.query.originalTitle || '').trim();
   const year = String(req.query.year || '').trim();
+  const tmdbId = String(req.query.tmdbId || '').trim();
 
   if (imdbId && !/^tt\d+$/.test(imdbId)) imdbId = '';
 
-  // Si TMDB ne fournit pas d'imdb_id, OMDb peut retrouver l'ID à partir du titre + année.
-  // Cela évite de décaler les synopsis d'un film vers un autre.
-  const omdbByTitle = !imdbId && title ? await fetchOmdbByTitle(title, year) : null;
+  // Priorité absolue au vrai identifiant IMDb :
+  // 1) imdb_id fourni par TMDB côté front
+  // 2) tmdbId -> external_ids côté backend
+  // 3) OMDb par titre + année
+  // 4) suggestion IMDb par titre + année
+  if (!imdbId && tmdbId) imdbId = await fetchTmdbExternalId(tmdbId);
+
+  const lookupTitle = originalTitle || title;
+  const omdbByTitle = !imdbId && lookupTitle ? await fetchOmdbByTitle(lookupTitle, year) : null;
   if (!imdbId && omdbByTitle?.imdbId) imdbId = omdbByTitle.imdbId;
+
+  if (!imdbId && lookupTitle) imdbId = await findImdbIdBySuggestion(lookupTitle, year);
 
   if (!imdbId) {
     return res.json({
