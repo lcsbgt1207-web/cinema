@@ -42,43 +42,6 @@ function cleanSynopsis(value = '') {
     .trim();
 }
 
-function normalizeText(value = '') {
-  return String(value)
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim();
-}
-
-function pageMatchesRequestedFilm(html = '', requestedTitle = '', requestedYear = '') {
-  const title = normalizeText(requestedTitle);
-  if (!title) return true;
-
-  const $ = cheerio.load(html);
-  let pageTitle = '';
-  let pageYear = '';
-
-  $('script[type="application/ld+json"]').each((_, el) => {
-    if (pageTitle) return;
-    try {
-      const json = JSON.parse($(el).contents().text());
-      if (json?.name) pageTitle = String(json.name);
-      if (json?.datePublished) pageYear = String(json.datePublished).slice(0, 4);
-    } catch {}
-  });
-
-  if (!pageTitle) {
-    pageTitle = $('h1').first().text() || $('title').first().text();
-  }
-
-  const normalizedPageTitle = normalizeText(pageTitle);
-  const titleOk = normalizedPageTitle === title || normalizedPageTitle.includes(title) || title.includes(normalizedPageTitle);
-  const yearOk = !requestedYear || !pageYear || String(pageYear) === String(requestedYear);
-
-  return titleOk && yearOk;
-}
-
 function isGoodSynopsis(text = '') {
   const clean = cleanSynopsis(text);
   if (clean.length < 45 || clean.length > 1200) return false;
@@ -199,23 +162,57 @@ async function fetchOmdbPlot(imdbId) {
   }
 }
 
+async function fetchOmdbByTitle(title, year = '') {
+  const apiKey = process.env.OMDB_API_KEY || process.env.VITE_OMDB_API_KEY || '';
+  if (!apiKey || !title) return null;
+
+  try {
+    const params = new URLSearchParams({ apikey: apiKey, t: title, plot: 'full', r: 'json' });
+    if (/^\d{4}$/.test(String(year))) params.set('y', String(year));
+
+    const response = await fetch(`https://www.omdbapi.com/?${params.toString()}`);
+    if (!response.ok) return null;
+    const data = await response.json();
+    if (data?.Response !== 'True') return null;
+
+    const imdbId = String(data?.imdbID || '').trim();
+    const plot = String(data?.Plot || '').trim();
+
+    return {
+      imdbId: /^tt\d+$/.test(imdbId) ? imdbId : '',
+      synopsis: plot && plot !== 'N/A' ? cleanSynopsis(plot) : ''
+    };
+  } catch {
+    return null;
+  }
+}
+
 app.get('/', (req, res) => {
   res.json({ message: 'Backend CinéProche actif', routes: ['/api/films-letterboxd', '/api/imdb-synopsis'] });
 });
 
 
 app.get('/api/imdb-synopsis', async (req, res) => {
-  const imdbId = String(req.query.imdbId || '').trim();
-  const requestedTitle = String(req.query.title || '').trim();
-  const requestedYear = String(req.query.year || '').trim();
+  let imdbId = String(req.query.imdbId || '').trim();
+  const title = String(req.query.title || '').trim();
+  const year = String(req.query.year || '').trim();
 
-  if (!/^tt\d+$/.test(imdbId)) {
-    return res.status(400).json({ source: 'invalid', synopsis: '' });
+  if (imdbId && !/^tt\d+$/.test(imdbId)) imdbId = '';
+
+  // Si TMDB ne fournit pas d'imdb_id, OMDb peut retrouver l'ID à partir du titre + année.
+  // Cela évite de décaler les synopsis d'un film vers un autre.
+  const omdbByTitle = !imdbId && title ? await fetchOmdbByTitle(title, year) : null;
+  if (!imdbId && omdbByTitle?.imdbId) imdbId = omdbByTitle.imdbId;
+
+  if (!imdbId) {
+    return res.json({
+      source: omdbByTitle?.synopsis ? 'omdb-title-plot' : 'unavailable',
+      imdbId: '',
+      synopsis: omdbByTitle?.synopsis || ''
+    });
   }
 
-  // Priorité : IMDb. OMDb n'est utilisé qu'en secours si une clé existe côté backend.
-  // Sécurité : même avec un ID IMDb, on vérifie le titre/année si le front les envoie.
-  // Cela évite d'associer un synopsis à un mauvais film.
+  // Priorité : vraie page IMDb. OMDb n'est utilisé qu'en secours.
   const urls = [
     `https://www.imdb.com/fr/title/${imdbId}/plotsummary/`,
     `https://www.imdb.com/title/${imdbId}/plotsummary/`,
@@ -227,7 +224,6 @@ app.get('/api/imdb-synopsis', async (req, res) => {
     try {
       const html = await fetchHtml(url);
       if (!html) continue;
-      if (!pageMatchesRequestedFilm(html, requestedTitle, requestedYear)) continue;
 
       const synopsis = extractImdbSynopsis(html);
       if (synopsis) {
@@ -239,6 +235,10 @@ app.get('/api/imdb-synopsis', async (req, res) => {
   const omdbPlot = await fetchOmdbPlot(imdbId);
   if (omdbPlot) {
     return res.json({ source: 'omdb-imdb-plot', imdbId, synopsis: omdbPlot });
+  }
+
+  if (omdbByTitle?.synopsis) {
+    return res.json({ source: 'omdb-title-plot', imdbId, synopsis: omdbByTitle.synopsis });
   }
 
   res.json({ source: 'unavailable', imdbId, synopsis: '' });

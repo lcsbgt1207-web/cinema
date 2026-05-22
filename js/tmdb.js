@@ -54,26 +54,26 @@ const TMDB = {
 
 
   // Synopsis IMDb via le backend local CinéProche.
-  // Important : on associe toujours le synopsis avec l'ID IMDb, jamais avec
-  // l'ordre des films ou seulement le titre. Cela évite qu'un film récupère
-  // le synopsis d'un autre film, comme Obsession / Le Réveil de la Momie.
+  // Important : aucune correspondance forcée en dur.
+  // Chaque film est identifié par son imdb_id TMDB, puis par son titre + année en secours.
   async getImdbSynopsis(film) {
-    const imdbId = film?.external_ids?.imdb_id || film?.imdb_id || film?.imdbID || '';
-    if (!/^tt\d+$/.test(String(imdbId))) return '';
+    const imdbId = String(film?.external_ids?.imdb_id || film?.imdb_id || film?.imdbID || '').trim();
+    const title = String(film?.title || film?.name || film?.original_title || '').trim();
+    const year = film?.release_date ? String(film.release_date).slice(0, 4) : String(film?.year || '').trim();
 
-    const title = String(film?.title || film?.name || film?.titre || '').trim();
-    const year = film?.release_date
-      ? String(film.release_date).slice(0, 4)
-      : (film?.annee ? String(film.annee) : '');
+    if (!imdbId && !title) return '';
 
-    const cacheKey = `cinepro_imdb_synopsis_v6_${imdbId}`;
+    const cacheIdentity = imdbId || `${title.toLowerCase()}-${year}`;
+    const cacheKey = `cinepro_imdb_synopsis_v8_${cacheIdentity}`;
+
     try {
       const cached = localStorage.getItem(cacheKey);
       if (cached) return cached;
     } catch {}
 
     try {
-      const params = new URLSearchParams({ imdbId });
+      const params = new URLSearchParams();
+      if (imdbId) params.set('imdbId', imdbId);
       if (title) params.set('title', title);
       if (year) params.set('year', year);
 
@@ -87,7 +87,7 @@ const TMDB = {
       try { localStorage.setItem(cacheKey, synopsis); } catch {}
       return synopsis;
     } catch (error) {
-      console.warn('Synopsis IMDb indisponible, fallback local/TMDB utilisé.', error);
+      console.warn('Synopsis IMDb indisponible, fallback local utilisé.', error);
       return '';
     }
   },
