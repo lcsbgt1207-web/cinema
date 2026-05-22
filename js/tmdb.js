@@ -84,7 +84,7 @@ const TMDB = {
     // 3. Appel OMDb avec l'imdbId
     if (resolvedImdbId && /^tt\d+$/.test(resolvedImdbId)) {
       try {
-        const url = `https://www.omdbapi.com/?apikey=${OMDB_KEY}&i=${resolvedImdbId}&plot=full&r=json`;
+        const url = `https://www.omdbapi.com/?apikey=${OMDB_KEY}&i=${resolvedImdbId}&plot=short&r=json`;
         const res = await fetch(url);
         if (res.ok) {
           const data = await res.json();
