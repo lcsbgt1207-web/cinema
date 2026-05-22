@@ -266,7 +266,7 @@
           </div>
           <div class="film-popup-synopsis-zone">
             <div class="section-label">Synopsis</div>
-            <p>${escapeHTML(synopsis)}</p>
+            <div class="popup-synopsis">${escapeHTML(synopsis)}</div>
           </div>
         </div>
         <div class="film-popup-seances-zone">
@@ -290,11 +290,17 @@
       const actors   = film.credits?.cast?.slice(0,4).map(a=>a.name).join(', ') || '';
       const duree    = TMDB.formatDuration(film.runtime);
       const genres   = film.genres?.map(g=>g.name) || [];
-      const synopsis = await getPopupSynopsis(film);
+      const synopsis = film.overview || 'Synopsis indisponible pour le moment.';
 
       popup.innerHTML = buildUnifiedFilmPopupHTML({ film, poster, director, actors, duree, synopsis, genres });
       overlay.classList.add('open');
       document.body.style.overflow = 'hidden';
+
+      TMDB.getImdbSynopsis(film).then((imdbSynopsis) => {
+        if (!imdbSynopsis) return;
+        const synopsisNode = popup.querySelector('.popup-synopsis');
+        if (synopsisNode) synopsisNode.textContent = imdbSynopsis;
+      }).catch(() => {});
     } catch(e) {
       popup.innerHTML = `<div style="padding:40px;text-align:center;color:var(--gray-400);">Impossible de charger ce film.<button class="popup-close-btn" onclick="closeFilmPopup()" style="display:block;margin:16px auto 0;">Fermer</button></div>`;
       overlay.classList.add('open');
