@@ -567,7 +567,7 @@ app.get('/api/imdb-debug', async (req, res) => {
 
     const tmdbSynopsis = await fetchTmdbFrenchOverview(input.tmdbId, input.title, input.year);
     let decision = 'unavailable';
-    if (cachedSynopsis && !isBadSynopsisText(cachedSynopsis)) decision = 'would-use-local-cache';
+    if (cachedSynopsis && !isBadSynopsisText(cachedSynopsis) && /^(imdb|omdb|legacy)/i.test(String(cacheEntry?.source || ''))) decision = 'would-use-imdb-cache';
     else if (bestImdbFr) decision = 'would-use-live-imdb-fr';
     else if (tmdbSynopsis) decision = 'would-use-tmdb-fr-fallback';
 
@@ -615,11 +615,12 @@ app.get('/api/imdb-synopsis', async (req, res) => {
       }
     }
 
-    // 2) Tentative source stable au clic : IMDb officiel si possible, puis OMDb traduit FR.
-    // Si IMDb bloque, OMDb remplit le cache local. TMDB ne sert qu'en dernier secours.
+    // 2) Tentative IMDb officielle en direct.
+    // Important : ce n'est PAS OMDb. On tente d'abord imdb.com/fr/title/tt...
+    // Si IMDb bloque la requête, on ne casse pas le site : on passe ensuite à TMDB.
     if (resolvedId) {
       const official = await getOfficialSynopsis(resolvedId);
-      if (official?.synopsis && String(official.source || '') !== 'unavailable' && !isBadSynopsisText(official.synopsis)) {
+      if (official?.synopsis && /^imdb/i.test(String(official.source || '')) && !isBadSynopsisText(official.synopsis)) {
         saveSynopsisCacheEntry(resolvedId, official);
         return res.json({
           source: official.source,

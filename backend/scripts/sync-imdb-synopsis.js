@@ -3,15 +3,20 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 
-dotenv.config();
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const BACKEND_DIR = path.resolve(__dirname, '..');
 const PROJECT_DIR = path.resolve(BACKEND_DIR, '..');
 const DATA_DIR = path.join(BACKEND_DIR, 'data');
+
+dotenv.config({ path: path.join(BACKEND_DIR, '.env') });
+dotenv.config({ path: path.join(PROJECT_DIR, '.env') });
+
 const CACHE_PATH = path.join(DATA_DIR, 'imdb-synopsis-cache.json');
+const OLD_CACHE_PATH = path.join(DATA_DIR, 'synopsis-cache.json');
+const FR_CACHE_PATH = path.join(DATA_DIR, 'imdb-synopsis-fr-cache.json');
 const TRANSLATION_CACHE_PATH = path.join(DATA_DIR, 'translation-cache.json');
+const LETTERBOXD_PATH = path.join(DATA_DIR, 'letterboxd-films.json');
 
 const TMDB_API_KEY = process.env.TMDB_API_KEY || process.env.VITE_TMDB_API_KEY || '16d984ea5d9a771088779b56497e0890';
 const OMDB_API_KEY = process.env.OMDB_API_KEY || process.env.VITE_OMDB_API_KEY || '';
@@ -21,7 +26,9 @@ function readJson(filePath, fallback = {}) {
   try {
     if (!fs.existsSync(filePath)) return fallback;
     return JSON.parse(fs.readFileSync(filePath, 'utf-8')) || fallback;
-  } catch { return fallback; }
+  } catch {
+    return fallback;
+  }
 }
 
 function writeJson(filePath, data) {
@@ -29,49 +36,71 @@ function writeJson(filePath, data) {
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
 }
 
-function decodeHtml(value = '') {
+function cleanSynopsis(value = '') {
   return String(value)
+    .replace(/<[^>]+>/g, ' ')
     .replace(/&quot;/g, '"')
     .replace(/&#39;|&apos;/g, "'")
     .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-function stripHtml(value = '') { return decodeHtml(String(value).replace(/<[^>]+>/g, ' ')); }
-function cleanSynopsis(value = '') {
-  return stripHtml(value)
     .replace(/\s*See full summary\s*»?\s*$/i, '')
     .replace(/\s*Voir le résumé complet\s*»?\s*$/i, '')
     .replace(/\s*Add a plot.*$/i, '')
-    .replace(/\s*Ajouter un résumé.*$/i, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
+
 function isBadSynopsisText(text = '') {
   const value = cleanSynopsis(text).toLowerCase();
   if (!value) return true;
-  return /javascript est désactivé|javascript est desactive|enable javascript|you need to enable javascript|nous devons vérifier|vous n.?êtes pas un robot|not a robot|robot|captcha|verify you are human|access denied|request blocked|réessayez plus tard|try again later|^n\/a$/i.test(value);
+  return /javascript est désactivé|javascript est desactive|enable javascript|robot|captcha|verify you are human|access denied|request blocked|réessayez plus tard|try again later|^n\/?a$/i.test(value);
 }
+
 function isGoodSynopsis(text = '') {
   const clean = cleanSynopsis(text);
   if (isBadSynopsisText(clean)) return false;
-  if (clean.length < 35 || clean.length > 900) return false;
-  if (!/[.!?…]/.test(clean)) return false;
-  if (/directed by|with [A-Z][a-z]+|watch options|add a plot/i.test(clean)) return false;
+  if (clean.length < 20 || clean.length > 1200) return false;
   return true;
 }
+
 function looksFrench(text = '') {
   const value = String(text).toLowerCase();
-  const frenchHits = (value.match(/\b(le|la|les|des|une|un|dans|avec|pour|qui|que|est|sont|son|sa|ses|leur|leurs|été|après|avant|mais|plus|tout|toute|alors|lorsque|tandis|afin|ce|cette|ces|aux|du)\b/g) || []).length;
+  const frenchHits = (value.match(/\b(le|la|les|des|une|un|dans|avec|pour|qui|que|est|sont|son|sa|ses|leur|leurs|été|après|avant|mais|plus|tout|toute|alors|lorsque|tandis|afin|ce|cette|ces|aux|du|de|au)\b/g) || []).length;
   const englishHits = (value.match(/\b(the|and|with|from|after|before|his|her|their|into|while|when|who|that|this|story|life|must|find)\b/g) || []).length;
   return frenchHits >= 3 && frenchHits >= englishHits;
 }
-async function translateToFrench(text = '', translationCache = {}) {
+
+function normalizeTitle(value = '') {
+  return String(value)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function mergeLegacyCaches(cache) {
+  for (const file of [OLD_CACHE_PATH, FR_CACHE_PATH]) {
+    const legacy = readJson(file, {});
+    for (const [key, value] of Object.entries(legacy)) {
+      const imdbMatch = String(key).match(/tt\d+/);
+      const imdbId = value?.imdbId || imdbMatch?.[0] || '';
+      const synopsis = cleanSynopsis(typeof value === 'string' ? value : (value?.synopsis || value?.plot || value?.overview || value?.description || ''));
+      if (/^tt\d+$/.test(imdbId) && isGoodSynopsis(synopsis) && !cache[imdbId]) {
+        cache[imdbId] = {
+          imdbId,
+          synopsis,
+          source: value?.source || 'legacy-cache-migrated',
+          updatedAt: new Date().toISOString()
+        };
+      }
+    }
+  }
+}
+
+async function translateToFrench(text = '', translationCache = {}, keyHint = '') {
   const clean = cleanSynopsis(text);
   if (!clean || looksFrench(clean)) return clean;
-  const key = `sync-fr-${clean}`;
+  const key = `sync-fr-${keyHint || clean}`;
   if (translationCache[key]) return translationCache[key];
   try {
     const params = new URLSearchParams({ client: 'gtx', sl: 'en', tl: 'fr', dt: 't', q: clean });
@@ -82,13 +111,14 @@ async function translateToFrench(text = '', translationCache = {}) {
     const data = await response.json();
     const translated = Array.isArray(data?.[0]) ? data[0].map(part => part?.[0] || '').join('').trim() : '';
     const finalText = cleanSynopsis(translated);
-    if (finalText && finalText.length >= 30) {
+    if (finalText && finalText.length >= 20) {
       translationCache[key] = finalText;
       return finalText;
     }
   } catch {}
   return clean;
 }
+
 async function fetchOmdbShortPlot(imdbId) {
   if (!OMDB_API_KEY || !/^tt\d+$/.test(imdbId)) return '';
   try {
@@ -100,62 +130,68 @@ async function fetchOmdbShortPlot(imdbId) {
     const data = await response.json();
     const plot = cleanSynopsis(data?.Plot || '');
     return plot && plot !== 'N/A' && isGoodSynopsis(plot) ? plot : '';
-  } catch { return ''; }
-}
-async function fetchTmdbFrenchOverview(tmdbId = '') {
-  if (!TMDB_API_KEY || !tmdbId) return '';
-  try {
-    const response = await fetch(`${TMDB_BASE_URL}/movie/${encodeURIComponent(tmdbId)}?api_key=${TMDB_API_KEY}&language=fr-FR`, {
-      headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json,text/plain,*/*' }
-    });
-    if (!response.ok) return '';
-    const data = await response.json();
-    const overview = cleanSynopsis(data?.overview || '');
-    return isGoodSynopsis(overview) ? overview : '';
-  } catch { return ''; }
-}
-function readCatalogueFilms() {
-  const file = path.join(PROJECT_DIR, 'js', 'data.js');
-  if (!fs.existsSync(file)) return [];
-  const content = fs.readFileSync(file, 'utf-8');
-  const films = [];
-  const blocks = content.match(/\{[\s\S]*?imdbID:\s*["']tt\d+["'][\s\S]*?\}/g) || [];
-  for (const block of blocks) {
-    const imdbId = block.match(/imdbID:\s*["'](tt\d+)["']/)?.[1] || '';
-    const title = block.match(/titre:\s*["']([^"']+)["']/)?.[1] || '';
-    const originalTitle = block.match(/original:\s*["']([^"']+)["']/)?.[1] || '';
-    const year = block.match(/annee:\s*(\d{4})/)?.[1] || '';
-    if (imdbId) films.push({ imdbId, tmdbId: '', title, originalTitle, year, sourceList: 'catalogue-local' });
+  } catch {
+    return '';
   }
-  return films;
 }
-async function getTmdbList(pathname, page = 1) {
+
+async function fetchTmdbJson(url) {
   try {
-    const url = `${TMDB_BASE_URL}${pathname}?api_key=${TMDB_API_KEY}&language=fr-FR&region=FR&page=${page}`;
-    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json,text/plain,*/*' } });
-    if (!res.ok) return [];
-    return (await res.json()).results || [];
-  } catch { return []; }
-}
-async function enrichTmdbMovie(item, sourceList) {
-  try {
-    const url = `${TMDB_BASE_URL}/movie/${item.id}?api_key=${TMDB_API_KEY}&language=fr-FR&append_to_response=external_ids`;
     const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json,text/plain,*/*' } });
     if (!res.ok) return null;
-    const data = await res.json();
-    const imdbId = String(data?.external_ids?.imdb_id || data?.imdb_id || '').trim();
-    if (!/^tt\d+$/.test(imdbId)) return null;
-    return {
-      imdbId,
-      tmdbId: String(data.id || item.id || ''),
-      title: data.title || item.title || '',
-      originalTitle: data.original_title || '',
-      year: data.release_date ? String(data.release_date).slice(0, 4) : '',
-      tmdbOverview: cleanSynopsis(data.overview || item.overview || ''),
-      sourceList
-    };
-  } catch { return null; }
+    return await res.json();
+  } catch {
+    return null;
+  }
 }
+
+async function getTmdbList(pathname, page = 1) {
+  if (!TMDB_API_KEY) return [];
+  const params = new URLSearchParams({ api_key: TMDB_API_KEY, language: 'fr-FR', region: 'FR', page: String(page) });
+  const data = await fetchTmdbJson(`${TMDB_BASE_URL}${pathname}?${params.toString()}`);
+  return data?.results || [];
+}
+
+async function enrichTmdbMovie(item, sourceList) {
+  if (!item?.id || !TMDB_API_KEY) return null;
+  const params = new URLSearchParams({ api_key: TMDB_API_KEY, language: 'fr-FR', append_to_response: 'external_ids' });
+  const data = await fetchTmdbJson(`${TMDB_BASE_URL}/movie/${encodeURIComponent(item.id)}?${params.toString()}`);
+  const imdbId = String(data?.external_ids?.imdb_id || data?.imdb_id || '').trim();
+  if (!/^tt\d+$/.test(imdbId)) return null;
+  return {
+    imdbId,
+    tmdbId: String(data.id || item.id || ''),
+    title: data.title || item.title || '',
+    originalTitle: data.original_title || item.original_title || '',
+    year: data.release_date ? String(data.release_date).slice(0, 4) : '',
+    sourceList
+  };
+}
+
+function readCatalogueFilms() {
+  const candidates = [];
+  const files = [
+    path.join(PROJECT_DIR, 'js', 'data.js'),
+    path.join(PROJECT_DIR, 'js', 'films.js'),
+    path.join(PROJECT_DIR, 'js', 'catalogue.js'),
+    LETTERBOXD_PATH
+  ];
+  for (const file of files) {
+    if (!fs.existsSync(file)) continue;
+    const content = fs.readFileSync(file, 'utf-8');
+    const json = file.endsWith('.json') ? readJson(file, null) : null;
+    if (Array.isArray(json)) {
+      for (const f of json) {
+        const imdbId = String(f.imdbId || f.imdb_id || f.imdbID || '').trim();
+        if (/^tt\d+$/.test(imdbId)) candidates.push({ imdbId, title: f.title || f.titre || '', year: f.year || f.annee || '', sourceList: path.basename(file) });
+      }
+    }
+    const ids = [...content.matchAll(/tt\d{6,}/g)].map(m => m[0]);
+    for (const imdbId of ids) candidates.push({ imdbId, title: '', year: '', sourceList: path.basename(file) });
+  }
+  return candidates;
+}
+
 async function collectFilms() {
   const all = [...readCatalogueFilms()];
   const tmdbSources = [
@@ -165,68 +201,90 @@ async function collectFilms() {
     ['/movie/top_rated', 'tmdb-top-rated']
   ];
   for (const [pathname, sourceList] of tmdbSources) {
-    for (let page = 1; page <= 3; page++) {
+    for (let page = 1; page <= 5; page++) {
       const list = await getTmdbList(pathname, page);
       for (const item of list) {
         const film = await enrichTmdbMovie(item, sourceList);
         if (film) all.push(film);
-        await wait(80);
+        await wait(60);
       }
     }
   }
   const byId = new Map();
-  for (const film of all) byId.set(film.imdbId, { ...(byId.get(film.imdbId) || {}), ...film });
+  for (const film of all) {
+    if (/^tt\d+$/.test(film.imdbId)) byId.set(film.imdbId, { ...(byId.get(film.imdbId) || {}), ...film });
+  }
   return [...byId.values()];
 }
+
 function wait(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+
 async function main() {
   fs.mkdirSync(DATA_DIR, { recursive: true });
   const cache = readJson(CACHE_PATH, {});
   const translationCache = readJson(TRANSLATION_CACHE_PATH, {});
-  for (const [id, entry] of Object.entries(cache)) {
-    if (!entry?.synopsis || isBadSynopsisText(entry.synopsis)) delete cache[id];
-  }
+  mergeLegacyCaches(cache);
+
   if (!OMDB_API_KEY) {
-    console.log('OMDB_API_KEY manquante : ajoute-la dans backend/.env puis relance npm run sync-imdb.');
+    console.log('ERREUR : OMDB_API_KEY manquante dans backend/.env. Le cache ne peut pas se remplir via OMDb.');
+    writeJson(CACHE_PATH, cache);
+    return;
   }
+
   const films = await collectFilms();
-  console.log(`Synchronisation cache synopsis : ${films.length} films à vérifier.`);
-  console.log('Priorité ZIP 2 : OMDb par imdbId → traduction FR → cache. TMDB reste le secours au clic.');
-  let added = 0, skipped = 0, missing = 0, tmdbKnown = 0;
+  console.log(`Synchronisation cache synopsis OMDb : ${films.length} films détectés.`);
+  console.log(`Cache cible : ${CACHE_PATH}`);
+
+  let added = 0;
+  let skipped = 0;
+  let missing = 0;
+
   for (const film of films) {
     const existing = cleanSynopsis(cache[film.imdbId]?.synopsis || '');
-    if (existing && !isBadSynopsisText(existing) && /^imdb/i.test(String(cache[film.imdbId]?.source || ''))) { skipped++; continue; }
-    process.stdout.write(`Cache IMDb ${film.imdbId} — ${film.title || film.originalTitle || ''}... `);
-    const omdbPlot = await fetchOmdbShortPlot(film.imdbId);
-    if (omdbPlot) {
-      const synopsisFr = await translateToFrench(omdbPlot, translationCache);
-      if (synopsisFr && isGoodSynopsis(synopsisFr)) {
-        cache[film.imdbId] = {
-          imdbId: film.imdbId,
-          tmdbId: film.tmdbId || '',
-          title: film.title || '',
-          originalTitle: film.originalTitle || '',
-          year: film.year || '',
-          synopsis: synopsisFr,
-          source: looksFrench(synopsisFr) ? 'imdb-omdb-short-translated-fr' : 'imdb-omdb-short',
-          originalSource: 'OMDb by imdbId',
-          updatedAt: new Date().toISOString()
-        };
-        writeJson(CACHE_PATH, cache);
-        writeJson(TRANSLATION_CACHE_PATH, translationCache);
-        added++;
-        console.log('OK OMDb');
-      } else { missing++; console.log('OMDb inutilisable'); }
-    } else {
-      const tmdb = film.tmdbOverview || await fetchTmdbFrenchOverview(film.tmdbId || '');
-      if (tmdb) tmdbKnown++;
-      missing++;
-      console.log(tmdb ? 'pas OMDb, TMDB sera utilisé au clic' : 'absent');
+    if (existing && !isBadSynopsisText(existing)) {
+      skipped++;
+      continue;
     }
-    await wait(250);
+
+    process.stdout.write(`OMDb ${film.imdbId} ${film.title ? '- ' + film.title : ''} ... `);
+    const omdbPlot = await fetchOmdbShortPlot(film.imdbId);
+    if (!omdbPlot) {
+      missing++;
+      console.log('absent');
+      await wait(180);
+      continue;
+    }
+
+    const synopsisFr = await translateToFrench(omdbPlot, translationCache, film.imdbId);
+    if (isGoodSynopsis(synopsisFr)) {
+      cache[film.imdbId] = {
+        imdbId: film.imdbId,
+        tmdbId: film.tmdbId || '',
+        title: film.title || '',
+        originalTitle: film.originalTitle || '',
+        year: film.year || '',
+        synopsis: synopsisFr,
+        source: looksFrench(synopsisFr) ? 'omdb-short-translated-fr' : 'omdb-short',
+        originalSource: 'OMDb by imdbId',
+        updatedAt: new Date().toISOString()
+      };
+      added++;
+      console.log('OK');
+      writeJson(CACHE_PATH, cache);
+      writeJson(TRANSLATION_CACHE_PATH, translationCache);
+    } else {
+      missing++;
+      console.log('inutilisable');
+    }
+    await wait(180);
   }
+
   writeJson(CACHE_PATH, cache);
   writeJson(TRANSLATION_CACHE_PATH, translationCache);
-  console.log(`Cache terminé : ${Object.keys(cache).length} entrées IMDb/OMDb, ${added} ajoutées, ${skipped} déjà présentes, ${missing} sans OMDb, ${tmdbKnown} avec TMDB connu.`);
+  console.log(`Cache terminé : ${Object.keys(cache).length} entrées dans imdb-synopsis-cache.json, ${added} ajoutées, ${skipped} déjà présentes, ${missing} sans OMDb.`);
 }
-main().catch(error => { console.error('sync-imdb échoué :', error?.message || error); process.exitCode = 0; });
+
+main().catch(error => {
+  console.error('sync-imdb échoué :', error?.message || error);
+  process.exitCode = 0;
+});
