@@ -631,21 +631,20 @@
         </div>
         <div class="popup-synopsis-block">
           <div class="section-label">Synopsis</div>
-          <div class="popup-synopsis">Chargement du synopsis IMDb…</div>
+          <div class="popup-synopsis">Chargement du synopsis…</div>
         </div>
         ${cinemasHtml}
         <button class="popup-close-btn" onclick="closeFilmPopup()">Fermer</button>`;
 
-      // Remplacer le synopsis TMDB par le synopsis IMDb FR officiel,
-      // ou par une traduction FR du synopsis court IMDb anglais si IMDb FR est absent.
+      // Afficher le synopsis IMDb FR si disponible, sinon le synopsis TMDB FR.
       TMDB.getImdbSynopsis(film)
         .then((synopsis) => {
           const node = popup.querySelector('.popup-synopsis');
-          if (node) node.textContent = synopsis || 'Aucun synopsis IMDb disponible pour ce film.';
+          if (node) node.textContent = synopsis || 'Aucun synopsis disponible pour ce film.';
         })
         .catch(() => {
           const node = popup.querySelector('.popup-synopsis');
-          if (node) node.textContent = 'Aucun synopsis IMDb disponible pour ce film.';
+          if (node) node.textContent = 'Aucun synopsis disponible pour ce film.';
         });
 
       // Charger les vraies séances en async

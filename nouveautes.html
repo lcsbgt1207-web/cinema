@@ -249,16 +249,16 @@
   async function getPopupSynopsis(film) {
     try {
       const imdbSynopsis = await TMDB.getImdbSynopsis(film);
-      return imdbSynopsis || 'Chargement du synopsis IMDb…';
+      return imdbSynopsis || 'Chargement du synopsis…';
     } catch {
-      return 'Chargement du synopsis IMDb…';
+      return 'Chargement du synopsis…';
     }
   }
 
   function setPopupSynopsisText(popup, text) {
     const synopsisNode = popup.querySelector('.popup-synopsis');
     if (!synopsisNode) return;
-    synopsisNode.textContent = text || 'Aucun synopsis IMDb disponible pour ce film.';
+    synopsisNode.textContent = text || 'Aucun synopsis disponible pour ce film.';
   }
 
   function buildUnifiedFilmPopupHTML({ film, poster, director, actors, duree, synopsis, genres }) {
@@ -318,10 +318,10 @@
       overlay.classList.add('open');
       document.body.style.overflow = 'hidden';
 
-      // Mise à jour finale avec la vraie source IMDb/OMDb.
+      // Mise à jour finale : IMDb FR puis TMDB FR en secours.
       TMDB.getImdbSynopsis(film)
         .then((imdbSynopsis) => setPopupSynopsisText(popup, imdbSynopsis))
-        .catch(() => setPopupSynopsisText(popup, 'Aucun synopsis IMDb disponible pour ce film.'));
+        .catch(() => setPopupSynopsisText(popup, 'Aucun synopsis disponible pour ce film.'));
     } catch(e) {
       popup.innerHTML = `<div style="padding:40px;text-align:center;color:var(--gray-400);">Impossible de charger ce film.<button class="popup-close-btn" onclick="closeFilmPopup()" style="display:block;margin:16px auto 0;">Fermer</button></div>`;
       overlay.classList.add('open');

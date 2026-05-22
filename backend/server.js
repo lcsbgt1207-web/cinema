@@ -76,34 +76,8 @@ function stripHtml(value = '') {
   return decodeHtml(String(value).replace(/<[^>]+>/g, ' '));
 }
 
-
-function isBlockedImdbPageText(value = '') {
-  const text = String(value || '').toLowerCase();
-  return [
-    'javascript est désactivé',
-    'javascript est desactive',
-    'afin de continuer, nous devons vérifier',
-    'afin de continuer, nous devons verifier',
-    'vous n’êtes pas un robot',
-    "vous n'êtes pas un robot",
-    'vous n etes pas un robot',
-    'cela nécessite javascript',
-    'cela necessite javascript',
-    'enable javascript',
-    'javascript is disabled',
-    'please enable javascript',
-    'verify you are a human',
-    'not a robot',
-    'captcha',
-    'robot check',
-    'unusual traffic',
-    'access denied'
-  ].some(fragment => text.includes(fragment));
-}
-
 function cleanSynopsis(value = '') {
-  if (isBlockedImdbPageText(value)) return '';
-  const cleaned = stripHtml(value)
+  return stripHtml(value)
     .replace(/\s*See full summary\s*»?\s*$/i, '')
     .replace(/\s*Voir le résumé complet\s*»?\s*$/i, '')
     .replace(/\s*Add a plot.*$/i, '')
@@ -111,13 +85,17 @@ function cleanSynopsis(value = '') {
     .replace(/\s*IMDb\s*$/i, '')
     .replace(/\s+/g, ' ')
     .trim();
-  return isBlockedImdbPageText(cleaned) ? '' : cleaned;
+}
+
+function isBadSynopsisText(text = '') {
+  const value = cleanSynopsis(text).toLowerCase();
+  if (!value) return true;
+  return /javascript est désactivé|javascript est desactive|enable javascript|you need to enable javascript|nous devons vérifier que vous n.?êtes pas un robot|vous n.?êtes pas un robot|not a robot|robot|captcha|verify you are human|access denied|request blocked|réessayez plus tard|try again later/i.test(value);
 }
 
 function isGoodSynopsis(text = '') {
-  if (isBlockedImdbPageText(text)) return false;
   const clean = cleanSynopsis(text);
-  if (isBlockedImdbPageText(clean)) return false;
+  if (isBadSynopsisText(clean)) return false;
   if (clean.length < 35 || clean.length > 900) return false;
   if (!/[.!?…]/.test(clean)) return false;
   if (/^(cast|crew|details|release|ratings|photos|videos|official sites)$/i.test(clean)) return false;
@@ -183,6 +161,129 @@ function collectSynopsisCandidatesFromJson(value, candidates = [], parentKey = '
   return candidates;
 }
 
+function decodeBackslashEscapes(value = '') {
+  return String(value)
+    .replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/\u([0-9a-fA-F]{4})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/\\n|\n/g, ' ')
+    .replace(/\\t|\t/g, ' ')
+    .replace(/\\r|\r/g, ' ')
+    .replace(/\\"/g, '"')
+    .replace(/\\'/g, "'")
+    .replace(/\\\//g, '/')
+    .replace(/\\x([0-9a-fA-F]{2})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function htmlVariantsForExtraction(html = '') {
+  const raw = String(html || '');
+  const loose = decodeBackslashEscapes(raw);
+  const noTagsJson = loose
+    .replace(/\\u003C/gi, '<')
+    .replace(/\\u003E/gi, '>')
+    .replace(/\\u002F/gi, '/')
+    .replace(/\u003C/gi, '<')
+    .replace(/\u003E/gi, '>')
+    .replace(/\u002F/gi, '/');
+  return [...new Set([raw, loose, noTagsJson])].filter(Boolean);
+}
+
+function isProbablyUiOrMetadata(text = '') {
+  const value = cleanSynopsis(text);
+  const lower = value.toLowerCase();
+  if (!value) return true;
+  if (/^(menu|tout|se connecter|créer un compte|liste de favoris|ajouter à la liste|marquer comme regardé)$/i.test(value)) return true;
+  if (/^(réalisation|scénaristes|stars|distribution|photos|vidéos|récompenses|imdbpro|in theaters|streaming)$/i.test(value)) return true;
+  if (/^(prochainement|sortie le|voir les séances|définissez vos services|nouveau client)/i.test(lower)) return true;
+  if (/\b(avis des critiques|informations de production|showtimes|watch options|user reviews|critic reviews)\b/i.test(lower)) return true;
+  if (/^\d+(\.\d+)?\s*(\/10|avis|h|min|victoires|nominations)/i.test(lower)) return true;
+  return false;
+}
+
+function collectVisibleTextCandidates($, candidates = []) {
+  const selectors = [
+    'main span',
+    'main div',
+    'section span',
+    'section div',
+    '[role="presentation"] span',
+    '.ipc-html-content-inner-div',
+    '.ipc-overflowText',
+    '.ipc-overflowText--children',
+    '[data-testid*="plot"]',
+    '[data-testid*="storyline"]',
+    '[data-testid*="hero"]'
+  ];
+
+  for (const selector of selectors) {
+    $(selector).each((_, el) => {
+      const text = cleanSynopsis($(el).clone().children('script,style,svg,button,a').remove().end().text());
+      if (!isProbablyUiOrMetadata(text) && isGoodSynopsis(text)) {
+        candidates.push(text);
+      }
+    });
+  }
+
+  // Dernier filet de sécurité : certains rendus IMDb Next.js mettent le pitch dans un élément
+  // sans data-testid stable. On parcourt alors les textes visibles courts/propres.
+  $('body *').each((_, el) => {
+    const childElements = $(el).children().length;
+    if (childElements > 2) return;
+    const text = cleanSynopsis($(el).clone().children('script,style,svg,button,a').remove().end().text());
+    if (!isProbablyUiOrMetadata(text) && isGoodSynopsis(text)) {
+      candidates.push(text);
+    }
+  });
+
+  return candidates;
+}
+
+function collectRawSynopsisCandidates(html = '', candidates = []) {
+  const rawPatterns = [
+    /"plot"\s*:\s*\{[\s\S]{0,4000}?"plotText"\s*:\s*\{[\s\S]{0,1200}?"plainText"\s*:\s*"((?:\\.|[^"\\]){35,1200})"/g,
+    /"plotText"\s*:\s*\{[\s\S]{0,1200}?"plainText"\s*:\s*"((?:\\.|[^"\\]){35,1200})"/g,
+    /"plainText"\s*:\s*"((?:\\.|[^"\\]){35,1200})"/g,
+    /"description"\s*:\s*"((?:\\.|[^"\\]){35,1200})"/g,
+    /"storyline"\s*:\s*"((?:\\.|[^"\\]){35,1200})"/g
+  ];
+
+  for (const variant of htmlVariantsForExtraction(html)) {
+    for (const pattern of rawPatterns) {
+      let match;
+      while ((match = pattern.exec(variant)) !== null) {
+        const text = decodeBackslashEscapes(decodeJsonString(match[1]));
+        if (!isProbablyUiOrMetadata(text) && isGoodSynopsis(text)) candidates.push(text);
+      }
+    }
+  }
+
+  return candidates;
+}
+
+function extractPlainTextSynopsis(text = '', preferFrench = false) {
+  const candidates = [];
+  const cleanText = decodeBackslashEscapes(stripHtml(text))
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  // Cas IMDb FR fréquent : pitch entre les genres et "Réalisation".
+  const blocks = [
+    /(?:Français|French|Drame|Drama|Action|Comédie|Comedy|Horreur|Horror|Thriller|Aventure|Adventure|Historique|History|Science-fiction|Sci-Fi)(?:\s+[A-ZÀ-Ÿ][^.!?…]{10,}){0,4}\s+([^|]{50,700}?[.!?…])\s+(?:Réalisation|Director|Directors|Scénaristes|Writers|Stars)/gi,
+    /\b((?:Jura suisse|Alors que|Dans|Après|Lorsque|Tandis|Une|Un|Le|La|Les|Des|Emma|Maverick|Chronicles|The|When|After)[^\n]{50,700}?[.!?…])\s+(?:Réalisation|Director|Scénaristes|Writers|Stars)/gi
+  ];
+
+  for (const pattern of blocks) {
+    let match;
+    while ((match = pattern.exec(cleanText)) !== null) {
+      const candidate = cleanSynopsis(match[1]);
+      if (!isProbablyUiOrMetadata(candidate) && isGoodSynopsis(candidate)) candidates.push(candidate);
+    }
+  }
+
+  return pickShortOfficial(candidates, preferFrench);
+}
+
 async function fetchHtml(url, lang = 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7') {
   const response = await fetch(url, {
     headers: {
@@ -202,18 +303,24 @@ function extractMainPageSynopsis(html = '', preferFrench = false) {
   const candidates = [];
   const $ = cheerio.load(html);
 
-  // DOM visible de la fiche titre : c'est le texte court sous les genres.
+  // DOM visible de la fiche titre : plusieurs variantes IMDb existent selon film/langue/rendu.
   [
     '[data-testid="plot-xl"]',
     '[data-testid="plot-l"]',
     '[data-testid="plot"]',
-    'span[data-testid="plot-xl"]',
-    'span[data-testid="plot-l"]',
-    'section[data-testid="Storyline"] [data-testid="plot"]'
+    '[data-testid="title-plot-xl"]',
+    '[data-testid="title-plot-l"]',
+    '[data-testid="hero-plot"]',
+    '[data-testid="hero-overview"] [data-testid*="plot"]',
+    '[data-testid="hero-overview"] span',
+    'section[data-testid="Storyline"] [data-testid*="plot"]',
+    'section[data-testid="Storyline"] .ipc-html-content-inner-div',
+    '.ipc-html-content-inner-div',
+    '.ipc-overflowText .ipc-html-content-inner-div'
   ].forEach(selector => {
     $(selector).each((_, el) => {
-      const text = $(el).text();
-      if (isGoodSynopsis(text)) candidates.push(text);
+      const text = cleanSynopsis($(el).text());
+      if (!isProbablyUiOrMetadata(text) && isGoodSynopsis(text)) candidates.push(text);
     });
   });
 
@@ -223,12 +330,12 @@ function extractMainPageSynopsis(html = '', preferFrench = false) {
       const json = JSON.parse($(el).contents().text());
       const values = Array.isArray(json) ? json : [json];
       values.forEach(item => {
-        if (item?.description && isGoodSynopsis(item.description)) candidates.push(item.description);
+        if (item?.description && !isProbablyUiOrMetadata(item.description) && isGoodSynopsis(item.description)) candidates.push(item.description);
       });
     } catch {}
   });
 
-  // Next/GraphQL : robuste quand IMDb change les classes HTML.
+  // Next/GraphQL classique.
   $('#__NEXT_DATA__, script#__NEXT_DATA__').each((_, el) => {
     try {
       const json = JSON.parse($(el).contents().text());
@@ -236,22 +343,21 @@ function extractMainPageSynopsis(html = '', preferFrench = false) {
     } catch {}
   });
 
-  // Recherche brute dans le HTML pour les champs IMDb les plus stables.
-  const rawPatterns = [
-    /"plot"\s*:\s*\{[\s\S]{0,2500}?"plotText"\s*:\s*\{[\s\S]{0,800}?"plainText"\s*:\s*"((?:\\.|[^"\\]){35,900})"/g,
-    /"plotText"\s*:\s*\{[\s\S]{0,800}?"plainText"\s*:\s*"((?:\\.|[^"\\]){35,900})"/g,
-    /"description"\s*:\s*"((?:\\.|[^"\\]){35,900})"/g
-  ];
-  for (const pattern of rawPatterns) {
-    let match;
-    while ((match = pattern.exec(html)) !== null) {
-      const text = decodeJsonString(match[1]);
-      if (isGoodSynopsis(text)) candidates.push(text);
-    }
-  }
+  // Next.js App Router / scripts self.__next_f.push : IMDb met parfois les données ici,
+  // avec les guillemets échappés. On scanne donc le HTML brut ET déséchappé.
+  collectRawSynopsisCandidates(html, candidates);
+
+  // Texte visible générique : utile pour les pages IMDb FR où le pitch est bien affiché
+  // mais pas sous un data-testid stable.
+  collectVisibleTextCandidates($, candidates);
 
   const meta = $('meta[name="description"]').attr('content') || $('meta[property="og:description"]').attr('content');
-  if (isGoodSynopsis(meta) && !/^.+?:\s*directed by/i.test(meta)) candidates.push(meta);
+  if (meta && !/^.+?:\s*directed by/i.test(meta) && !isProbablyUiOrMetadata(meta) && isGoodSynopsis(meta)) candidates.push(meta);
+
+  // Fallback texte brut : récupère les cas où le pitch existe dans le HTML rendu, mais
+  // mélangé dans un gros flux texte.
+  const fromPlain = extractPlainTextSynopsis($.text(), preferFrench) || extractPlainTextSynopsis(html, preferFrench);
+  if (fromPlain) candidates.push(fromPlain);
 
   return pickShortOfficial(candidates, preferFrench);
 }
@@ -265,6 +371,52 @@ async function fetchTmdbExternalId(tmdbId) {
     const data = await response.json();
     const imdbId = String(data?.external_ids?.imdb_id || data?.imdb_id || '').trim();
     return /^tt\d+$/.test(imdbId) ? imdbId : '';
+  } catch {
+    return '';
+  }
+}
+
+async function fetchTmdbFrenchOverview(tmdbId = '', title = '', year = '') {
+  if (!TMDB_API_KEY) return '';
+  try {
+    let movieId = String(tmdbId || '').trim();
+
+    if (!movieId && title) {
+      const params = new URLSearchParams({
+        api_key: TMDB_API_KEY,
+        language: 'fr-FR',
+        region: 'FR',
+        query: title
+      });
+      if (/^\d{4}$/.test(String(year))) params.set('year', String(year));
+      const searchRes = await fetch(`${TMDB_BASE_URL}/search/movie?${params.toString()}`);
+      if (searchRes.ok) {
+        const searchData = await searchRes.json();
+        const wanted = normalizeSearchTitle(title);
+        const wantedYear = /^\d{4}$/.test(String(year)) ? Number(year) : null;
+        const best = (searchData?.results || [])
+          .map(item => {
+            const itemTitle = normalizeSearchTitle(item?.title || item?.original_title || '');
+            const itemYear = item?.release_date ? Number(String(item.release_date).slice(0, 4)) : null;
+            let score = 0;
+            if (itemTitle === wanted) score += 100;
+            if (itemTitle.includes(wanted) || wanted.includes(itemTitle)) score += 25;
+            if (wantedYear && itemYear === wantedYear) score += 80;
+            if (wantedYear && itemYear && Math.abs(itemYear - wantedYear) <= 1) score += 25;
+            return { item, score };
+          })
+          .sort((a, b) => b.score - a.score)[0];
+        if (best && best.score >= 60) movieId = String(best.item.id || '');
+      }
+    }
+
+    if (!movieId) return '';
+    const url = `${TMDB_BASE_URL}/movie/${encodeURIComponent(movieId)}?api_key=${TMDB_API_KEY}&language=fr-FR`;
+    const response = await fetch(url);
+    if (!response.ok) return '';
+    const data = await response.json();
+    const overview = cleanSynopsis(data?.overview || '');
+    return isGoodSynopsis(overview) ? overview : '';
   } catch {
     return '';
   }
@@ -358,7 +510,7 @@ function readSynopsisCache() {
 }
 
 function saveSynopsisCacheEntry(imdbId, entry) {
-  if (!/^tt\d+$/.test(imdbId) || !entry?.synopsis || !isGoodSynopsis(entry.synopsis)) return;
+  if (!/^tt\d+$/.test(imdbId) || !entry?.synopsis) return;
   const cache = readSynopsisCache();
   cache[imdbId] = {
     imdbId,
@@ -386,24 +538,24 @@ async function getOfficialSynopsis(imdbId) {
   for (const url of frUrls) {
     const html = await fetchHtml(url, 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7');
     const fr = extractMainPageSynopsis(html, true);
-    if (fr && looksFrench(fr)) {
+    if (fr && looksFrench(fr) && !isBadSynopsisText(fr)) {
       return { source: 'imdb-fr-official', synopsis: fr };
     }
   }
 
-  // 2) Page IMDb anglaise officielle puis traduction française.
-  const enHtml = await fetchHtml(`https://www.imdb.com/title/${imdbId}/`, 'en-US,en;q=0.9,fr-FR;q=0.7');
-  const en = extractMainPageSynopsis(enHtml, false);
-  if (en) {
-    const translated = await translateSynopsisToFrench(en, `imdb-official-en-${imdbId}`);
-    return { source: looksFrench(translated) ? 'imdb-en-official-translated-fr' : 'imdb-en-official', synopsis: translated };
+  return { source: 'imdb-fr-unavailable', synopsis: '' };
+}
+
+async function getBestSynopsis({ imdbId = '', tmdbId = '', title = '', year = '' }) {
+  // Règle demandée : IMDb FR en priorité, sinon TMDB FR, sinon aucun synopsis.
+  if (/^tt\d+$/.test(imdbId)) {
+    const imdb = await getOfficialSynopsis(imdbId);
+    if (imdb.synopsis && !isBadSynopsisText(imdb.synopsis)) return imdb;
   }
 
-  // 3) Dernier secours : OMDb court traduit, uniquement si IMDb ne fournit rien.
-  const omdb = await fetchOmdbShortPlot(imdbId);
-  if (omdb) {
-    const translated = await translateSynopsisToFrench(omdb, `omdb-short-${imdbId}`);
-    return { source: looksFrench(translated) ? 'omdb-short-translated-fr' : 'omdb-short', synopsis: translated };
+  const tmdb = await fetchTmdbFrenchOverview(tmdbId, title, year);
+  if (tmdb && !isBadSynopsisText(tmdb)) {
+    return { source: 'tmdb-fr-fallback', synopsis: tmdb };
   }
 
   return { source: 'unavailable', synopsis: '' };
@@ -429,25 +581,24 @@ app.get('/api/imdb-synopsis', async (req, res) => {
 
     const refresh = String(req.query.refresh || '') === '1';
     const cache = readSynopsisCache();
-    if (!refresh && cache[resolvedId]?.synopsis) {
-      const cachedSynopsis = cleanSynopsis(cache[resolvedId].synopsis);
-      if (cachedSynopsis && isGoodSynopsis(cachedSynopsis)) {
-        return res.json({ source: `${cache[resolvedId].source || 'cache'}-cache`, imdbId: resolvedId, synopsis: cachedSynopsis });
-      }
-
-      // Ancien cache invalide : par exemple une page anti-bot IMDb prise pour un synopsis.
+    const cachedSynopsis = cleanSynopsis(cache[resolvedId]?.synopsis || '');
+    if (!refresh && cachedSynopsis && !isBadSynopsisText(cachedSynopsis)) {
+      return res.json({ source: `${cache[resolvedId].source || 'cache'}-cache`, imdbId: resolvedId, synopsis: cachedSynopsis });
+    }
+    if (cachedSynopsis && isBadSynopsisText(cachedSynopsis)) {
       delete cache[resolvedId];
       writeJson(synopsisCachePath(), cache);
     }
 
-    const result = await getOfficialSynopsis(resolvedId);
-    const safeSynopsis = cleanSynopsis(result.synopsis || '');
-    if (safeSynopsis && isGoodSynopsis(safeSynopsis)) {
-      saveSynopsisCacheEntry(resolvedId, { ...result, synopsis: safeSynopsis });
-      return res.json({ source: result.source, imdbId: resolvedId, synopsis: safeSynopsis });
-    }
+    const result = await getBestSynopsis({
+      imdbId: resolvedId,
+      tmdbId: String(req.query.tmdbId || '').trim(),
+      title: String(req.query.title || '').trim(),
+      year: String(req.query.year || '').trim()
+    });
+    if (result.synopsis && !isBadSynopsisText(result.synopsis)) saveSynopsisCacheEntry(resolvedId, result);
 
-    return res.json({ source: 'unavailable', imdbId: resolvedId, synopsis: '' });
+    return res.json({ source: result.source, imdbId: resolvedId, synopsis: result.synopsis || '' });
   } catch (error) {
     return res.json({ source: 'imdb-fetch-error', imdbId: '', synopsis: '' });
   }

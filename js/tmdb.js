@@ -63,20 +63,24 @@ const TMDB = {
     const tmdbId = String(film?.id || film?.tmdbID || '').trim();
     const year = film?.release_date ? String(film.release_date).slice(0, 4) : String(film?.year || '').trim();
 
-    if (!imdbId && !title) return '';
+    const tmdbFallback = String(film?.overview || '').trim();
+    const isBadSynopsis = (value = '') => /javascript est désactivé|javascript est desactive|enable javascript|robot|captcha|verify you are human|access denied|request blocked/i.test(String(value).toLowerCase());
+
+    if (!imdbId && !title) return tmdbFallback;
 
     const cacheIdentity = imdbId || (tmdbId ? `tmdb-${tmdbId}` : `${title.toLowerCase()}-${year}`);
-    const cacheKey = `cinepro_imdb_synopsis_v41_imdb_fr_exact_or_translated_${cacheIdentity}`;
+    const cacheKey = `cinepro_synopsis_v50_imdb_fr_then_tmdb_fr_${cacheIdentity}`;
 
     try {
-      if (!localStorage.getItem('cinepro_imdb_synopsis_fr_cache_cleaned_v41')) {
+      if (!localStorage.getItem('cinepro_synopsis_cache_cleaned_v50')) {
         Object.keys(localStorage)
-          .filter(key => key.startsWith('cinepro_imdb_synopsis_'))
+          .filter(key => key.startsWith('cinepro_imdb_synopsis_') || key.startsWith('cinepro_synopsis_'))
           .forEach(key => localStorage.removeItem(key));
-        localStorage.setItem('cinepro_imdb_synopsis_fr_cache_cleaned_v41', '1');
+        localStorage.setItem('cinepro_synopsis_cache_cleaned_v50', '1');
       }
       const cached = localStorage.getItem(cacheKey);
-      if (cached) return cached;
+      if (cached && !isBadSynopsis(cached)) return cached;
+      if (cached && isBadSynopsis(cached)) localStorage.removeItem(cacheKey);
     } catch {}
 
     try {
@@ -94,13 +98,14 @@ const TMDB = {
 
       const data = await res.json();
       const synopsis = String(data?.synopsis || '').trim();
-      if (!synopsis) return '';
+      const finalSynopsis = synopsis && !isBadSynopsis(synopsis) ? synopsis : tmdbFallback;
+      if (!finalSynopsis || isBadSynopsis(finalSynopsis)) return '';
 
-      try { localStorage.setItem(cacheKey, synopsis); } catch {}
-      return synopsis;
+      try { localStorage.setItem(cacheKey, finalSynopsis); } catch {}
+      return finalSynopsis;
     } catch (error) {
-      console.warn('Synopsis IMDb indisponible, fallback local utilisé.', error);
-      return '';
+      console.warn('Synopsis IMDb indisponible, fallback TMDB utilisé.', error);
+      return tmdbFallback && !isBadSynopsis(tmdbFallback) ? tmdbFallback : '';
     }
   },
 
