@@ -182,6 +182,79 @@ async function fetchHtml(url) {
   return response.text();
 }
 
+function cleanImdbMainDescription(value = '') {
+  let text = cleanSynopsis(value)
+    .replace(/^.*?\s-\sIMDb\s*$/i, '')
+    .replace(/\s*-\sIMDb\s*$/i, '')
+    .replace(/^IMDb\s*:\s*/i, '')
+    .trim();
+  return text;
+}
+
+function pickShortMainSynopsis(candidates = []) {
+  const cleaned = [...new Set(candidates.map(cleanImdbMainDescription).filter(isGoodSynopsis))]
+    .filter(text => text.length >= 45 && text.length <= 650)
+    .filter(text => !/photos|videos|cast|trivia|awards|reviews/i.test(text));
+  if (!cleaned.length) return '';
+
+  // Le synopsis visible sur la fiche IMDb est court. On le préfère aux longs résumés /plotsummary.
+  return cleaned.sort((a, b) => {
+    const score = t => {
+      let value = 0;
+      if (t.length >= 80 && t.length <= 360) value += 100;
+      if (t.length > 360 && t.length <= 650) value += 40;
+      if (/\b(while|when|after|before|during|as|dans|alors|lorsque|quand|après|avant|pendant)\b/i.test(t)) value += 10;
+      value -= Math.abs(220 - Math.min(t.length, 500)) / 20;
+      return value;
+    };
+    return score(b) - score(a);
+  })[0];
+}
+
+function extractImdbMainSynopsis(html = '') {
+  const candidates = [];
+  const $ = cheerio.load(html);
+
+  // 1) Description officielle de la fiche IMDb (celle visible sous les genres).
+  $('script[type="application/ld+json"]').each((_, el) => {
+    try {
+      const json = JSON.parse($(el).contents().text());
+      const descriptions = Array.isArray(json) ? json.map(item => item?.description) : [json?.description];
+      descriptions.forEach(text => { if (isGoodSynopsis(text)) candidates.push(text); });
+    } catch {}
+  });
+
+  [
+    '[data-testid="plot-xl"]',
+    '[data-testid="plot-l"]',
+    '[data-testid="plot"]',
+    'span[data-testid="plot-xl"]',
+    'span[data-testid="plot-l"]'
+  ].forEach(selector => {
+    $(selector).each((_, el) => {
+      const text = $(el).text();
+      if (isGoodSynopsis(text)) candidates.push(text);
+    });
+  });
+
+  const meta = $('meta[name="description"]').attr('content') || $('meta[property="og:description"]').attr('content');
+  if (isGoodSynopsis(meta)) candidates.push(meta);
+
+  const rawPatterns = [
+    /\"plotText\"\s*:\s*\{\s*\"plainText\"\s*:\s*\"((?:\\.|[^\"\\]){40,650})\"/g,
+    /\"description\"\s*:\s*\"((?:\\.|[^\"\\]){40,650})\"/g
+  ];
+  for (const pattern of rawPatterns) {
+    let match;
+    while ((match = pattern.exec(html)) !== null) {
+      const text = decodeJsonString(match[1]);
+      if (isGoodSynopsis(text)) candidates.push(text);
+    }
+  }
+
+  return pickShortMainSynopsis(candidates);
+}
+
 function extractImdbSynopsis(html = '') {
   const candidates = [];
   const $ = cheerio.load(html);
@@ -399,22 +472,39 @@ app.get('/api/imdb-synopsis', async (req, res) => {
     });
   }
 
-  // Priorité : vraie page IMDb. OMDb n'est utilisé qu'en secours.
-  const urls = [
-    `https://www.imdb.com/fr/title/${imdbId}/plotsummary/`,
-    `https://www.imdb.com/title/${imdbId}/plotsummary/`,
+  // Priorité : vraie fiche IMDb, pas les longs résumés OMDb/TMDB.
+  // On commence par /title/ pour récupérer le synopsis court visible sur IMDb.
+  const mainUrls = [
     `https://www.imdb.com/fr/title/${imdbId}/`,
     `https://www.imdb.com/title/${imdbId}/`
   ];
 
-  for (const url of urls) {
+  for (const url of mainUrls) {
+    try {
+      const html = await fetchHtml(url);
+      if (!html) continue;
+
+      const synopsis = extractImdbMainSynopsis(html);
+      if (synopsis) {
+        return sendSynopsisJson(res, { source: 'imdb-main', imdbId, synopsis, title: lookupTitle, year });
+      }
+    } catch {}
+  }
+
+  // Secours IMDb : page /plotsummary. Elle peut être plus longue, mais reste IMDb.
+  const plotSummaryUrls = [
+    `https://www.imdb.com/fr/title/${imdbId}/plotsummary/`,
+    `https://www.imdb.com/title/${imdbId}/plotsummary/`
+  ];
+
+  for (const url of plotSummaryUrls) {
     try {
       const html = await fetchHtml(url);
       if (!html) continue;
 
       const synopsis = extractImdbSynopsis(html);
       if (synopsis) {
-        return sendSynopsisJson(res, { source: 'imdb', imdbId, synopsis, title: lookupTitle, year });
+        return sendSynopsisJson(res, { source: 'imdb-plotsummary', imdbId, synopsis, title: lookupTitle, year });
       }
     } catch {}
   }
