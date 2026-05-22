@@ -87,8 +87,16 @@ function cleanSynopsis(value = '') {
     .trim();
 }
 
+
+function isBlockedOrRobotText(text = '') {
+  const value = cleanSynopsis(text).toLowerCase();
+  if (!value) return false;
+  return /javascript est désactivé|javascript est desactive|activez javascript|enable javascript|verify you are human|vérifier que vous n.?êtes pas un robot|verifier que vous n.?etes pas un robot|vous n.?êtes pas un robot|robot check|captcha|automated access|access to this page has been denied|unusual traffic|désolé, nous devons vérifier|desole, nous devons verifier/.test(value);
+}
+
 function isGoodSynopsis(text = '') {
   const clean = cleanSynopsis(text);
+  if (isBlockedOrRobotText(clean)) return false;
   if (clean.length < 35 || clean.length > 900) return false;
   if (!/[.!?…]/.test(clean)) return false;
   if (/^(cast|crew|details|release|ratings|photos|videos|official sites)$/i.test(clean)) return false;
@@ -186,6 +194,7 @@ function isProbablyUiOrMetadata(text = '') {
   const value = cleanSynopsis(text);
   const lower = value.toLowerCase();
   if (!value) return true;
+  if (isBlockedOrRobotText(value)) return true;
   if (/^(menu|tout|se connecter|créer un compte|liste de favoris|ajouter à la liste|marquer comme regardé)$/i.test(value)) return true;
   if (/^(réalisation|scénaristes|stars|distribution|photos|vidéos|récompenses|imdbpro|in theaters|streaming)$/i.test(value)) return true;
   if (/^(prochainement|sortie le|voir les séances|définissez vos services|nouveau client)/i.test(lower)) return true;
@@ -293,6 +302,7 @@ async function fetchHtml(url, lang = 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7') {
 }
 
 function extractMainPageSynopsis(html = '', preferFrench = false) {
+  if (isBlockedOrRobotText(html)) return '';
   const candidates = [];
   const $ = cheerio.load(html);
 
@@ -425,7 +435,8 @@ function translationCachePath() {
 
 async function translateSynopsisToFrench(text = '', cacheKey = '') {
   const synopsis = cleanSynopsis(text);
-  if (!synopsis || looksFrench(synopsis)) return synopsis;
+  if (!synopsis || isBlockedOrRobotText(synopsis)) return '';
+  if (looksFrench(synopsis)) return synopsis;
   const cache = readJson(translationCachePath(), {});
   const key = cacheKey || synopsis;
   if (cache[key]) return cache[key];
@@ -457,7 +468,7 @@ function readSynopsisCache() {
 }
 
 function saveSynopsisCacheEntry(imdbId, entry) {
-  if (!/^tt\d+$/.test(imdbId) || !entry?.synopsis) return;
+  if (!/^tt\d+$/.test(imdbId) || !entry?.synopsis || isBlockedOrRobotText(entry.synopsis)) return;
   const cache = readSynopsisCache();
   cache[imdbId] = {
     imdbId,
@@ -528,11 +539,15 @@ app.get('/api/imdb-synopsis', async (req, res) => {
 
     const refresh = String(req.query.refresh || '') === '1';
     const cache = readSynopsisCache();
-    if (!refresh && cache[resolvedId]?.synopsis) {
+    if (!refresh && cache[resolvedId]?.synopsis && !isBlockedOrRobotText(cache[resolvedId].synopsis)) {
       return res.json({ source: `${cache[resolvedId].source || 'cache'}-cache`, imdbId: resolvedId, synopsis: cache[resolvedId].synopsis });
     }
 
     const result = await getOfficialSynopsis(resolvedId);
+    if (result.synopsis && isBlockedOrRobotText(result.synopsis)) {
+      return res.json({ source: 'imdb-blocked', imdbId: resolvedId, synopsis: '' });
+    }
+
     if (result.synopsis) saveSynopsisCacheEntry(resolvedId, result);
 
     return res.json({ source: result.source, imdbId: resolvedId, synopsis: result.synopsis || '' });
