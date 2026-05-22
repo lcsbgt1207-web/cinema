@@ -289,7 +289,7 @@ const FILMS = [
     synopsis: "Un survivant raconte l’étrange histoire d’un groupe de criminels lié au mystérieux Keyser Söze.",
     color: 'p4', badge: null,
     lb: 4.1, imdb: 8.5, sc: 8.2, annee: 1995, imdbID: "tt0114814", cinemas: []
-  },
+  },,
   {
     id: 41, titre: "Alien", original: "Alien", genre: "Science-fiction", duree: "1h57",
     real: "Ridley Scott", acteurs: "Sigourney Weaver, Tom Skerritt, John Hurt",
