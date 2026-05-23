@@ -1,5 +1,5 @@
-/* CinéProche — Catalogue proche — ZIP 2.9.6
-   Objectif unique : nettoyer les faux titres et fiabiliser la liste des films des séances.
+/* CinéProche — Catalogue proche — ZIP 2.9.7
+   Objectif unique : dédupliquer les films, améliorer le matching catalogue et préparer une liste propre à enrichir.
    - Les films reconnus dans js/data.js gardent leur note locale.
    - Les films non reconnus ne restent plus vides : badge "À enrichir".
    - Ajout d'un panneau visuel + compteurs : classés / à enrichir.
@@ -44,6 +44,30 @@
     return normalizeNearbyTitle(value).replace(/\s+/g, '');
   }
 
+  function removeLeadingArticles(value) {
+    return String(value || '')
+      .replace(/^(le|la|les|l|un|une|des|de|du|the|a|an)\s+/i, '')
+      .trim();
+  }
+
+  function stripSequelMarkers(value) {
+    return String(value || '')
+      .replace(/\b(part|partie|chapter|chapitre|episode|ep)\s*(i{1,3}|iv|v|vi{0,3}|[0-9]+)\b/gi, '')
+      .replace(/\b(i{2,3}|iv|v|vi{0,3}|[2-9])\b$/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function canonicalNearbyTitleKey(value) {
+    const normalized = normalizeNearbyTitle(value);
+    const withoutArticles = removeLeadingArticles(normalized);
+    return withoutArticles.replace(/\s+/g, ' ').trim() || normalized;
+  }
+
+  function titleWords(value) {
+    return normalizeNearbyTitle(value).split(' ').filter(word => word.length > 1);
+  }
+
   function getGlobalFilms() {
     if (Array.isArray(window.FILMS)) return window.FILMS;
     try { if (Array.isArray(FILMS)) return FILMS; } catch (_) {}
@@ -83,36 +107,77 @@
     const b = normalizeNearbyTitle(candidateTitle);
     const ca = compactNearbyTitle(sessionTitle);
     const cb = compactNearbyTitle(candidateTitle);
+    const ka = canonicalNearbyTitleKey(sessionTitle);
+    const kb = canonicalNearbyTitleKey(candidateTitle);
 
     if (!a || !b) return 0;
     if (a === b) return 100;
-    if (ca === cb) return 98;
+    if (ca === cb) return 99;
+    if (ka && kb && ka === kb) return 98;
 
-    if (a.includes(b) || b.includes(a)) {
+    const baseA = stripSequelMarkers(ka);
+    const baseB = stripSequelMarkers(kb);
+    if (baseA && baseB && baseA === baseB) return 88;
+
+    if (a.includes(b) || b.includes(a) || ka.includes(kb) || kb.includes(ka)) {
       const shortLen = Math.min(a.length, b.length);
       const longLen = Math.max(a.length, b.length);
-      return Math.round(82 + (shortLen / longLen) * 12);
+      const containment = Math.round(78 + (shortLen / longLen) * 17);
+      return Math.min(95, containment);
     }
 
-    const wordsA = new Set(a.split(' ').filter(w => w.length > 1));
-    const wordsB = new Set(b.split(' ').filter(w => w.length > 1));
+    const wordsA = new Set(titleWords(sessionTitle));
+    const wordsB = new Set(titleWords(candidateTitle));
     const intersection = [...wordsA].filter(w => wordsB.has(w));
     if (!intersection.length) return 0;
-    const ratio = intersection.length / Math.max(wordsA.size, wordsB.size);
-    return Math.round(ratio * 80);
+
+    const maxSize = Math.max(wordsA.size, wordsB.size);
+    const minSize = Math.min(wordsA.size, wordsB.size);
+    const maxRatio = intersection.length / maxSize;
+    const minRatio = intersection.length / minSize;
+    let score = Math.round((maxRatio * 62) + (minRatio * 25));
+
+    // Petit bonus si le mot principal est identique. Utile pour les titres avec sous-titre.
+    const firstA = [...wordsA][0];
+    const firstB = [...wordsB][0];
+    if (firstA && firstB && firstA === firstB) score += 5;
+
+    return Math.min(87, score);
   }
 
-  function findLocalFilmByTitle(title) {
+  function getLocalMatchCandidates(title, limit = 5) {
     const index = buildLocalFilmIndex();
-    let best = null;
+    const byFilm = new Map();
 
     for (const item of index) {
       const score = scoreTitleMatch(title, item.title);
-      if (!best || score > best.score) best = { ...item, score };
+      if (!score) continue;
+      const filmId = item.film?.id ?? item.film?.imdbID ?? item.title;
+      const previous = byFilm.get(filmId);
+      if (!previous || score > previous.score) {
+        byFilm.set(filmId, { ...item, score });
+      }
     }
 
-    if (best && best.score >= 82) {
-      return { film: best.film, matchedTitle: best.title, score: best.score };
+    return Array.from(byFilm.values())
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit)
+      .map(item => ({
+        film: item.film,
+        titre: item.film?.titre || item.title,
+        original: item.film?.original || item.film?.originalTitle || '',
+        matchedTitle: item.title,
+        score: item.score,
+        imdb: item.film?.imdb ?? null,
+        imdbID: item.film?.imdbID || ''
+      }));
+  }
+
+  function findLocalFilmByTitle(title) {
+    const best = getLocalMatchCandidates(title, 1)[0] || null;
+
+    if (best && best.score >= 84) {
+      return { film: best.film, matchedTitle: best.matchedTitle, score: best.score };
     }
     return null;
   }
@@ -512,7 +577,7 @@
   }
 
   function extractSeancesArray(data) {
-    // ZIP 2.9.6 : on ne suppose plus une structure précise.
+    // ZIP 2.9.7 : on ne suppose plus une structure précise.
     // L'API /seances peut renvoyer les films dans data, results, showtimes, movie, film,
     // ou même dans des fragments HTML/JSON imbriqués. On scanne tout récursivement.
     const found = [];
@@ -693,7 +758,7 @@
         <div class="nearby-catalogue-head">
           <div>
             <h2>Films proches trouvés</h2>
-            <p>ZIP 2.9.6 : séances réelles + nettoyage des faux titres + films absents visibles pour enrichissement Catalogue.</p>
+            <p>ZIP 2.9.7 : séances réelles + nettoyage des faux titres + films absents visibles pour enrichissement Catalogue.</p>
           </div>
           <div class="nearby-catalogue-stats">
             <div class="nearby-catalogue-stat"><strong>${stats.total}</strong> films</div>
@@ -735,7 +800,8 @@
         annee: null,
         imdbID: '',
         tmdbId: movie.tmdbId || '',
-        cinemas: movie.cinemas.map(c => c.nom)
+        bestLocalCandidates: movie.bestLocalCandidates || [],
+        cinemas: movie.cinemas.map(c => ({ nom: c.nom, horaires: c.horaires || [] }))
       }));
   }
 
@@ -750,7 +816,7 @@
     }
     if (!location) location = await window.PLACES.geolocate();
 
-    console.log('[Catalogue proche] ZIP 2.9.6 actif — /seances-auto + nettoyage titres techniques.');
+    console.log('[Catalogue proche] ZIP 2.9.7 actif — déduplication + matching catalogue amélioré.');
     console.log('[Catalogue proche] Position utilisée :', location);
 
     const cinemas = await window.PLACES.findNearbycinemas(location, radius);
@@ -769,10 +835,11 @@
 
         for (const item of showtimes) {
           const title = item.title;
-          const key = item.normalizedKey || normalizeNearbyTitle(title);
+          const key = canonicalNearbyTitleKey(item.normalizedKey || title);
           if (!key) continue;
 
-          const localMatch = findLocalFilmByTitle(title);
+          const localCandidates = getLocalMatchCandidates(title, 3);
+          const localMatch = localCandidates[0]?.score >= 84 ? { film: localCandidates[0].film, matchedTitle: localCandidates[0].matchedTitle, score: localCandidates[0].score } : null;
           const rating = await resolveMovieRating(title, localMatch, item.rawMovie);
           const enrichmentStatus = localMatch ? 'catalogue' : 'missing';
 
@@ -780,7 +847,8 @@
             seances: title,
             catalogue: localMatch?.film?.titre || localMatch?.matchedTitle || 'ABSENT',
             statut: enrichmentStatus === 'catalogue' ? 'Classé' : 'À enrichir',
-            scoreLocal: localMatch?.score || 0,
+            scoreLocal: localMatch?.score || localCandidates[0]?.score || 0,
+            meilleursCandidats: localCandidates.map(c => `${c.titre} (${c.score})`).join(' | ') || '—',
             note: rating?.value ?? '—',
             source: rating?.source ?? '—',
             provenance: rating?.ratingKind || 'aucune',
@@ -799,6 +867,7 @@
               ratingKind: rating?.ratingKind || null,
               enrichmentStatus,
               tmdbId: rating?.tmdbId || null,
+              bestLocalCandidates: localCandidates.map(c => ({ titre: c.titre, original: c.original, score: c.score, imdb: c.imdb, imdbID: c.imdbID })),
               cinemas: [],
               rawShowtimes: []
             });
@@ -854,13 +923,22 @@
 
     const missingDraft = buildMissingCatalogueDraft(ranked);
 
-    console.log(`[Catalogue proche] Résultat ZIP 2.9.6 : ${stats.total} film(s), ${stats.rated} classé(s), ${stats.missing} à enrichir.`);
+    console.log(`[Catalogue proche] Résultat ZIP 2.9.7 : ${stats.total} film(s), ${stats.rated} classé(s), ${stats.missing} à enrichir.`);
     console.group('[Catalogue proche] Debug correspondances titres');
     console.table(matchDebug);
     console.groupEnd();
 
     if (missingDraft.length) {
       console.warn('[Catalogue proche] Films absents de js/data.js — brouillon prêt pour futur enrichissement :', missingDraft);
+      console.group('[Catalogue proche] Meilleurs candidats locaux pour les films à enrichir');
+      console.table(missingDraft.map(item => ({
+        film: item.titre,
+        cinemas: item.cinemas.map(c => c.nom).join(', '),
+        choix1: item.bestLocalCandidates?.[0] ? `${item.bestLocalCandidates[0].titre} (${item.bestLocalCandidates[0].score})` : '—',
+        choix2: item.bestLocalCandidates?.[1] ? `${item.bestLocalCandidates[1].titre} (${item.bestLocalCandidates[1].score})` : '—',
+        choix3: item.bestLocalCandidates?.[2] ? `${item.bestLocalCandidates[2].titre} (${item.bestLocalCandidates[2].score})` : '—'
+      })));
+      console.groupEnd();
     }
 
     console.table(ranked.map((movie, index) => ({
@@ -869,6 +947,7 @@
       statut: movie.enrichmentStatus === 'missing' ? 'À enrichir' : 'Catalogue',
       catalogue: movie.matchedTitle || 'ABSENT',
       scoreMatch: movie.matchScore || '—',
+      meilleurCandidat: movie.enrichmentStatus === 'missing' ? (movie.bestLocalCandidates?.[0] ? `${movie.bestLocalCandidates[0].titre} (${movie.bestLocalCandidates[0].score})` : '—') : '—',
       note: movie.ratingValue ?? '—',
       source: movie.ratingSource ?? '—',
       cinemas: movie.cinemas.map(c => c.nom).join(', ')
