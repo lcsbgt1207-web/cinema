@@ -1,4 +1,4 @@
-/* CinéProche — Catalogue proche — ZIP 3.5.2
+/* CinéProche — Catalogue proche — ZIP 3.5.3
    Objectif : conserver la fusion proche + enrichir les fiches film utilisées par le Catalogue.
    - Les films reconnus dans js/data.js gardent leur note locale.
    - Les films absents trouvés sur TMDB deviennent utilisables directement dans la liste finale.
@@ -11,7 +11,6 @@
   const NEARBY_CATALOGUE_API = 'https://cinepro-api-yal8.onrender.com';
   const tmdbRatingCache = new Map();
   const tmdbEnrichmentCache = new Map();
-  let nearbyWindowAnchorDate = null;
 
   function stripAccents(value) {
     return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -534,62 +533,37 @@
   }
 
   function getNearbyWindowBounds() {
-    const anchor = nearbyWindowAnchorDate instanceof Date && !Number.isNaN(nearbyWindowAnchorDate.getTime())
-      ? nearbyWindowAnchorDate
-      : new Date();
-    const start = startOfLocalDay(anchor);
+    const start = startOfLocalDay(new Date());
     const endExclusive = new Date(start);
     // J+7 inclus = on garde tout jusqu'au début de J+8.
     endExclusive.setDate(endExclusive.getDate() + 8);
     return { start, endExclusive };
   }
 
-  function setNearbyWindowAnchorFromRawShowtimes(rawShowtimes) {
-    const dates = [];
-    const seenObjects = new WeakSet();
+  function getDateFromRelativeFrenchLabel(text) {
+    const normalized = stripAccents(String(text || '').toLowerCase());
+    if (!normalized) return null;
 
-    function visit(node, path = '$', fallbackDate = null, depth = 0) {
-      if (node === null || node === undefined || depth > 10) return;
-
-      if (typeof node === 'string' || typeof node === 'number' || node instanceof Date) {
-        if (keyLooksLikeShowtimeDate(path)) {
-          const parsed = parseShowtimeDate(node, fallbackDate);
-          if (parsed && !Number.isNaN(parsed.getTime())) dates.push(parsed);
-        }
-        return;
-      }
-
-      if (typeof node !== 'object') return;
-      if (seenObjects.has(node)) return;
-      seenObjects.add(node);
-
-      const objectDate = parseShowtimeDate(firstString(node.date, node.day, node.jour, node.showDate, node.sessionDate), fallbackDate) || fallbackDate;
-      const directValues = [
-        node.startsAt, node.startAt, node.start, node.datetime, node.dateTime,
-        node.showtime, node.showTime, node.time, node.horaire, node.hour, node.heure
-      ];
-      for (const value of directValues) {
-        const parsed = parseShowtimeDate(value, objectDate);
-        if (parsed && !Number.isNaN(parsed.getTime())) dates.push(parsed);
-      }
-
-      if (Array.isArray(node)) {
-        node.forEach((child, index) => visit(child, `${path}[${index}]`, objectDate, depth + 1));
-        return;
-      }
-
-      for (const [key, value] of Object.entries(node)) {
-        visit(value, `${path}.${key}`, objectDate, depth + 1);
-      }
+    const today = startOfLocalDay(new Date());
+    if (/\b(aujourd hui|ce jour)\b/.test(normalized)) return today;
+    if (/\b(demain)\b/.test(normalized)) {
+      const date = new Date(today);
+      date.setDate(date.getDate() + 1);
+      return date;
     }
+    if (/\b(apres demain)\b/.test(normalized)) {
+      const date = new Date(today);
+      date.setDate(date.getDate() + 2);
+      return date;
+    }
+    return null;
+  }
 
-    for (const item of Array.isArray(rawShowtimes) ? rawShowtimes : []) visit(item);
-    const validDates = dates.filter(date => date instanceof Date && !Number.isNaN(date.getTime()));
-    if (!validDates.length) return;
-
-    const earliest = validDates.reduce((min, date) => date < min ? date : min, validDates[0]);
-    nearbyWindowAnchorDate = startOfLocalDay(earliest);
-    console.log('[Catalogue proche] Fenêtre séances ancrée sur la première date disponible :', nearbyWindowAnchorDate.toISOString().slice(0, 10));
+  function combineDayAndTime(dayDate, hour, minute) {
+    if (!(dayDate instanceof Date) || Number.isNaN(dayDate.getTime())) return null;
+    const combined = startOfLocalDay(dayDate);
+    combined.setHours(Number(hour), Number(minute), 0, 0);
+    return combined;
   }
 
   function parseShowtimeDate(value, fallbackDate = null) {
@@ -598,11 +572,26 @@
     const text = String(value).trim();
     if (!text) return null;
 
+    const relativeDate = getDateFromRelativeFrenchLabel(text);
+    const relativeTimeMatch = text.match(/\b(\d{1,2})[:h](\d{2})\b/);
+    if (relativeDate && relativeTimeMatch) {
+      return combineDayAndTime(relativeDate, relativeTimeMatch[1], relativeTimeMatch[2]);
+    }
+    if (relativeDate) return relativeDate;
+
     // Format ISO : 2026-05-23T17:00:00 ou 2026-05-23 17:00.
     const isoMatch = text.match(/(20\d{2}-\d{2}-\d{2})(?:[T\s]+(\d{1,2})[:h](\d{2}))?/);
     if (isoMatch) {
       const [, day, hour = '0', minute = '0'] = isoMatch;
       const parsed = new Date(`${day}T${String(hour).padStart(2, '0')}:${minute}:00`);
+
+      // Correction 3.5.3 : certains cinémas renvoient une ancienne date ISO mais le bloc parent
+      // porte la vraie date relative (ex : Demain). Dans ce cas on garde l'heure et on utilise le jour parent.
+      if (fallbackDate && hour && minute && (!parsed || !isShowtimeInNearbyWindow(parsed))) {
+        const rebased = combineDayAndTime(fallbackDate, hour, minute);
+        if (rebased) return rebased;
+      }
+
       return Number.isNaN(parsed.getTime()) ? null : parsed;
     }
 
@@ -626,7 +615,7 @@
 
   function formatNearbyShowtime(date) {
     if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
-    const today = getNearbyWindowBounds().start;
+    const today = startOfLocalDay(new Date());
     const day = startOfLocalDay(date);
     const diffDays = Math.round((day - today) / 86400000);
     const time = date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }).replace(':', 'h');
@@ -662,7 +651,10 @@
       if (seenObjects.has(node)) return;
       seenObjects.add(node);
 
-      const objectDate = parseShowtimeDate(firstString(node.date, node.day, node.jour, node.showDate, node.sessionDate), fallbackDate) || fallbackDate;
+      const objectDate = parseShowtimeDate(firstString(
+        node.date, node.day, node.jour, node.showDate, node.sessionDate,
+        node.dateLabel, node.dayLabel, node.label, node.tabLabel, node.displayDate, node.displayDay
+      ), fallbackDate) || fallbackDate;
 
       const directValues = [
         node.startsAt, node.startAt, node.start, node.datetime, node.dateTime,
@@ -699,13 +691,20 @@
     if (filtered.length) return filtered;
 
     // Sécurité : si l'API ne donne que des heures sans date dans un tableau classique,
-    // on les rattache à aujourd'hui uniquement si elles sont exploitables.
+    // on les rattache à la date du bloc si elle existe, sinon aujourd'hui.
     const possibleArrays = [item.horaires, item.times, item.showtimes, item.seances, item.sessions, item.scr, item.version?.times];
     const fallback = [];
+    const itemDate = parseShowtimeDate(firstString(
+      item.date, item.day, item.jour, item.showDate, item.sessionDate,
+      item.dateLabel, item.dayLabel, item.label, item.tabLabel, item.displayDate, item.displayDay
+    ));
     for (const arr of possibleArrays) {
       if (!Array.isArray(arr)) continue;
       for (const value of arr) {
-        const parsed = parseShowtimeDate(typeof value === 'string' ? value : firstString(value?.startsAt, value?.time, value?.horaire));
+        const parsed = parseShowtimeDate(
+          typeof value === 'string' ? value : firstString(value?.startsAt, value?.startAt, value?.time, value?.horaire, value?.hour, value?.heure),
+          itemDate
+        );
         if (parsed && isShowtimeInNearbyWindow(parsed)) fallback.push(formatNearbyShowtime(parsed));
       }
     }
@@ -1017,11 +1016,6 @@
       console.log(`[Catalogue proche][DEBUG] Premier objet brut pour ${cinema?.nom} :`, rawShowtimes[0]);
       console.log(`[Catalogue proche][DEBUG] Clés premier objet pour ${cinema?.nom} :`, Object.keys(rawShowtimes[0] || {}));
     }
-    // ZIP 3.5.2 : on ancre la fenêtre J à J+7 sur la première date réellement renvoyée
-    // par l'API. Cela évite de supprimer des séances valides quand l'ordinateur,
-    // le backend ou les données de test ne sont pas exactement sur le même jour.
-    setNearbyWindowAnchorFromRawShowtimes(rawShowtimes);
-
     return rawShowtimes.map(normalizeShowtimeItem).filter(Boolean);
   }
 
@@ -1330,7 +1324,7 @@
     }
     if (!location) location = await window.PLACES.geolocate();
 
-    console.log('[Catalogue proche] ZIP 3.5.2 actif — Correction filtre séances proches J à J+7.');
+    console.log('[Catalogue proche] ZIP 3.5 actif — Catalogue limité aux séances de J à J+7.');
     console.log('[Catalogue proche] Position utilisée :', location);
 
     const cinemas = await window.PLACES.findNearbycinemas(location, radius);
