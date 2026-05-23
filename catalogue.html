@@ -169,6 +169,10 @@
       <option>Rayon : 30 km</option>
       <option>Rayon : 50 km</option>
     </select>
+    <select class="filter-select" id="catalogue-mode-filter" onchange="setCatalogueMode(this.value)">
+      <option value="nearby">Films proches classés</option>
+      <option value="all">Tous les films</option>
+    </select>
     <span class="toolbar-count" id="count-label"></span>
   </div>
 
@@ -240,17 +244,18 @@
   </div>
 </div>
 
-<script src="js/config.js?v=3.0"></script>
-<script src="js/data.js?v=3.0"></script>
-<script src="js/omdb.js?v=3.0"></script>
-<script src="js/tmdb.js?v=3.0"></script>
-<script src="js/places.js?v=3.0"></script>
-<script src="js/nearby-catalogue.js?v=3.0"></script>
+<script src="js/config.js?v=3.1"></script>
+<script src="js/data.js?v=3.1"></script>
+<script src="js/omdb.js?v=3.1"></script>
+<script src="js/tmdb.js?v=3.1"></script>
+<script src="js/places.js?v=3.1"></script>
+<script src="js/nearby-catalogue.js?v=3.1"></script>
 <script>
-  // ZIP 3.0 — Le Catalogue peut maintenant utiliser la fusion runtime créée par le menu Catalogue proche.
-  // Sécurité : si aucun enrichissement TMDB n'existe, on garde toujours js/data.js comme avant.
+  // ZIP 3.1 — Le Catalogue peut maintenant afficher en priorité les films qui passent près de l'utilisateur.
+  // Sécurité : si aucun résultat proche n'existe, on garde le catalogue enrichi ZIP 3.0 puis js/data.js.
   const STATIC_CATALOGUE = FILMS.filter(f => f && !f.isMock);
   let catalogue = [];
+  let catalogueMode = localStorage.getItem('cinepro_catalogue_mode') || 'nearby';
   const LETTERBOXD_API_URL = 'http://localhost:3000/api/films-letterboxd';
   const LETTERBOXD_MIN_VALID_RATING = 0.5;
   const favs = new Set(JSON.parse(localStorage.getItem('cinepro_favs') || '[]'));
@@ -302,12 +307,49 @@
     }
   }
 
-  function getCatalogueSource() {
+  function readStoredNearbyCatalogue() {
+    try {
+      const payload = JSON.parse(localStorage.getItem('cinepro_nearby_ranked_catalogue') || 'null');
+      return Array.isArray(payload?.films) ? payload.films : [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  function hasNearbyCatalogue() {
+    return (Array.isArray(window.NEARBY_CATALOGUE_NEARBY_RANKED) && window.NEARBY_CATALOGUE_NEARBY_RANKED.length) || readStoredNearbyCatalogue().length;
+  }
+
+  function getActiveRawCatalogueSource() {
+    const nearby = Array.isArray(window.NEARBY_CATALOGUE_NEARBY_RANKED) && window.NEARBY_CATALOGUE_NEARBY_RANKED.length
+      ? window.NEARBY_CATALOGUE_NEARBY_RANKED
+      : readStoredNearbyCatalogue();
+
     const runtime = Array.isArray(window.NEARBY_CATALOGUE_RUNTIME_DATA) && window.NEARBY_CATALOGUE_RUNTIME_DATA.length
       ? window.NEARBY_CATALOGUE_RUNTIME_DATA
       : readStoredRuntimeCatalogue();
 
-    const source = runtime.length ? runtime : STATIC_CATALOGUE;
+    if (catalogueMode === 'nearby' && nearby.length) {
+      return { source: nearby, label: 'films proches classés' };
+    }
+    if (runtime.length) {
+      return { source: runtime, label: 'catalogue enrichi' };
+    }
+    return { source: STATIC_CATALOGUE, label: 'catalogue local' };
+  }
+
+  function getBestNote(film) {
+    const values = [film.bestNote, film.nearbyRatingValue, film.imdb, film.tmdb, film.sc, film.lb];
+    for (const value of values) {
+      const rating = Number(value);
+      if (Number.isFinite(rating) && rating > 0) return rating;
+    }
+    return null;
+  }
+
+  function getCatalogueSource() {
+    const active = getActiveRawCatalogueSource();
+    const source = active.source;
     const seen = new Set();
     const merged = [];
 
@@ -320,16 +362,30 @@
       merged.push(prepared);
     });
 
-    if (runtime.length) {
-      console.log(`[Catalogue] ZIP 3.0 : catalogue enrichi utilisé (${merged.length} films).`);
-    } else {
-      console.log(`[Catalogue] ZIP 3.0 : catalogue local utilisé (${merged.length} films). Lance getNearbyRankedMovies(...) pour générer la fusion TMDB.`);
-    }
-
+    console.log(`[Catalogue] ZIP 3.1 : ${active.label} utilisé (${merged.length} films).`);
     return merged;
   }
 
+  function updateCatalogueModeControl() {
+    const select = document.getElementById('catalogue-mode-filter');
+    if (!select) return;
+    if (!hasNearbyCatalogue() && catalogueMode === 'nearby') catalogueMode = 'all';
+    select.value = catalogueMode;
+    const nearbyOption = select.querySelector('option[value="nearby"]');
+    if (nearbyOption) nearbyOption.textContent = hasNearbyCatalogue() ? 'Films proches classés' : 'Films proches classés — lance un test';
+  }
+
+  function setCatalogueMode(mode) {
+    catalogueMode = mode === 'nearby' ? 'nearby' : 'all';
+    localStorage.setItem('cinepro_catalogue_mode', catalogueMode);
+    if (catalogueMode === 'nearby') { sortKey = 'bestNote'; sortDir = -1; }
+    currentPage = 1;
+    refreshCatalogueFromRuntime();
+  }
+  window.setCatalogueMode = setCatalogueMode;
+
   function refreshCatalogueFromRuntime() {
+    updateCatalogueModeControl();
     catalogue = getCatalogueSource();
     currentPage = 1;
     filterTable();
@@ -337,6 +393,15 @@
 
   window.addEventListener('nearby-catalogue-runtime-ready', () => {
     console.log('[Catalogue] Fusion runtime reçue depuis Catalogue proche. Rafraîchissement de la liste.');
+    refreshCatalogueFromRuntime();
+  });
+
+  window.addEventListener('nearby-catalogue-ranked-ready', () => {
+    console.log('[Catalogue] Films proches classés reçus. Passage en mode films proches.');
+    catalogueMode = 'nearby';
+    localStorage.setItem('cinepro_catalogue_mode', 'nearby');
+    sortKey = 'bestNote';
+    sortDir = -1;
     refreshCatalogueFromRuntime();
   });
 
@@ -358,6 +423,7 @@
   }
 
   function getSortValue(film, key) {
+    if (key === 'bestNote') return getBestNote(film);
     if (key === 'imdb' && (film.isMock || !Number.isFinite(film.imdb))) return null;
     if (key === 'lbRank') return film.lbRank ?? null;
     return film[key] ?? null;
@@ -373,6 +439,10 @@
     }
 
     return a > b ? 1 : a < b ? -1 : 0;
+  }
+
+  function escapeCatalogueHtml(value) {
+    return String(value ?? '').replace(/[&<>"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[char] || char));
   }
 
   function renderTable(data) {
@@ -398,6 +468,7 @@
             <div>
               <div class="film-name">${f.lbRank ? '#' + f.lbRank + ' · ' : ''}${f.titre}</div>
               ${f.original ? `<div class="film-original">${f.original}</div>` : ''}
+              ${f.isNearbyShowing ? `<div class="film-original">À l’affiche près de toi · ${escapeCatalogueHtml((f.nearbyCinemas || f.cinemas || []).slice(0, 2).map(c => c.nom).join(', ') || 'cinéma proche')}</div>` : ''}
             </div>
           </div>
         </td>
@@ -482,9 +553,10 @@
     const d = document.getElementById('decade-filter').value;
     let data = catalogue.filter(f =>
       (!q || String(f.titre || '').toLowerCase().includes(q) || String(f.real || '').toLowerCase().includes(q) || String(f.original || '').toLowerCase().includes(q)) &&
-      (!g || f.genre === g) &&
+      (!g || String(f.genre || '').toLowerCase().includes(g.toLowerCase())) &&
       decadeMatch(f.annee, d)
     );
+    if (catalogueMode === 'nearby' && sortKey === 'imdb') sortKey = 'bestNote';
     data.sort((a, b) => {
       const va = getSortValue(a, sortKey);
       const vb = getSortValue(b, sortKey);
@@ -622,7 +694,9 @@
 
   async function initCatalogue() {
     // 1) Afficher immédiatement le catalogue local, pour éviter une page vide si une API plante.
+    updateCatalogueModeControl();
     catalogue = getCatalogueSource();
+    if (catalogueMode === 'nearby') { sortKey = 'bestNote'; sortDir = -1; }
     filterTable();
 
     // 2) Letterboxd ne met à jour QUE les notes Letterboxd.

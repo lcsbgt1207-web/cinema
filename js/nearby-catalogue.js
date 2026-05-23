@@ -1,4 +1,4 @@
-/* CinéProche — Catalogue proche — ZIP 3.0
+/* CinéProche — Catalogue proche — ZIP 3.1
    Objectif unique : fusionner les films TMDB enrichis dans le résultat Catalogue proche.
    - Les films reconnus dans js/data.js gardent leur note locale.
    - Les films absents trouvés sur TMDB deviennent utilisables directement dans la liste finale.
@@ -1066,6 +1066,75 @@
     };
   }
 
+
+
+  function buildNearbyCatalogueRankedExport(ranked) {
+    return ranked.map((movie, index) => {
+      const local = movie.localFilm || null;
+      const tmdb = movie.tmdbDraft || null;
+      const bestTitle = local?.titre || tmdb?.titre || movie.title;
+      const bestOriginal = local?.original || tmdb?.original || '';
+      const bestGenres = local?.genre || (Array.isArray(tmdb?.genres) ? tmdb.genres.join(', ') : '') || 'À compléter';
+      const bestPoster = local?.poster || tmdb?.poster || movie.poster || '';
+      const bestSynopsis = local?.synopsis || tmdb?.synopsis || 'Synopsis à compléter.';
+      const bestYear = local?.annee ?? tmdb?.annee ?? null;
+      const bestTmdb = Number.isFinite(Number(local?.tmdb)) ? Number(local.tmdb) : (Number.isFinite(Number(tmdb?.tmdb)) ? Number(tmdb.tmdb) : null);
+      const bestImdb = Number.isFinite(Number(local?.imdb)) ? Number(local.imdb) : null;
+      const bestLb = Number.isFinite(Number(local?.lb)) ? Number(local.lb) : null;
+      const bestSc = Number.isFinite(Number(local?.sc)) ? Number(local.sc) : (bestTmdb ?? null);
+      const bestRating = Number.isFinite(Number(movie.ratingValue)) ? Number(movie.ratingValue) : (bestImdb ?? bestTmdb ?? bestSc ?? bestLb ?? null);
+      const ratingSource = movie.ratingSource || (bestImdb ? 'IMDb' : (bestTmdb ? 'TMDB' : (bestSc ? 'Note' : '—')));
+
+      return {
+        ...(local || {}),
+        id: local?.id || `nearby-${tmdb?.tmdbId || canonicalNearbyTitleKey(bestTitle) || index}`,
+        titre: bestTitle,
+        title: bestTitle,
+        original: bestOriginal,
+        originalTitle: bestOriginal,
+        genre: bestGenres,
+        genres: Array.isArray(tmdb?.genres) ? tmdb.genres : (Array.isArray(local?.genres) ? local.genres : []),
+        duree: local?.duree || (tmdb?.runtime ? `${tmdb.runtime} min` : ''),
+        runtime: local?.runtime || tmdb?.runtime || null,
+        real: local?.real || tmdb?.real || 'Non renseigné',
+        acteurs: local?.acteurs || tmdb?.acteurs || 'Non renseigné',
+        synopsis: bestSynopsis,
+        poster: bestPoster,
+        color: local?.color || 'p1',
+        badge: local ? 'À l’affiche' : 'TMDB proche',
+        lb: bestLb,
+        imdb: bestImdb,
+        tmdb: bestTmdb,
+        sc: bestSc,
+        bestNote: bestRating,
+        bestNoteSource: ratingSource,
+        annee: bestYear,
+        year: bestYear,
+        imdbID: local?.imdbID || tmdb?.imdbID || '',
+        tmdbId: local?.tmdbId || tmdb?.tmdbId || movie.tmdbId || '',
+        source: local ? 'nearby-local-catalogue' : 'nearby-tmdb-runtime',
+        isNearbyShowing: true,
+        nearbyRank: index + 1,
+        nearbyStatus: movie.enrichmentStatus,
+        nearbyMatchedTitle: movie.matchedTitle || tmdb?.titre || '',
+        nearbyRatingValue: bestRating,
+        nearbyRatingSource: ratingSource,
+        nearbyCinemas: movie.cinemas.map(c => ({
+          nom: c.nom,
+          adresse: c.adresse || '',
+          distanceKm: c.distanceKm ?? null,
+          horaires: c.horaires || []
+        })),
+        cinemas: movie.cinemas.map(c => ({ nom: c.nom, horaires: c.horaires || [] }))
+      };
+    }).sort((a, b) => {
+      const ar = Number(a.bestNote ?? a.nearbyRatingValue ?? 0);
+      const br = Number(b.bestNote ?? b.nearbyRatingValue ?? 0);
+      if (br !== ar) return br - ar;
+      return String(a.titre || '').localeCompare(String(b.titre || ''), 'fr');
+    });
+  }
+
   async function getNearbyRankedMovies(options = {}) {
     if (!window.PLACES) throw new Error('PLACES n’est pas chargé. Vérifie js/places.js.');
 
@@ -1078,7 +1147,7 @@
     }
     if (!location) location = await window.PLACES.geolocate();
 
-    console.log('[Catalogue proche] ZIP 3.0 actif — fusion Catalogue + TMDB exportée vers le menu Catalogue.');
+    console.log('[Catalogue proche] ZIP 3.1 actif — mode Films proches classés exporté vers le Catalogue.');
     console.log('[Catalogue proche] Position utilisée :', location);
 
     const cinemas = await window.PLACES.findNearbycinemas(location, radius);
@@ -1196,8 +1265,9 @@
     const missingDraft = buildMissingCatalogueDraft(ranked);
     const enrichedDraft = buildEnrichedCatalogueDraft(ranked);
     const runtimeFusion = buildRuntimeCatalogueFusion(ranked);
+    const nearbyRankedCatalogue = buildNearbyCatalogueRankedExport(ranked);
 
-    console.log(`[Catalogue proche] Résultat ZIP 3.0 : ${stats.total} film(s), ${stats.rated} avec note, ${stats.tmdbEnriched} film(s) fusionné(s) TMDB, ${stats.missing} à vérifier.`);
+    console.log(`[Catalogue proche] Résultat ZIP 3.1 : ${stats.total} film(s), ${stats.rated} avec note, ${stats.tmdbEnriched} film(s) fusionné(s) TMDB, ${stats.missing} à vérifier.`);
     console.group('[Catalogue proche] Debug correspondances titres');
     console.table(matchDebug);
     console.groupEnd();
@@ -1266,6 +1336,7 @@
     window.NEARBY_CATALOGUE_ENRICHED_DRAFT = enrichedDraft;
     window.NEARBY_CATALOGUE_RUNTIME_DATA = runtimeFusion.films;
     window.NEARBY_CATALOGUE_RUNTIME_TMDB_ONLY = runtimeFusion.tmdbRuntimeFilms;
+    window.NEARBY_CATALOGUE_NEARBY_RANKED = nearbyRankedCatalogue;
     window.NEARBY_TMDB_ENRICHMENT_CACHE = tmdbEnrichmentCache;
     window.NEARBY_CATALOGUE_STATS = { ...stats, runtimeTotal: runtimeFusion.total, runtimeTmdbAdded: runtimeFusion.tmdbRuntimeCount };
 
@@ -1277,9 +1348,19 @@
         tmdbRuntimeFilms: runtimeFusion.tmdbRuntimeFilms,
         stats: window.NEARBY_CATALOGUE_STATS
       };
+      const nearbyPayload = {
+        version: '3.1',
+        updatedAt: new Date().toISOString(),
+        address: options.address || '',
+        radius,
+        films: nearbyRankedCatalogue,
+        stats: { total: nearbyRankedCatalogue.length, rated: nearbyRankedCatalogue.filter(f => Number.isFinite(Number(f.bestNote))).length }
+      };
       localStorage.setItem('cinepro_runtime_catalogue', JSON.stringify(storedPayload));
-      console.log(`[Catalogue proche] ZIP 3.0 : catalogue runtime sauvegardé pour catalogue.html (${runtimeFusion.total} films).`);
+      localStorage.setItem('cinepro_nearby_ranked_catalogue', JSON.stringify(nearbyPayload));
+      console.log(`[Catalogue proche] ZIP 3.1 : catalogue runtime sauvegardé pour catalogue.html (${runtimeFusion.total} films).`);
       window.dispatchEvent(new CustomEvent('nearby-catalogue-runtime-ready', { detail: storedPayload }));
+      window.dispatchEvent(new CustomEvent('nearby-catalogue-ranked-ready', { detail: nearbyPayload }));
     } catch (storageError) {
       console.warn('[Catalogue proche] Impossible de sauvegarder le catalogue runtime :', storageError?.message || storageError);
     }
