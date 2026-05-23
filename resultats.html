@@ -384,7 +384,7 @@
           // Charger les vrais films AlloCiné séquentiellement avec délai
           (async () => {
             for (let ci = 0; ci < pageCinemas.length; ci++) {
-              loadFilmsForCinema(pageCinemas[ci], ci);
+              setTimeout(() => loadFilmsForCinema(pageCinemas[ci], ci), ci * 200);
               await new Promise(r => setTimeout(r, 800));
             }
           })();
@@ -484,17 +484,31 @@
 
 
   // ── Chargement des vrais films AlloCiné pour un cinéma ──
+  // Fetch avec timeout
+  async function fetchWithTimeout(url, ms = 8000) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), ms);
+    try {
+      const r = await fetch(url, { signal: ctrl.signal });
+      clearTimeout(timer);
+      return r;
+    } catch(e) {
+      clearTimeout(timer);
+      throw e;
+    }
+  }
+
   async function loadFilmsForCinema(cinema, ci) {
     const container = document.getElementById('films-cinema-' + ci);
     if (!container) return;
     try {
-      // 1. Trouver l'ID AlloCiné du cinéma
+      // 1. Trouver l'ID AlloCiné du cinéma (timeout 8s)
       const searchParams = new URLSearchParams({
         name: cinema.nom,
         lat: cinema.location?.lat || '',
         lng: cinema.location?.lng || ''
       });
-      const searchR = await fetch(`${CINEPRO_API}/search-cinema?${searchParams}`);
+      const searchR = await fetchWithTimeout(`${CINEPRO_API}/search-cinema?${searchParams}`, 8000);
       if (!searchR.ok) throw new Error('API indisponible');
       const searchData = await searchR.json();
       if (!searchData.id) {
@@ -504,7 +518,7 @@
 
       // 2. Récupérer les séances du cinéma (= les films à l'affiche)
       const todayStr = new Date().toISOString().split('T')[0];
-      const s = await fetch(`${CINEPRO_API}/seances?id=${searchData.id}&date=${todayStr}`);
+      const s = await fetchWithTimeout(`${CINEPRO_API}/seances?id=${searchData.id}&date=${todayStr}`, 8000);
       if (!s.ok) throw new Error('Séances indisponibles');
       const data = await s.json();
       const films = data.seances || [];
