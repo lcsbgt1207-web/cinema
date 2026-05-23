@@ -1,5 +1,5 @@
-/* CinéProche — Catalogue proche — ZIP 2.9.4
-   Objectif unique : rendre les films des séances exploitables.
+/* CinéProche — Catalogue proche — ZIP 2.9.5
+   Objectif unique : brancher /seances-auto pour récupérer les séances réelles exploitables.
    - Les films reconnus dans js/data.js gardent leur note locale.
    - Les films non reconnus ne restent plus vides : badge "À enrichir".
    - Ajout d'un panneau visuel + compteurs : classés / à enrichir.
@@ -495,7 +495,7 @@
   }
 
   function extractSeancesArray(data) {
-    // ZIP 2.9.4 : on ne suppose plus une structure précise.
+    // ZIP 2.9.5 : on ne suppose plus une structure précise.
     // L'API /seances peut renvoyer les films dans data, results, showtimes, movie, film,
     // ou même dans des fragments HTML/JSON imbriqués. On scanne tout récursivement.
     const found = [];
@@ -582,9 +582,18 @@
   async function getCinemaShowtimes(cinema) {
     const allocineId = await getCinemaAllocineId(cinema);
     if (!allocineId) return [];
-    const today = new Date().toISOString().split('T')[0];
-    const data = await fetchJsonWithDebug(`${NEARBY_CATALOGUE_API}/seances?id=${encodeURIComponent(allocineId)}&date=${today}`, `seances pour ${cinema?.nom}`);
-    console.log(`[Catalogue proche][DEBUG] JSON complet /seances pour ${cinema?.nom} :`, data);
+
+    const requestedDate = new Date().toISOString().split('T')[0];
+    const url = `${NEARBY_CATALOGUE_API}/seances-auto?id=${encodeURIComponent(allocineId)}&date=${requestedDate}&days=7`;
+    const data = await fetchJsonWithDebug(url, `seances-auto pour ${cinema?.nom}`);
+
+    console.log(`[Catalogue proche][DEBUG] JSON complet /seances-auto pour ${cinema?.nom} :`, data);
+    console.log(`[Catalogue proche][DEBUG] Date demandée / date utilisée pour ${cinema?.nom} :`, {
+      requestedDate: data?.requested_date || requestedDate,
+      usedDate: data?.date || requestedDate,
+      attempts: data?.attempts || []
+    });
+
     const rawShowtimes = extractSeancesArray(data);
     console.log(`[Catalogue proche][DEBUG] Tableau extrait pour ${cinema?.nom} :`, rawShowtimes);
     if (rawShowtimes[0]) {
@@ -667,7 +676,7 @@
         <div class="nearby-catalogue-head">
           <div>
             <h2>Films proches trouvés</h2>
-            <p>ZIP 2.9.4 : extraction ID cinéma robuste + films absents visibles pour enrichissement Catalogue.</p>
+            <p>ZIP 2.9.5 : extraction ID cinéma robuste + films absents visibles pour enrichissement Catalogue.</p>
           </div>
           <div class="nearby-catalogue-stats">
             <div class="nearby-catalogue-stat"><strong>${stats.total}</strong> films</div>
@@ -724,7 +733,7 @@
     }
     if (!location) location = await window.PLACES.geolocate();
 
-    console.log('[Catalogue proche] ZIP 2.9.4 actif — extraction séances robuste.');
+    console.log('[Catalogue proche] ZIP 2.9.5 actif — appel /seances-auto + extraction séances robuste.');
     console.log('[Catalogue proche] Position utilisée :', location);
 
     const cinemas = await window.PLACES.findNearbycinemas(location, radius);
@@ -828,7 +837,7 @@
 
     const missingDraft = buildMissingCatalogueDraft(ranked);
 
-    console.log(`[Catalogue proche] Résultat ZIP 2.9.4 : ${stats.total} film(s), ${stats.rated} classé(s), ${stats.missing} à enrichir.`);
+    console.log(`[Catalogue proche] Résultat ZIP 2.9.5 : ${stats.total} film(s), ${stats.rated} classé(s), ${stats.missing} à enrichir.`);
     console.group('[Catalogue proche] Debug correspondances titres');
     console.table(matchDebug);
     console.groupEnd();
