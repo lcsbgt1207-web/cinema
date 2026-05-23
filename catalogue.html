@@ -255,7 +255,7 @@
 <script src="js/places.js?v=3.3"></script>
 <script src="js/nearby-catalogue.js?v=3.3"></script>
 <script>
-  // ZIP 3.3 — Catalogue centré sur les films proches : un seul mode, données enrichies conservées.
+  // ZIP 3.4 — Catalogue centré sur les films proches : un seul mode, données enrichies conservées.
   // Sécurité : si aucun résultat proche n'existe, on garde le catalogue enrichi ZIP 3.0 puis js/data.js.
   const STATIC_CATALOGUE = FILMS.filter(f => f && !f.isMock);
   let catalogue = [];
@@ -335,7 +335,7 @@
   }
 
   function getActiveRawCatalogueSource() {
-    // ZIP 3.3 : le Catalogue est centré sur les films proches.
+    // ZIP 3.4 : le Catalogue est centré sur les films proches.
     // On utilise toujours en priorité la liste complète enrichie des films proches,
     // afin de ne jamais perdre réalisateur, genre, affiche, année ou note après un changement de filtre.
     const nearby = Array.isArray(window.NEARBY_CATALOGUE_NEARBY_RANKED) && window.NEARBY_CATALOGUE_NEARBY_RANKED.length
@@ -400,7 +400,7 @@
       merged.push(prepared);
     });
 
-    console.log(`[Catalogue] ZIP 3.3 : ${active.label} utilisé (${merged.length} films).`);
+    console.log(`[Catalogue] ZIP 3.4 : ${active.label} utilisé (${merged.length} films).`);
     return merged;
   }
 
@@ -415,7 +415,7 @@
   }
 
   function setCatalogueMode(_mode) {
-    // ZIP 3.3 : on supprime le mode “Tous les films” du parcours utilisateur.
+    // ZIP 3.4 : on supprime le mode “Tous les films” du parcours utilisateur.
     // Le menu Catalogue doit répondre à : “Quels bons films passent près de moi ?”.
     catalogueMode = 'nearby';
     localStorage.setItem('cinepro_catalogue_mode', 'nearby');
@@ -757,6 +757,14 @@
       popup.innerHTML = buildPopupHTML(film);
       overlay.classList.add('open');
       document.body.style.overflow = 'hidden';
+
+      // ZIP 3.4 : même priorité synopsis que le Catalogue classique.
+      // On garde l'affichage instantané, puis on remplace par le cache IMDb FR si disponible.
+      if (typeof loadCachedSynopsisForCatalogue === 'function' && typeof setCataloguePopupSynopsis === 'function') {
+        loadCachedSynopsisForCatalogue(film).then((synopsis) => {
+          setCataloguePopupSynopsis(popup, synopsis || film.synopsis || film.overview || 'Aucun synopsis disponible pour ce film.');
+        });
+      }
       return;
     }
 

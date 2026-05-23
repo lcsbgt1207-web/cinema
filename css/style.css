@@ -645,3 +645,16 @@ img { max-width: 100%; display: block; }
 .page-btn:disabled { opacity: .35; cursor: not-allowed; border-color: var(--gray-200); }
 .page-ellipsis { height: 38px; min-width: 22px; display: inline-flex; align-items: center; justify-content: center; color: var(--gray-400); font-size: 14px; user-select: none; }
 .page-size-select { height: 38px; border: 0.5px solid var(--gray-200); border-radius: 8px; padding: 0 34px 0 12px; background: var(--white); color: var(--gray-600); font-size: 13px; }
+
+/* cinema-update: zip-3-4-popup-film-enrichie */
+.popup-title-row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:10px; }
+.popup-original-title { margin-top:6px; color:var(--gray-500); font-size:13px; line-height:1.35; }
+.popup-rating-pill { display:inline-flex; align-items:center; gap:6px; margin-top:12px; padding:7px 10px; border-radius:999px; background:#111; color:#fff; font-size:13px; font-weight:700; }
+.popup-badge-nearby { background:#ecfdf3; color:#12783b; border-color:#c7f0d7; }
+.popup-seances-list { display:flex; flex-direction:column; gap:10px; }
+.popup-cinema-row { border:1px solid var(--gray-200); border-radius:14px; padding:12px; background:var(--gray-50); }
+.popup-cinema-name { display:flex; align-items:center; gap:7px; font-size:13px; font-weight:700; color:var(--gray-900); margin-bottom:8px; }
+.popup-showtimes { display:flex; gap:6px; flex-wrap:wrap; }
+.popup-showtimes span { border:1px solid var(--gray-200); border-radius:999px; background:#fff; padding:5px 8px; font-size:12px; color:var(--gray-700); }
+.popup-showtimes-muted { color:var(--gray-500); font-size:12.5px; line-height:1.45; }
+@media (max-width:640px){ .popup-rating-pill{font-size:12px;} .popup-cinema-row{padding:10px;} }

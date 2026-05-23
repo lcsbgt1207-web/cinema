@@ -615,9 +615,22 @@ function escapeHTML(value) {
 
 function buildPopupHTML(film) {
   const bg = POSTER_COLORS[film.color] || '#ccc';
+  const title = film.titre || film.title || 'Film sans titre';
   const posterHTML = film.poster
-    ? `<img src="${escapeHTML(film.poster)}" alt="Affiche du film ${escapeHTML(film.titre)}" loading="lazy">`
+    ? `<img src="${escapeHTML(film.poster)}" alt="Affiche du film ${escapeHTML(title)}" loading="lazy">`
     : '<i class="ti ti-photo"></i>';
+
+  const ratingValue = getPopupBestRating(film);
+  const ratingSource = film.bestNoteSource || film.nearbyRatingSource || film.ratingSource || (film.imdb ? 'IMDb' : film.tmdb ? 'TMDB' : film.lb ? 'Letterboxd' : film.sc ? 'Note' : '');
+  const ratingHTML = ratingValue !== null
+    ? `<span class="popup-rating-pill"><i class="ti ti-star-filled"></i> ${escapeHTML(ratingValue.toFixed(1))}/10${ratingSource ? ` · ${escapeHTML(ratingSource)}` : ''}</span>`
+    : '';
+
+  const genre = film.genre || (Array.isArray(film.genres) ? film.genres.join(', ') : '') || 'Genre inconnu';
+  const duree = film.duree || (film.runtime ? `${film.runtime} min` : '') || 'Durée inconnue';
+  const annee = film.annee || film.year || '';
+  const cinemas = getPopupCinemas(film);
+  const seancesHTML = buildPopupSeancesHTML(cinemas);
 
   return `
     <div class="film-popup-layout">
@@ -627,37 +640,77 @@ function buildPopupHTML(film) {
 
       <div class="film-popup-main">
         <div class="film-popup-title-zone">
-          ${film.badge ? `<span class="popup-badge">${escapeHTML(film.badge)}</span>` : ''}
-          <div class="popup-title">${escapeHTML(film.titre)}</div>
+          <div class="popup-title-row">
+            ${film.badge ? `<span class="popup-badge">${escapeHTML(film.badge)}</span>` : ''}
+            ${film.isNearbyShowing ? '<span class="popup-badge popup-badge-nearby">À l’affiche près de toi</span>' : ''}
+          </div>
+          <div class="popup-title">${escapeHTML(title)}</div>
+          ${film.original ? `<div class="popup-original-title">${escapeHTML(film.original)}</div>` : ''}
+          ${ratingHTML}
         </div>
 
         <div class="film-popup-meta-zone">
-          <span class="popup-tag">${escapeHTML(film.genre || 'Genre inconnu')}</span>
-          <span class="popup-tag">${escapeHTML(film.duree || 'Durée inconnue')}</span>
-          ${film.annee ? `<span class="popup-tag">${escapeHTML(film.annee)}</span>` : ''}
+          <span class="popup-tag">${escapeHTML(genre)}</span>
+          <span class="popup-tag">${escapeHTML(duree)}</span>
+          ${annee ? `<span class="popup-tag">${escapeHTML(annee)}</span>` : ''}
         </div>
 
         <div class="film-popup-crew-zone">
-          <div class="popup-crew-row"><strong>Réalisateur ·</strong> ${escapeHTML(film.real || 'Non renseigné')}</div>
-          <div class="popup-crew-row"><strong>Avec ·</strong> ${escapeHTML(film.acteurs || 'Non renseigné')}</div>
+          <div class="popup-crew-row"><strong>Réalisateur ·</strong> ${escapeHTML(film.real || film.realisateur || film.director || 'Non renseigné')}</div>
+          <div class="popup-crew-row"><strong>Avec ·</strong> ${escapeHTML(film.acteurs || film.cast || 'Non renseigné')}</div>
         </div>
 
         <div class="film-popup-synopsis-zone">
           <div class="section-label">Synopsis</div>
-          <div class="popup-synopsis">${escapeHTML(film.synopsis || 'Synopsis indisponible pour le moment.')}</div>
+          <div class="popup-synopsis">${escapeHTML(film.synopsis || film.overview || 'Synopsis indisponible pour le moment.')}</div>
         </div>
       </div>
 
       <div class="film-popup-seances-zone">
-        <div class="section-label">Séances</div>
-        <div class="empty-seances">
-          Aucune séance réelle n’est encore branchée pour ce film. Cette zone sera connectée plus tard au scraping des cinémas indépendants, avec le cinéma, l’horaire, la VF/VO et le lien de réservation.
-        </div>
+        <div class="section-label">Séances proches</div>
+        ${seancesHTML}
       </div>
     </div>
 
     <button class="popup-close-btn" onclick="closeFilmPopup()">Fermer</button>
   `;
+}
+
+function getPopupBestRating(film) {
+  const candidates = [film?.bestNote, film?.nearbyRatingValue, film?.imdb, film?.tmdb, film?.sc];
+  for (const value of candidates) {
+    const rating = Number(value);
+    if (Number.isFinite(rating) && rating > 0) return Math.round(rating * 10) / 10;
+  }
+  const lb = Number(film?.lb);
+  if (Number.isFinite(lb) && lb > 0) return Math.round(lb * 20) / 10;
+  return null;
+}
+
+function getPopupCinemas(film) {
+  const nearby = Array.isArray(film?.nearbyCinemas) ? film.nearbyCinemas : [];
+  const cinemas = nearby.length ? nearby : (Array.isArray(film?.cinemas) ? film.cinemas : []);
+  return cinemas.filter(cinema => cinema && (cinema.nom || cinema.name));
+}
+
+function buildPopupSeancesHTML(cinemas) {
+  if (!cinemas.length) {
+    return `<div class="empty-seances">Aucune séance proche n’est encore associée à ce film. Lance une recherche de cinémas proches pour remplir cette zone.</div>`;
+  }
+
+  return `<div class="popup-seances-list">${cinemas.slice(0, 8).map(cinema => {
+    const nom = cinema.nom || cinema.name || 'Cinéma';
+    const distance = Number(cinema.distanceKm ?? cinema.dist);
+    const distanceLabel = Number.isFinite(distance) ? ` · ${distance.toFixed(1)} km` : '';
+    const horaires = Array.isArray(cinema.horaires) ? cinema.horaires : [];
+    const horairesHTML = horaires.length
+      ? `<div class="popup-showtimes">${horaires.slice(0, 8).map(time => `<span>${escapeHTML(typeof time === 'string' ? time : (time?.time || time?.horaire || time?.startsAt || 'Horaire'))}</span>`).join('')}</div>`
+      : '<div class="popup-showtimes-muted">Horaires à vérifier sur le site du cinéma.</div>';
+    return `<div class="popup-cinema-row">
+      <div class="popup-cinema-name"><i class="ti ti-map-pin"></i>${escapeHTML(nom)}${distanceLabel}</div>
+      ${horairesHTML}
+    </div>`;
+  }).join('')}</div>`;
 }
 
 

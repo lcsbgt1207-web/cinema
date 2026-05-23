@@ -55,6 +55,19 @@ ensure_git_identity() {
   git config user.name >/dev/null 2>&1 || git config user.name "CineProche Auto Update" || true
 }
 
+COMMIT_MESSAGE=""
+
+ask_commit_message() {
+  echo ""
+  echo "Nom du commit GitHub pour cette mise à jour :"
+  echo "Exemple : [CinéProche] ZIP 2.9.8 - Enrichissement TMDB"
+  read -p "> " COMMIT_MESSAGE
+
+  if [ -z "${COMMIT_MESSAGE// }" ]; then
+    COMMIT_MESSAGE="Mise à jour CinéProche automatique"
+  fi
+}
+
 commit_if_needed() {
   local message="$1"
   [ -d ".git" ] || return 0
@@ -87,14 +100,7 @@ sync_git_before_update() {
 push_git_after_everything() {
   [ -d ".git" ] || return 0
 
-  local commit_message=""
-  echo ""
-  read -p "Nom du commit GitHub pour cette mise à jour : " commit_message
-  if [ -z "${commit_message// }" ]; then
-    commit_message="Mise à jour CinéProche automatique"
-  fi
-
-  commit_if_needed "$commit_message"
+  commit_if_needed "$COMMIT_MESSAGE"
 
   echo "Synchronisation finale avec GitHub..."
   git pull --rebase origin main >/dev/null 2>&1 || {
@@ -163,6 +169,8 @@ if [ -z "$FOUND_ZIP" ]; then
 fi
 
 echo "ZIP trouvé : $FOUND_ZIP"
+
+ask_commit_message
 
 stop_node_processes
 

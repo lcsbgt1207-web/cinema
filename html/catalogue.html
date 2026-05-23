@@ -45,6 +45,11 @@
     .film-original { font-size: 12px; color: var(--gray-400); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .td-real { color: var(--gray-500); white-space: nowrap; font-size: 13px; }
     .td-note { text-align: center; }
+    .td-source { text-align:center; color:var(--gray-500); font-size:12px; white-space:nowrap; }
+    .td-cinema { text-align:center; color:var(--gray-500); font-size:12px; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .nearby-note-main { display:inline-flex; align-items:center; justify-content:center; min-width:46px; padding:4px 8px; border-radius:8px; background:var(--red-bg); color:var(--red); font-weight:700; }
+    .nearby-source-pill { display:inline-flex; align-items:center; justify-content:center; padding:4px 8px; border:0.5px solid var(--gray-200); border-radius:999px; background:#fff; color:var(--gray-600); font-weight:600; }
+    .nearby-cinema-pill { display:inline-flex; align-items:center; justify-content:center; gap:4px; max-width:170px; padding:4px 8px; border-radius:999px; background:var(--gray-50); color:var(--gray-500); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .td-year { color: var(--gray-500); font-size: 12px; white-space: nowrap; }
     .sep-left { border-left: 0.5px solid var(--gray-200); }
 
@@ -169,6 +174,9 @@
       <option>Rayon : 30 km</option>
       <option>Rayon : 50 km</option>
     </select>
+    <select class="filter-select" id="catalogue-mode-filter" onchange="setCatalogueMode(this.value)" title="Le Catalogue affiche maintenant les meilleurs films projetés près de vous.">
+      <option value="nearby" selected>Films proches classés</option>
+    </select>
     <span class="toolbar-count" id="count-label"></span>
   </div>
 
@@ -181,13 +189,13 @@
           <th onclick="sortTable('real')">Réalisateur <i class="ti ti-selector" id="icon-real"></i></th>
           <th onclick="sortTable('genre')">Genre</th>
           <th class="note-col sep-left" onclick="sortTable('lb')">
-            <div class="source-header"><span class="source-dot dot-lb"></span> Letterboxd <i class="ti ti-selector" id="icon-lb"></i></div>
+            <div class="source-header" id="header-lb"><span class="source-dot dot-lb"></span> Letterboxd <i class="ti ti-selector" id="icon-lb"></i></div>
           </th>
           <th class="note-col sorted" onclick="sortTable('imdb')">
-            <div class="source-header"><span class="source-dot dot-imdb"></span> IMDb <i class="ti ti-chevron-down" id="icon-imdb"></i></div>
+            <div class="source-header" id="header-imdb"><span class="source-dot dot-imdb"></span> IMDb <i class="ti ti-chevron-down" id="icon-imdb"></i></div>
           </th>
           <th class="note-col" onclick="sortTable('sc')">
-            <div class="source-header"><span class="source-dot dot-sc"></span> SensCritique <i class="ti ti-selector" id="icon-sc"></i></div>
+            <div class="source-header" id="header-sc"><span class="source-dot dot-sc"></span> SensCritique <i class="ti ti-selector" id="icon-sc"></i></div>
           </th>
           <th onclick="sortTable('annee')">Année <i class="ti ti-selector" id="icon-annee"></i></th>
         </tr>
@@ -240,17 +248,19 @@
   </div>
 </div>
 
-<script src="js/config.js?v=3.0"></script>
-<script src="js/data.js?v=3.0"></script>
-<script src="js/omdb.js?v=3.0"></script>
-<script src="js/tmdb.js?v=3.0"></script>
-<script src="js/places.js?v=3.0"></script>
-<script src="js/nearby-catalogue.js?v=3.0"></script>
+<script src="js/config.js?v=3.3"></script>
+<script src="js/data.js?v=3.3"></script>
+<script src="js/omdb.js?v=3.3"></script>
+<script src="js/tmdb.js?v=3.3"></script>
+<script src="js/places.js?v=3.3"></script>
+<script src="js/nearby-catalogue.js?v=3.3"></script>
 <script>
-  // ZIP 3.0 — Le Catalogue peut maintenant utiliser la fusion runtime créée par le menu Catalogue proche.
-  // Sécurité : si aucun enrichissement TMDB n'existe, on garde toujours js/data.js comme avant.
+  // ZIP 3.4 — Catalogue centré sur les films proches : un seul mode, données enrichies conservées.
+  // Sécurité : si aucun résultat proche n'existe, on garde le catalogue enrichi ZIP 3.0 puis js/data.js.
   const STATIC_CATALOGUE = FILMS.filter(f => f && !f.isMock);
   let catalogue = [];
+  let catalogueMode = 'nearby';
+  localStorage.setItem('cinepro_catalogue_mode', 'nearby');
   const LETTERBOXD_API_URL = 'http://localhost:3000/api/films-letterboxd';
   const LETTERBOXD_MIN_VALID_RATING = 0.5;
   const favs = new Set(JSON.parse(localStorage.getItem('cinepro_favs') || '[]'));
@@ -260,6 +270,15 @@
   let lastFilteredData = [];
 
   const LABELS = { lb:'Letterboxd', imdb:'IMDb', sc:'SensCritique', annee:'Année', titre:'Titre', real:'Réalisateur', genre:'Genre' };
+
+  function normalizePositiveRating(value) {
+    const rating = Number(value);
+    return Number.isFinite(rating) && rating > 0 ? Math.round(rating * 10) / 10 : null;
+  }
+
+  function isNearbyModeActive() {
+    return catalogueMode === 'nearby' && hasNearbyCatalogue();
+  }
 
   function normalizeRuntimeCatalogueKey(value) {
     return String(value || '')
@@ -284,10 +303,10 @@
     copy.synopsis = copy.synopsis || copy.overview || 'Synopsis à compléter.';
     copy.color = copy.color || ['p1','p2','p3','p4','p5','p6'][index % 6];
     copy.badge = copy.badge || (copy.source === 'tmdb-runtime-fusion' ? 'TMDB' : 'Catalogue');
-    copy.lb = Number.isFinite(Number(copy.lb)) ? Number(copy.lb) : null;
-    copy.imdb = Number.isFinite(Number(copy.imdb)) ? Number(copy.imdb) : null;
-    copy.tmdb = Number.isFinite(Number(copy.tmdb)) ? Number(copy.tmdb) : null;
-    copy.sc = Number.isFinite(Number(copy.sc)) ? Number(copy.sc) : (Number.isFinite(copy.tmdb) ? copy.tmdb : null);
+    copy.lb = normalizePositiveRating(copy.lb);
+    copy.imdb = normalizePositiveRating(copy.imdb);
+    copy.tmdb = normalizePositiveRating(copy.tmdb);
+    copy.sc = normalizePositiveRating(copy.sc) ?? copy.tmdb ?? null;
     copy.annee = Number.isFinite(Number(copy.annee)) ? Number(copy.annee) : (Number.isFinite(Number(copy.year)) ? Number(copy.year) : null);
     copy.isMock = false;
     return copy;
@@ -302,12 +321,73 @@
     }
   }
 
-  function getCatalogueSource() {
+  function readStoredNearbyCatalogue() {
+    try {
+      const payload = JSON.parse(localStorage.getItem('cinepro_nearby_ranked_catalogue') || 'null');
+      return Array.isArray(payload?.films) ? payload.films : [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  function hasNearbyCatalogue() {
+    return (Array.isArray(window.NEARBY_CATALOGUE_NEARBY_RANKED) && window.NEARBY_CATALOGUE_NEARBY_RANKED.length) || readStoredNearbyCatalogue().length;
+  }
+
+  function getActiveRawCatalogueSource() {
+    // ZIP 3.4 : le Catalogue est centré sur les films proches.
+    // On utilise toujours en priorité la liste complète enrichie des films proches,
+    // afin de ne jamais perdre réalisateur, genre, affiche, année ou note après un changement de filtre.
+    const nearby = Array.isArray(window.NEARBY_CATALOGUE_NEARBY_RANKED) && window.NEARBY_CATALOGUE_NEARBY_RANKED.length
+      ? window.NEARBY_CATALOGUE_NEARBY_RANKED
+      : readStoredNearbyCatalogue();
+
     const runtime = Array.isArray(window.NEARBY_CATALOGUE_RUNTIME_DATA) && window.NEARBY_CATALOGUE_RUNTIME_DATA.length
       ? window.NEARBY_CATALOGUE_RUNTIME_DATA
       : readStoredRuntimeCatalogue();
 
-    const source = runtime.length ? runtime : STATIC_CATALOGUE;
+    if (nearby.length) {
+      catalogueMode = 'nearby';
+      localStorage.setItem('cinepro_catalogue_mode', 'nearby');
+      return { source: nearby, label: 'films proches classés' };
+    }
+    if (runtime.length) {
+      return { source: runtime, label: 'catalogue enrichi en attente de films proches' };
+    }
+    return { source: STATIC_CATALOGUE, label: 'catalogue local en attente de films proches' };
+  }
+
+  function getBestNote(film) {
+    const values = [film.bestNote, film.nearbyRatingValue, film.imdb, film.tmdb, film.sc, film.lb];
+    for (const value of values) {
+      const rating = normalizePositiveRating(value);
+      if (rating !== null) return rating;
+    }
+    return null;
+  }
+
+  function getNearbyRatingSource(film) {
+    return film.bestNoteSource || film.nearbyRatingSource || film.ratingSource || (film.tmdb ? 'TMDB' : film.imdb ? 'IMDb' : film.lb ? 'Letterboxd' : film.sc ? 'Note' : '—');
+  }
+
+  function getNearbyCinemaLabel(film) {
+    const cinemas = Array.isArray(film.nearbyCinemas) && film.nearbyCinemas.length ? film.nearbyCinemas : (Array.isArray(film.cinemas) ? film.cinemas : []);
+    return cinemas.map(c => c?.nom || c?.name || '').filter(Boolean).slice(0, 2).join(', ') || 'cinéma proche';
+  }
+
+  function formatNearbyBestNote(film) {
+    const rating = getBestNote(film);
+    return rating !== null ? rating.toFixed(1) : '—';
+  }
+
+  function formatClassicRating(value, suffix = '') {
+    const rating = normalizePositiveRating(value);
+    return rating !== null ? `${rating.toFixed(1)}${suffix}` : '—';
+  }
+
+  function getCatalogueSource() {
+    const active = getActiveRawCatalogueSource();
+    const source = active.source;
     const seen = new Set();
     const merged = [];
 
@@ -320,16 +400,34 @@
       merged.push(prepared);
     });
 
-    if (runtime.length) {
-      console.log(`[Catalogue] ZIP 3.0 : catalogue enrichi utilisé (${merged.length} films).`);
-    } else {
-      console.log(`[Catalogue] ZIP 3.0 : catalogue local utilisé (${merged.length} films). Lance getNearbyRankedMovies(...) pour générer la fusion TMDB.`);
-    }
-
+    console.log(`[Catalogue] ZIP 3.4 : ${active.label} utilisé (${merged.length} films).`);
     return merged;
   }
 
+  function updateCatalogueModeControl() {
+    const select = document.getElementById('catalogue-mode-filter');
+    if (!select) return;
+    catalogueMode = 'nearby';
+    localStorage.setItem('cinepro_catalogue_mode', 'nearby');
+    select.value = 'nearby';
+    const nearbyOption = select.querySelector('option[value="nearby"]');
+    if (nearbyOption) nearbyOption.textContent = hasNearbyCatalogue() ? 'Films proches classés' : 'Films proches classés — lance une recherche';
+  }
+
+  function setCatalogueMode(_mode) {
+    // ZIP 3.4 : on supprime le mode “Tous les films” du parcours utilisateur.
+    // Le menu Catalogue doit répondre à : “Quels bons films passent près de moi ?”.
+    catalogueMode = 'nearby';
+    localStorage.setItem('cinepro_catalogue_mode', 'nearby');
+    sortKey = 'bestNote';
+    sortDir = -1;
+    currentPage = 1;
+    refreshCatalogueFromRuntime();
+  }
+  window.setCatalogueMode = setCatalogueMode;
+
   function refreshCatalogueFromRuntime() {
+    updateCatalogueModeControl();
     catalogue = getCatalogueSource();
     currentPage = 1;
     filterTable();
@@ -337,6 +435,15 @@
 
   window.addEventListener('nearby-catalogue-runtime-ready', () => {
     console.log('[Catalogue] Fusion runtime reçue depuis Catalogue proche. Rafraîchissement de la liste.');
+    refreshCatalogueFromRuntime();
+  });
+
+  window.addEventListener('nearby-catalogue-ranked-ready', () => {
+    console.log('[Catalogue] Films proches classés reçus. Mode unique films proches conservé.');
+    catalogueMode = 'nearby';
+    localStorage.setItem('cinepro_catalogue_mode', 'nearby');
+    sortKey = 'bestNote';
+    sortDir = -1;
     refreshCatalogueFromRuntime();
   });
 
@@ -352,13 +459,17 @@
 
   function formatImdbNote(film) {
     if (film.isMock) return '—';
-    const rating = Number(film.imdb);
-    // Important : si OMDb/TMDB échoue, on garde toujours la note IMDb locale de js/data.js.
-    return Number.isFinite(rating) ? `${rating.toFixed(1)} ★` : '—';
+    return formatClassicRating(film.imdb, ' ★');
   }
 
   function getSortValue(film, key) {
-    if (key === 'imdb' && (film.isMock || !Number.isFinite(film.imdb))) return null;
+    if (key === 'bestNote') return getBestNote(film);
+    if (isNearbyModeActive()) {
+      if (key === 'lb') return getBestNote(film);
+      if (key === 'imdb') return getNearbyRatingSource(film);
+      if (key === 'sc') return getNearbyCinemaLabel(film);
+    }
+    if (key === 'imdb' && (film.isMock || normalizePositiveRating(film.imdb) === null)) return null;
     if (key === 'lbRank') return film.lbRank ?? null;
     return film[key] ?? null;
   }
@@ -375,7 +486,31 @@
     return a > b ? 1 : a < b ? -1 : 0;
   }
 
+  function escapeCatalogueHtml(value) {
+    return String(value ?? '').replace(/[&<>"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[char] || char));
+  }
+
+  function updateCatalogueTableHeaders() {
+    const nearby = isNearbyModeActive();
+    const headers = {
+      lb: document.getElementById('header-lb'),
+      imdb: document.getElementById('header-imdb'),
+      sc: document.getElementById('header-sc')
+    };
+
+    if (nearby) {
+      if (headers.lb) headers.lb.innerHTML = '<span class="source-dot dot-sc"></span> Note <i class="ti ti-selector" id="icon-lb"></i>';
+      if (headers.imdb) headers.imdb.innerHTML = '<span class="source-dot dot-imdb"></span> Source <i class="ti ti-selector" id="icon-imdb"></i>';
+      if (headers.sc) headers.sc.innerHTML = '<span class="source-dot dot-lb"></span> Cinéma <i class="ti ti-selector" id="icon-sc"></i>';
+    } else {
+      if (headers.lb) headers.lb.innerHTML = '<span class="source-dot dot-lb"></span> Letterboxd <i class="ti ti-selector" id="icon-lb"></i>';
+      if (headers.imdb) headers.imdb.innerHTML = '<span class="source-dot dot-imdb"></span> IMDb <i class="ti ti-selector" id="icon-imdb"></i>';
+      if (headers.sc) headers.sc.innerHTML = '<span class="source-dot dot-sc"></span> SensCritique <i class="ti ti-selector" id="icon-sc"></i>';
+    }
+  }
+
   function renderTable(data) {
+    updateCatalogueTableHeaders();
     lastFilteredData = data;
     const totalPages = Math.max(1, Math.ceil(data.length / pageSize));
     if (currentPage > totalPages) currentPage = totalPages;
@@ -398,20 +533,28 @@
             <div>
               <div class="film-name">${f.lbRank ? '#' + f.lbRank + ' · ' : ''}${f.titre}</div>
               ${f.original ? `<div class="film-original">${f.original}</div>` : ''}
+              ${f.isNearbyShowing ? `<div class="film-original">À l’affiche près de toi · ${escapeCatalogueHtml((f.nearbyCinemas || f.cinemas || []).slice(0, 2).map(c => c.nom).join(', ') || 'cinéma proche')}</div>` : ''}
             </div>
           </div>
         </td>
         <td class="td-real">${f.real}</td>
         <td><span class="genre-pill">${f.genre}</span></td>
-        <td class="td-note sep-left"><span class="note note-lb">${Number.isFinite(f.lb) ? f.lb.toFixed(1) + ' ★' : '—'}</span></td>
-        <td class="td-note"><span class="note note-imdb">${formatImdbNote(f)}</span></td>
-        <td class="td-note"><span class="note note-sc">${Number.isFinite(f.sc) ? f.sc.toFixed(1) : '—'}</span></td>
+        ${isNearbyModeActive() ? `
+          <td class="td-note sep-left"><span class="nearby-note-main">${formatNearbyBestNote(f)}</span></td>
+          <td class="td-source"><span class="nearby-source-pill">${escapeCatalogueHtml(getNearbyRatingSource(f))}</span></td>
+          <td class="td-cinema"><span class="nearby-cinema-pill"><i class="ti ti-map-pin"></i>${escapeCatalogueHtml(getNearbyCinemaLabel(f))}</span></td>
+        ` : `
+          <td class="td-note sep-left"><span class="note note-lb">${formatClassicRating(f.lb, ' ★')}</span></td>
+          <td class="td-note"><span class="note note-imdb">${formatImdbNote(f)}</span></td>
+          <td class="td-note"><span class="note note-sc">${formatClassicRating(f.sc)}</span></td>
+        `}
         <td class="td-year">${f.annee || '—'}</td>
       </tr>`;
     }).join('');
 
-    document.getElementById('count-label').textContent = data.length + ' film' + (data.length > 1 ? 's' : '');
-    document.getElementById('film-count').textContent = data.length + ' films';
+    const label = data.length + ' film' + (data.length > 1 ? 's' : '') + (isNearbyModeActive() ? ' proches' : '');
+    document.getElementById('count-label').textContent = label;
+    document.getElementById('film-count').textContent = label;
     renderPagination(totalPages);
   }
 
@@ -482,9 +625,10 @@
     const d = document.getElementById('decade-filter').value;
     let data = catalogue.filter(f =>
       (!q || String(f.titre || '').toLowerCase().includes(q) || String(f.real || '').toLowerCase().includes(q) || String(f.original || '').toLowerCase().includes(q)) &&
-      (!g || f.genre === g) &&
+      (!g || String(f.genre || '').toLowerCase().includes(g.toLowerCase())) &&
       decadeMatch(f.annee, d)
     );
+    if (catalogueMode === 'nearby' && sortKey === 'imdb') sortKey = 'bestNote';
     data.sort((a, b) => {
       const va = getSortValue(a, sortKey);
       const vb = getSortValue(b, sortKey);
@@ -613,6 +757,14 @@
       popup.innerHTML = buildPopupHTML(film);
       overlay.classList.add('open');
       document.body.style.overflow = 'hidden';
+
+      // ZIP 3.4 : même priorité synopsis que le Catalogue classique.
+      // On garde l'affichage instantané, puis on remplace par le cache IMDb FR si disponible.
+      if (typeof loadCachedSynopsisForCatalogue === 'function' && typeof setCataloguePopupSynopsis === 'function') {
+        loadCachedSynopsisForCatalogue(film).then((synopsis) => {
+          setCataloguePopupSynopsis(popup, synopsis || film.synopsis || film.overview || 'Aucun synopsis disponible pour ce film.');
+        });
+      }
       return;
     }
 
@@ -621,8 +773,10 @@
 
 
   async function initCatalogue() {
-    // 1) Afficher immédiatement le catalogue local, pour éviter une page vide si une API plante.
+    // 1) Afficher immédiatement la meilleure source disponible. Le mode utilisateur reste Films proches.
+    updateCatalogueModeControl();
     catalogue = getCatalogueSource();
+    sortKey = 'bestNote'; sortDir = -1;
     filterTable();
 
     // 2) Letterboxd ne met à jour QUE les notes Letterboxd.
