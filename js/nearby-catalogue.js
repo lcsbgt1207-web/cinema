@@ -8,7 +8,7 @@
 (function () {
   'use strict';
 
-  const NEARBY_CATALOGUE_API = 'https://cinepro-api-production.up.railway.app';
+  const NEARBY_CATALOGUE_API = 'https://cinepro-api-yal8.onrender.com';
   const tmdbRatingCache = new Map();
 
   function stripAccents(value) {
