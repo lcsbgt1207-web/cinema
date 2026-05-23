@@ -178,6 +178,8 @@
     navigator.geolocation.getCurrentPosition(
       pos => {
         const { latitude, longitude } = pos.coords;
+        localStorage.setItem('cinepro_user_lat', latitude);
+        localStorage.setItem('cinepro_user_lng', longitude);
         window.location.href = `resultats.html?lat=${latitude}&lng=${longitude}&mode=lieu&q=Ma+position`;
       },
       () => {

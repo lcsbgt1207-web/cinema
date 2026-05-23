@@ -78,6 +78,19 @@
   </div>
 </header>
 
+
+<!-- ── BANNIÈRE LOCALISATION ── -->
+<div id="loc-banner" style="display:none; background:#f8f8f8; border-bottom:1px solid #e5e5e5; padding:10px 0;">
+  <div class="container" style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+    <i class="ti ti-map-pin" style="color:#888; font-size:15px; flex-shrink:0;"></i>
+    <span style="font-size:13px; color:#555; flex:1;">Activez votre position pour voir les séances proches de chez vous.</span>
+    <button onclick="demanderPosition()" style="font-size:12px; font-weight:500; background:#111; color:#fff; border:none; border-radius:6px; padding:6px 14px; cursor:pointer; white-space:nowrap;">
+      <i class="ti ti-current-location"></i> Utiliser ma position
+    </button>
+    <button onclick="document.getElementById('loc-banner').style.display='none'" style="background:none; border:none; cursor:pointer; color:#aaa; font-size:18px; padding:0 4px; line-height:1;">×</button>
+  </div>
+</div>
+
 <main class="container page-content">
   <div class="page-header">
     <div>
@@ -293,8 +306,8 @@
         </div>
         <div class="film-popup-seances-zone">
           <div class="section-label">Séances</div>
-          <div class="empty-seances">
-            Aucune séance réelle n’est encore branchée pour ce film. Cette zone sera connectée plus tard au scraping des cinémas indépendants, avec le cinéma, l’horaire, la VF/VO et le lien de réservation.
+          <div id="popup-seances-content" class="empty-seances">
+            <span style="color:#bbb;"><i class="ti ti-loader"></i> Chargement des séances…</span>
           </div>
         </div>
       </div>
@@ -322,6 +335,9 @@
       TMDB.getImdbSynopsis(film)
         .then((imdbSynopsis) => setPopupSynopsisText(popup, imdbSynopsis))
         .catch(() => setPopupSynopsisText(popup, 'Aucun synopsis disponible pour ce film.'));
+
+      // Chargement des séances proches
+      chargerSeancesProches(film);
     } catch(e) {
       popup.innerHTML = `<div style="padding:40px;text-align:center;color:var(--gray-400);">Impossible de charger ce film.<button class="popup-close-btn" onclick="closeFilmPopup()" style="display:block;margin:16px auto 0;">Fermer</button></div>`;
       overlay.classList.add('open');
@@ -370,6 +386,95 @@
       localStorage.setItem('cinepro_billets',JSON.stringify(billets));
     }
   }
+
+
+  // ── LOCALISATION & SÉANCES ──────────────────────────────────────
+
+  const BACKEND = 'https://cinepro-api-yal8.onrender.com';
+
+  function initBanniere() {
+    const lat = localStorage.getItem('cinepro_user_lat');
+    const lng = localStorage.getItem('cinepro_user_lng');
+    const banner = document.getElementById('loc-banner');
+    if (!lat || !lng) {
+      banner.style.display = 'block';
+    } else {
+      banner.style.display = 'none';
+      if (typeof PLACES !== 'undefined') {
+        PLACES.userLocation = { lat: parseFloat(lat), lng: parseFloat(lng) };
+      }
+    }
+  }
+
+  function demanderPosition() {
+    if (!navigator.geolocation) { alert('Géolocalisation non disponible.'); return; }
+    const btn = document.querySelector('#loc-banner button');
+    if (btn) btn.textContent = 'Localisation…';
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        localStorage.setItem('cinepro_user_lat', pos.coords.latitude);
+        localStorage.setItem('cinepro_user_lng', pos.coords.longitude);
+        if (typeof PLACES !== 'undefined') PLACES.userLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        document.getElementById('loc-banner').style.display = 'none';
+      },
+      () => {
+        alert('Impossible d\'obtenir votre position.');
+        if (btn) btn.textContent = 'Utiliser ma position';
+      }
+    );
+  }
+
+  async function chargerSeancesProches(film) {
+    const zone = document.getElementById('popup-seances-content');
+    if (!zone) return;
+    const lat = parseFloat(localStorage.getItem('cinepro_user_lat'));
+    const lng = parseFloat(localStorage.getItem('cinepro_user_lng'));
+    if (!lat || !lng) {
+      zone.innerHTML = '<span style="color:#aaa;">📍 <a href="#" onclick="demanderPosition();return false;" style="color:#555;text-decoration:underline;">Activez votre position</a> pour voir les séances proches.</span>';
+      return;
+    }
+    const titre = film.title || film.original_title || '';
+    if (!titre) { zone.innerHTML = '<span style="color:#bbb;">Titre introuvable.</span>'; return; }
+    zone.innerHTML = '<span style="color:#bbb;">Recherche des séances proches…</span>';
+    try {
+      const res = await fetch(`${BACKEND}/search-cinema?lat=${lat}&lng=${lng}&radius=15000`);
+      if (!res.ok) throw new Error();
+      const cinemas = await res.json();
+      if (!cinemas || cinemas.length === 0) { zone.innerHTML = '<span style="color:#aaa;">Aucun cinéma dans un rayon de 15 km.</span>'; return; }
+      let toutesSeances = [];
+      await Promise.all(cinemas.slice(0, 5).map(async cinema => {
+        try {
+          const r = await fetch(`${BACKEND}/seances?allocine_id=${cinema.allocine_id}`);
+          if (!r.ok) return;
+          const data = await r.json();
+          const mot = titre.toLowerCase().slice(0, 10);
+          (data.seances || []).filter(s => s.titre && s.titre.toLowerCase().includes(mot))
+            .forEach(s => toutesSeances.push({ ...s, cinema_nom: cinema.name }));
+        } catch {}
+      }));
+      if (toutesSeances.length === 0) { zone.innerHTML = `<span style="color:#aaa;">Pas de séance trouvée pour <em>${titre}</em> près de chez vous.</span>`; return; }
+      const parCinema = {};
+      toutesSeances.forEach(s => { if (!parCinema[s.cinema_nom]) parCinema[s.cinema_nom] = []; parCinema[s.cinema_nom].push(s); });
+      let html = '<div style="display:flex;flex-direction:column;gap:14px;">';
+      for (const [nom, seances] of Object.entries(parCinema)) {
+        html += `<div><div style="font-size:12px;font-weight:600;color:#333;margin-bottom:6px;">${nom}</div><div style="display:flex;flex-wrap:wrap;gap:6px;">`;
+        seances.forEach(s => {
+          const h = s.heure || s.time || '';
+          const v = s.version ? ` <span style='font-size:10px;color:#888;'>${s.version}</span>` : '';
+          const tEsc = titre.replace(/'/g,"\'");
+          const nEsc = nom.replace(/'/g,"\'");
+          html += `<button onclick="openReservation('${tEsc}','${nEsc}','${h}')" style="font-size:12px;padding:4px 10px;border-radius:5px;border:1px solid #ddd;background:#fff;cursor:pointer;color:#222;">${h}${v}</button>`;
+        });
+        html += '</div></div>';
+      }
+      html += '</div>';
+      zone.innerHTML = html;
+    } catch {
+      zone.innerHTML = '<span style="color:#aaa;">Impossible de charger les séances pour l'instant.</span>';
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', initBanniere);
 
   // Init
   loadFilms('now');
