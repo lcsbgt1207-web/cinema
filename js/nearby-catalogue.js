@@ -1,4 +1,4 @@
-/* CinéProche — Catalogue proche — ZIP 2.9.9
+/* CinéProche — Catalogue proche — ZIP 3.0
    Objectif unique : fusionner les films TMDB enrichis dans le résultat Catalogue proche.
    - Les films reconnus dans js/data.js gardent leur note locale.
    - Les films absents trouvés sur TMDB deviennent utilisables directement dans la liste finale.
@@ -1078,7 +1078,7 @@
     }
     if (!location) location = await window.PLACES.geolocate();
 
-    console.log('[Catalogue proche] ZIP 2.9.9 actif — fusion Catalogue + TMDB des films absents.');
+    console.log('[Catalogue proche] ZIP 3.0 actif — fusion Catalogue + TMDB exportée vers le menu Catalogue.');
     console.log('[Catalogue proche] Position utilisée :', location);
 
     const cinemas = await window.PLACES.findNearbycinemas(location, radius);
@@ -1197,7 +1197,7 @@
     const enrichedDraft = buildEnrichedCatalogueDraft(ranked);
     const runtimeFusion = buildRuntimeCatalogueFusion(ranked);
 
-    console.log(`[Catalogue proche] Résultat ZIP 2.9.9 : ${stats.total} film(s), ${stats.rated} avec note, ${stats.tmdbEnriched} film(s) fusionné(s) TMDB, ${stats.missing} à vérifier.`);
+    console.log(`[Catalogue proche] Résultat ZIP 3.0 : ${stats.total} film(s), ${stats.rated} avec note, ${stats.tmdbEnriched} film(s) fusionné(s) TMDB, ${stats.missing} à vérifier.`);
     console.group('[Catalogue proche] Debug correspondances titres');
     console.table(matchDebug);
     console.groupEnd();
@@ -1268,6 +1268,21 @@
     window.NEARBY_CATALOGUE_RUNTIME_TMDB_ONLY = runtimeFusion.tmdbRuntimeFilms;
     window.NEARBY_TMDB_ENRICHMENT_CACHE = tmdbEnrichmentCache;
     window.NEARBY_CATALOGUE_STATS = { ...stats, runtimeTotal: runtimeFusion.total, runtimeTmdbAdded: runtimeFusion.tmdbRuntimeCount };
+
+    try {
+      const storedPayload = {
+        version: '3.0',
+        updatedAt: new Date().toISOString(),
+        films: runtimeFusion.films,
+        tmdbRuntimeFilms: runtimeFusion.tmdbRuntimeFilms,
+        stats: window.NEARBY_CATALOGUE_STATS
+      };
+      localStorage.setItem('cinepro_runtime_catalogue', JSON.stringify(storedPayload));
+      console.log(`[Catalogue proche] ZIP 3.0 : catalogue runtime sauvegardé pour catalogue.html (${runtimeFusion.total} films).`);
+      window.dispatchEvent(new CustomEvent('nearby-catalogue-runtime-ready', { detail: storedPayload }));
+    } catch (storageError) {
+      console.warn('[Catalogue proche] Impossible de sauvegarder le catalogue runtime :', storageError?.message || storageError);
+    }
 
     renderNearbyRankedMovies(ranked, { ...stats, runtimeTotal: runtimeFusion.total, runtimeTmdbAdded: runtimeFusion.tmdbRuntimeCount });
     return ranked;

@@ -240,24 +240,17 @@
   </div>
 </div>
 
-<script src="js/config.js?v=2">// update: pagination starts at 8 per page
-</script>
-<<<<<<< HEAD
-<script src="js/data.js?v=2"></script>
-<script src="js/omdb.js?v=2"></script>
-<script src="js/tmdb.js?v=2"></script>
-<script src="js/places.js?v=2"></script>
-=======
-<script src="js/data.js"></script>
-<script src="js/omdb.js"></script>
-<script src="js/tmdb.js"></script>
-<script src="js/places.js"></script>
->>>>>>> c63a9c3342a63001a67db95bc183c0fcafd23711
-<script src="js/nearby-catalogue.js"></script>
+<script src="js/config.js?v=3.0"></script>
+<script src="js/data.js?v=3.0"></script>
+<script src="js/omdb.js?v=3.0"></script>
+<script src="js/tmdb.js?v=3.0"></script>
+<script src="js/places.js?v=3.0"></script>
+<script src="js/nearby-catalogue.js?v=3.0"></script>
 <script>
-  // Catalogue = films avec annee définie + films nouveautés
-  let catalogue = FILMS.filter(f => f && !f.isMock); // garder le catalogue même si une API échoue
-  const STATIC_CATALOGUE = [...catalogue];
+  // ZIP 3.0 — Le Catalogue peut maintenant utiliser la fusion runtime créée par le menu Catalogue proche.
+  // Sécurité : si aucun enrichissement TMDB n'existe, on garde toujours js/data.js comme avant.
+  const STATIC_CATALOGUE = FILMS.filter(f => f && !f.isMock);
+  let catalogue = [];
   const LETTERBOXD_API_URL = 'http://localhost:3000/api/films-letterboxd';
   const LETTERBOXD_MIN_VALID_RATING = 0.5;
   const favs = new Set(JSON.parse(localStorage.getItem('cinepro_favs') || '[]'));
@@ -267,6 +260,85 @@
   let lastFilteredData = [];
 
   const LABELS = { lb:'Letterboxd', imdb:'IMDb', sc:'SensCritique', annee:'Année', titre:'Titre', real:'Réalisateur', genre:'Genre' };
+
+  function normalizeRuntimeCatalogueKey(value) {
+    return String(value || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
+  }
+
+  function prepareCatalogueFilm(film, index = 0) {
+    const copy = { ...film };
+    if (copy.id === undefined || copy.id === null || copy.id === '') {
+      const base = copy.tmdbId ? `runtime-tmdb-${copy.tmdbId}` : `runtime-${normalizeRuntimeCatalogueKey(copy.titre || copy.title || 'film')}-${index}`;
+      copy.id = base;
+    }
+    copy.titre = copy.titre || copy.title || 'Film sans titre';
+    copy.original = copy.original || copy.originalTitle || copy.original_title || '';
+    copy.genre = copy.genre || (Array.isArray(copy.genres) ? copy.genres.join(', ') : '') || 'À compléter';
+    copy.real = copy.real || copy.realisateur || copy.director || 'Non renseigné';
+    copy.acteurs = copy.acteurs || copy.cast || 'Non renseigné';
+    copy.synopsis = copy.synopsis || copy.overview || 'Synopsis à compléter.';
+    copy.color = copy.color || ['p1','p2','p3','p4','p5','p6'][index % 6];
+    copy.badge = copy.badge || (copy.source === 'tmdb-runtime-fusion' ? 'TMDB' : 'Catalogue');
+    copy.lb = Number.isFinite(Number(copy.lb)) ? Number(copy.lb) : null;
+    copy.imdb = Number.isFinite(Number(copy.imdb)) ? Number(copy.imdb) : null;
+    copy.tmdb = Number.isFinite(Number(copy.tmdb)) ? Number(copy.tmdb) : null;
+    copy.sc = Number.isFinite(Number(copy.sc)) ? Number(copy.sc) : (Number.isFinite(copy.tmdb) ? copy.tmdb : null);
+    copy.annee = Number.isFinite(Number(copy.annee)) ? Number(copy.annee) : (Number.isFinite(Number(copy.year)) ? Number(copy.year) : null);
+    copy.isMock = false;
+    return copy;
+  }
+
+  function readStoredRuntimeCatalogue() {
+    try {
+      const payload = JSON.parse(localStorage.getItem('cinepro_runtime_catalogue') || 'null');
+      return Array.isArray(payload?.films) ? payload.films : [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  function getCatalogueSource() {
+    const runtime = Array.isArray(window.NEARBY_CATALOGUE_RUNTIME_DATA) && window.NEARBY_CATALOGUE_RUNTIME_DATA.length
+      ? window.NEARBY_CATALOGUE_RUNTIME_DATA
+      : readStoredRuntimeCatalogue();
+
+    const source = runtime.length ? runtime : STATIC_CATALOGUE;
+    const seen = new Set();
+    const merged = [];
+
+    source.forEach((film, index) => {
+      if (!film || film.isMock) return;
+      const prepared = prepareCatalogueFilm(film, index);
+      const key = prepared.tmdbId ? `tmdb:${prepared.tmdbId}` : normalizeRuntimeCatalogueKey(prepared.titre || prepared.original || prepared.id);
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      merged.push(prepared);
+    });
+
+    if (runtime.length) {
+      console.log(`[Catalogue] ZIP 3.0 : catalogue enrichi utilisé (${merged.length} films).`);
+    } else {
+      console.log(`[Catalogue] ZIP 3.0 : catalogue local utilisé (${merged.length} films). Lance getNearbyRankedMovies(...) pour générer la fusion TMDB.`);
+    }
+
+    return merged;
+  }
+
+  function refreshCatalogueFromRuntime() {
+    catalogue = getCatalogueSource();
+    currentPage = 1;
+    filterTable();
+  }
+
+  window.addEventListener('nearby-catalogue-runtime-ready', () => {
+    console.log('[Catalogue] Fusion runtime reçue depuis Catalogue proche. Rafraîchissement de la liste.');
+    refreshCatalogueFromRuntime();
+  });
 
   function decadeMatch(annee, f) {
     if (!f || !annee) return true;
@@ -317,8 +389,8 @@
         : `<i class="ti ti-photo"></i>`;
 
       return `
-      <tr onclick="openCatalogueFilmPopup(${f.id})">
-        <td><button class="fav-btn ${favs.has(f.id) ? 'active' : ''}" onclick="event.stopPropagation(); toggleFav(${f.id}, this)">
+      <tr onclick='openCatalogueFilmPopup(${JSON.stringify(String(f.id))})'>
+        <td><button class="fav-btn ${favs.has(String(f.id)) ? 'active' : ''}" onclick='event.stopPropagation(); toggleFav(${JSON.stringify(String(f.id))}, this)'>
           <i class="ti ti-bookmark"></i></button></td>
         <td class="td-title">
           <div class="film-cell">
@@ -430,6 +502,7 @@
   }
 
   function toggleFav(id, btn) {
+    id = String(id);
     if (favs.has(id)) { favs.delete(id); btn.classList.remove('active'); }
     else { favs.add(id); btn.classList.add('active'); }
     localStorage.setItem('cinepro_favs', JSON.stringify([...favs]));
@@ -511,7 +584,7 @@
 
     // Important : Letterboxd ne sert maintenant qu'à mettre à jour les notes.
     // On garde toujours le catalogue local pour les affiches, synopsis, réalisateurs et genres.
-    catalogue = STATIC_CATALOGUE;
+    catalogue = getCatalogueSource();
 
     try {
       const response = await fetch(LETTERBOXD_API_URL, { cache: 'no-store' });
@@ -529,7 +602,8 @@
   }
 
   function openCatalogueFilmPopup(id) {
-    const film = FILMS.find(f => f.id === id) || catalogue.find(f => f.id === id);
+    const wantedId = String(id);
+    const film = catalogue.find(f => String(f.id) === wantedId) || FILMS.find(f => String(f.id) === wantedId);
     if (!film) return;
 
     if (typeof buildPopupHTML === 'function') {
@@ -548,7 +622,7 @@
 
   async function initCatalogue() {
     // 1) Afficher immédiatement le catalogue local, pour éviter une page vide si une API plante.
-    catalogue = STATIC_CATALOGUE;
+    catalogue = getCatalogueSource();
     filterTable();
 
     // 2) Letterboxd ne met à jour QUE les notes Letterboxd.
@@ -557,7 +631,7 @@
       filterTable();
     } catch (error) {
       console.warn('Letterboxd ignoré, catalogue local conservé :', error.message);
-      catalogue = STATIC_CATALOGUE;
+      catalogue = getCatalogueSource();
       filterTable();
     }
 
