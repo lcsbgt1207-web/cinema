@@ -1,4 +1,4 @@
-/* CinéProche — Catalogue proche — ZIP 3.1
+/* CinéProche — Catalogue proche — ZIP 3.2
    Objectif unique : fusionner les films TMDB enrichis dans le résultat Catalogue proche.
    - Les films reconnus dans js/data.js gardent leur note locale.
    - Les films absents trouvés sur TMDB deviennent utilisables directement dans la liste finale.
@@ -1147,7 +1147,7 @@
     }
     if (!location) location = await window.PLACES.geolocate();
 
-    console.log('[Catalogue proche] ZIP 3.1 actif — mode Films proches classés exporté vers le Catalogue.');
+    console.log('[Catalogue proche] ZIP 3.2 actif — mode Films proches classés exporté vers le Catalogue.');
     console.log('[Catalogue proche] Position utilisée :', location);
 
     const cinemas = await window.PLACES.findNearbycinemas(location, radius);
@@ -1267,7 +1267,7 @@
     const runtimeFusion = buildRuntimeCatalogueFusion(ranked);
     const nearbyRankedCatalogue = buildNearbyCatalogueRankedExport(ranked);
 
-    console.log(`[Catalogue proche] Résultat ZIP 3.1 : ${stats.total} film(s), ${stats.rated} avec note, ${stats.tmdbEnriched} film(s) fusionné(s) TMDB, ${stats.missing} à vérifier.`);
+    console.log(`[Catalogue proche] Résultat ZIP 3.2 : ${stats.total} film(s), ${stats.rated} avec note, ${stats.tmdbEnriched} film(s) fusionné(s) TMDB, ${stats.missing} à vérifier.`);
     console.group('[Catalogue proche] Debug correspondances titres');
     console.table(matchDebug);
     console.groupEnd();
@@ -1358,7 +1358,7 @@
       };
       localStorage.setItem('cinepro_runtime_catalogue', JSON.stringify(storedPayload));
       localStorage.setItem('cinepro_nearby_ranked_catalogue', JSON.stringify(nearbyPayload));
-      console.log(`[Catalogue proche] ZIP 3.1 : catalogue runtime sauvegardé pour catalogue.html (${runtimeFusion.total} films).`);
+      console.log(`[Catalogue proche] ZIP 3.2 : catalogue runtime sauvegardé pour catalogue.html (${runtimeFusion.total} films).`);
       window.dispatchEvent(new CustomEvent('nearby-catalogue-runtime-ready', { detail: storedPayload }));
       window.dispatchEvent(new CustomEvent('nearby-catalogue-ranked-ready', { detail: nearbyPayload }));
     } catch (storageError) {
