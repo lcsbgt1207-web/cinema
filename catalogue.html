@@ -174,9 +174,8 @@
       <option>Rayon : 30 km</option>
       <option>Rayon : 50 km</option>
     </select>
-    <select class="filter-select" id="catalogue-mode-filter" onchange="setCatalogueMode(this.value)">
-      <option value="nearby">Films proches classés</option>
-      <option value="all">Tous les films</option>
+    <select class="filter-select" id="catalogue-mode-filter" onchange="setCatalogueMode(this.value)" title="Le Catalogue affiche maintenant les meilleurs films projetés près de vous.">
+      <option value="nearby" selected>Films proches classés</option>
     </select>
     <span class="toolbar-count" id="count-label"></span>
   </div>
@@ -249,18 +248,19 @@
   </div>
 </div>
 
-<script src="js/config.js?v=3.2"></script>
-<script src="js/data.js?v=3.2"></script>
-<script src="js/omdb.js?v=3.2"></script>
-<script src="js/tmdb.js?v=3.2"></script>
-<script src="js/places.js?v=3.2"></script>
-<script src="js/nearby-catalogue.js?v=3.2"></script>
+<script src="js/config.js?v=3.3"></script>
+<script src="js/data.js?v=3.3"></script>
+<script src="js/omdb.js?v=3.3"></script>
+<script src="js/tmdb.js?v=3.3"></script>
+<script src="js/places.js?v=3.3"></script>
+<script src="js/nearby-catalogue.js?v=3.3"></script>
 <script>
-  // ZIP 3.2 — Mode Films proches : colonnes Note / Source / Cinéma, suppression des faux 0.0.
+  // ZIP 3.3 — Catalogue centré sur les films proches : un seul mode, données enrichies conservées.
   // Sécurité : si aucun résultat proche n'existe, on garde le catalogue enrichi ZIP 3.0 puis js/data.js.
   const STATIC_CATALOGUE = FILMS.filter(f => f && !f.isMock);
   let catalogue = [];
-  let catalogueMode = localStorage.getItem('cinepro_catalogue_mode') || 'nearby';
+  let catalogueMode = 'nearby';
+  localStorage.setItem('cinepro_catalogue_mode', 'nearby');
   const LETTERBOXD_API_URL = 'http://localhost:3000/api/films-letterboxd';
   const LETTERBOXD_MIN_VALID_RATING = 0.5;
   const favs = new Set(JSON.parse(localStorage.getItem('cinepro_favs') || '[]'));
@@ -335,6 +335,9 @@
   }
 
   function getActiveRawCatalogueSource() {
+    // ZIP 3.3 : le Catalogue est centré sur les films proches.
+    // On utilise toujours en priorité la liste complète enrichie des films proches,
+    // afin de ne jamais perdre réalisateur, genre, affiche, année ou note après un changement de filtre.
     const nearby = Array.isArray(window.NEARBY_CATALOGUE_NEARBY_RANKED) && window.NEARBY_CATALOGUE_NEARBY_RANKED.length
       ? window.NEARBY_CATALOGUE_NEARBY_RANKED
       : readStoredNearbyCatalogue();
@@ -343,13 +346,15 @@
       ? window.NEARBY_CATALOGUE_RUNTIME_DATA
       : readStoredRuntimeCatalogue();
 
-    if (catalogueMode === 'nearby' && nearby.length) {
+    if (nearby.length) {
+      catalogueMode = 'nearby';
+      localStorage.setItem('cinepro_catalogue_mode', 'nearby');
       return { source: nearby, label: 'films proches classés' };
     }
     if (runtime.length) {
-      return { source: runtime, label: 'catalogue enrichi' };
+      return { source: runtime, label: 'catalogue enrichi en attente de films proches' };
     }
-    return { source: STATIC_CATALOGUE, label: 'catalogue local' };
+    return { source: STATIC_CATALOGUE, label: 'catalogue local en attente de films proches' };
   }
 
   function getBestNote(film) {
@@ -395,23 +400,27 @@
       merged.push(prepared);
     });
 
-    console.log(`[Catalogue] ZIP 3.2 : ${active.label} utilisé (${merged.length} films).`);
+    console.log(`[Catalogue] ZIP 3.3 : ${active.label} utilisé (${merged.length} films).`);
     return merged;
   }
 
   function updateCatalogueModeControl() {
     const select = document.getElementById('catalogue-mode-filter');
     if (!select) return;
-    if (!hasNearbyCatalogue() && catalogueMode === 'nearby') catalogueMode = 'all';
-    select.value = catalogueMode;
+    catalogueMode = 'nearby';
+    localStorage.setItem('cinepro_catalogue_mode', 'nearby');
+    select.value = 'nearby';
     const nearbyOption = select.querySelector('option[value="nearby"]');
-    if (nearbyOption) nearbyOption.textContent = hasNearbyCatalogue() ? 'Films proches classés' : 'Films proches classés — lance un test';
+    if (nearbyOption) nearbyOption.textContent = hasNearbyCatalogue() ? 'Films proches classés' : 'Films proches classés — lance une recherche';
   }
 
-  function setCatalogueMode(mode) {
-    catalogueMode = mode === 'nearby' ? 'nearby' : 'all';
-    localStorage.setItem('cinepro_catalogue_mode', catalogueMode);
-    if (catalogueMode === 'nearby') { sortKey = 'bestNote'; sortDir = -1; }
+  function setCatalogueMode(_mode) {
+    // ZIP 3.3 : on supprime le mode “Tous les films” du parcours utilisateur.
+    // Le menu Catalogue doit répondre à : “Quels bons films passent près de moi ?”.
+    catalogueMode = 'nearby';
+    localStorage.setItem('cinepro_catalogue_mode', 'nearby');
+    sortKey = 'bestNote';
+    sortDir = -1;
     currentPage = 1;
     refreshCatalogueFromRuntime();
   }
@@ -430,7 +439,7 @@
   });
 
   window.addEventListener('nearby-catalogue-ranked-ready', () => {
-    console.log('[Catalogue] Films proches classés reçus. Passage en mode films proches.');
+    console.log('[Catalogue] Films proches classés reçus. Mode unique films proches conservé.');
     catalogueMode = 'nearby';
     localStorage.setItem('cinepro_catalogue_mode', 'nearby');
     sortKey = 'bestNote';
@@ -756,10 +765,10 @@
 
 
   async function initCatalogue() {
-    // 1) Afficher immédiatement le catalogue local, pour éviter une page vide si une API plante.
+    // 1) Afficher immédiatement la meilleure source disponible. Le mode utilisateur reste Films proches.
     updateCatalogueModeControl();
     catalogue = getCatalogueSource();
-    if (catalogueMode === 'nearby') { sortKey = 'bestNote'; sortDir = -1; }
+    sortKey = 'bestNote'; sortDir = -1;
     filterTable();
 
     // 2) Letterboxd ne met à jour QUE les notes Letterboxd.
