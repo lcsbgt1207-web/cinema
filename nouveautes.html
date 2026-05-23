@@ -473,42 +473,22 @@
           if (!r2.ok) return;
           const data2 = await r2.json();
 
-          // Parser la réponse — l'API peut renvoyer différentes structures
-          const mot = titre.toLowerCase().slice(0, 10);
+          // Structure réelle : {seances: [{title, showtimes: [{startsAt, diffusionVersion}]}]}
+          const mot = titre.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 12);
+          const films = data2.seances || data2.films || data2.results || [];
 
-          // Chercher récursivement les séances dans la réponse
-          function extraireSeances(obj, depth = 0) {
-            if (!obj || depth > 5) return [];
-            const found = [];
-            if (Array.isArray(obj)) {
-              for (const item of obj) {
-                // Si l'item a un titre qui correspond au film
-                const t = (item.titre || item.title || item.film || item.name || '').toLowerCase();
-                if (t.includes(mot)) {
-                  // Extraire les horaires
-                  const horaires = item.horaires || item.times || item.showtimes || item.seances || item.sessions || [];
-                  if (Array.isArray(horaires) && horaires.length > 0) {
-                    horaires.forEach(h => {
-                      const heure = typeof h === 'string' ? h : (h.heure || h.time || h.horaire || h.debut || '');
-                      const version = typeof h === 'object' ? (h.version || h.lang || h.type || '') : '';
-                      if (heure) found.push({ heure, version });
-                    });
-                  } else if (item.heure || item.time) {
-                    found.push({ heure: item.heure || item.time, version: item.version || '' });
-                  }
-                }
-                found.push(...extraireSeances(item, depth + 1));
-              }
-            } else if (typeof obj === 'object') {
-              for (const val of Object.values(obj)) {
-                found.push(...extraireSeances(val, depth + 1));
-              }
+          for (const film of films) {
+            const titreFilm = (film.title || film.titre || film.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+            if (!titreFilm.includes(mot) && !mot.includes(titreFilm.slice(0, 8))) continue;
+
+            const showtimes = film.showtimes || film.horaires || film.times || [];
+            for (const s of showtimes) {
+              const startsAt = s.startsAt || s.heure || s.time || '';
+              const heure = startsAt ? startsAt.slice(11, 16) : ''; // "2026-05-23T16:30:00" → "16:30"
+              const version = s.diffusionVersion || s.version || s.lang || '';
+              if (heure) toutesSeances.push({ heure, version, cinema_nom: cinema.nom });
             }
-            return found;
           }
-
-          const seancesFilm = extraireSeances(data2);
-          seancesFilm.forEach(s => toutesSeances.push({ ...s, cinema_nom: cinema.nom }));
         } catch {}
       }));
 
