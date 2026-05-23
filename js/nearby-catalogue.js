@@ -1,5 +1,5 @@
-/* CinéProche — Catalogue proche — ZIP 2.9.5
-   Objectif unique : brancher /seances-auto pour récupérer les séances réelles exploitables.
+/* CinéProche — Catalogue proche — ZIP 2.9.6
+   Objectif unique : nettoyer les faux titres et fiabiliser la liste des films des séances.
    - Les films reconnus dans js/data.js gardent leur note locale.
    - Les films non reconnus ne restent plus vides : badge "À enrichir".
    - Ajout d'un panneau visuel + compteurs : classés / à enrichir.
@@ -233,9 +233,22 @@
     try { return path.split('.').reduce((acc, key) => acc?.[key], obj); } catch (_) { return undefined; }
   }
 
+  function isTechnicalShowtimeLabel(value) {
+    const text = normalizeNearbyTitle(value);
+    if (!text) return true;
+    const compact = text.replace(/\s+/g, '');
+    const blocked = new Set([
+      'original', 'dubbed', 'local', 'vf', 'vo', 'vost', 'vostfr', 'version',
+      'imax', '4dx', 'dolby', 'standard', 'seance', 'seances', 'showtime', 'showtimes',
+      'dubbing', 'subtitled', 'subtitles', 'francais', 'french', 'english'
+    ]);
+    return blocked.has(text) || blocked.has(compact);
+  }
+
   function looksLikeRealMovieTitle(value) {
     const text = String(value || '').trim();
     if (!text) return false;
+    if (isTechnicalShowtimeLabel(text)) return false;
     if (text.length < 2 || text.length > 140) return false;
     if (/^https?:\/\//i.test(text)) return false;
     if (/^\d{1,2}[:h]\d{0,2}$/i.test(text)) return false;
@@ -246,7 +259,11 @@
   }
 
   function keyLooksLikeMovieTitle(path = '') {
-    return /(title|titre|name|nom|label|movie|film|work|show|production|localized|original|display)/i.test(String(path));
+    const fullPath = String(path || '');
+    const key = fullPath.split('.').pop().replace(/\[\d+\]/g, '');
+    if (/diffusionVersion|version|format|language|lang|startsAt|time|date|horaire|showtimes|seances|sessions/i.test(key)) return false;
+    return /^(title|titre|name|nom|label|movieTitle|filmTitle|workTitle|fullTitle|displayTitle|originalTitle|localizedTitle|primaryTitle|secondaryTitle)$/i.test(key)
+      || /(movie|film|work|production|localized|original|display).*(title|titre|name|nom|label)/i.test(fullPath);
   }
 
   function extractMovieTitle(item) {
@@ -301,7 +318,7 @@
   function normalizeShowtimeItem(rawItem) {
     const movieObject = extractMovieObject(rawItem);
     const title = extractMovieTitle(movieObject) || extractMovieTitle(rawItem);
-    if (!title) return null;
+    if (!title || !looksLikeRealMovieTitle(title)) return null;
     return {
       title,
       normalizedKey: normalizeNearbyTitle(title),
@@ -495,7 +512,7 @@
   }
 
   function extractSeancesArray(data) {
-    // ZIP 2.9.5 : on ne suppose plus une structure précise.
+    // ZIP 2.9.6 : on ne suppose plus une structure précise.
     // L'API /seances peut renvoyer les films dans data, results, showtimes, movie, film,
     // ou même dans des fragments HTML/JSON imbriqués. On scanne tout récursivement.
     const found = [];
@@ -676,7 +693,7 @@
         <div class="nearby-catalogue-head">
           <div>
             <h2>Films proches trouvés</h2>
-            <p>ZIP 2.9.5 : extraction ID cinéma robuste + films absents visibles pour enrichissement Catalogue.</p>
+            <p>ZIP 2.9.6 : séances réelles + nettoyage des faux titres + films absents visibles pour enrichissement Catalogue.</p>
           </div>
           <div class="nearby-catalogue-stats">
             <div class="nearby-catalogue-stat"><strong>${stats.total}</strong> films</div>
@@ -733,7 +750,7 @@
     }
     if (!location) location = await window.PLACES.geolocate();
 
-    console.log('[Catalogue proche] ZIP 2.9.5 actif — appel /seances-auto + extraction séances robuste.');
+    console.log('[Catalogue proche] ZIP 2.9.6 actif — /seances-auto + nettoyage titres techniques.');
     console.log('[Catalogue proche] Position utilisée :', location);
 
     const cinemas = await window.PLACES.findNearbycinemas(location, radius);
@@ -837,7 +854,7 @@
 
     const missingDraft = buildMissingCatalogueDraft(ranked);
 
-    console.log(`[Catalogue proche] Résultat ZIP 2.9.5 : ${stats.total} film(s), ${stats.rated} classé(s), ${stats.missing} à enrichir.`);
+    console.log(`[Catalogue proche] Résultat ZIP 2.9.6 : ${stats.total} film(s), ${stats.rated} classé(s), ${stats.missing} à enrichir.`);
     console.group('[Catalogue proche] Debug correspondances titres');
     console.table(matchDebug);
     console.groupEnd();
