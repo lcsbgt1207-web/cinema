@@ -1,5 +1,5 @@
 /* CinéProche — Catalogue proche — ZIP 3.5.3
-   Objectif : conserver la fusion proche + enrichir les fiches film utilisées par le Catalogue.
+   Objectif : correction date locale et fallback séances UGC + enrichir les fiches film utilisées par le Catalogue.
    - Les films reconnus dans js/data.js gardent leur note locale.
    - Les films absents trouvés sur TMDB deviennent utilisables directement dans la liste finale.
    - Ajout d'un catalogue temporaire exportable window.NEARBY_CATALOGUE_RUNTIME_DATA.
@@ -532,6 +532,13 @@
     return new Date(date.getFullYear(), date.getMonth(), date.getDate());
   }
 
+  function formatLocalDateYYYYMMDD(date = new Date()) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
   function getNearbyWindowBounds() {
     const start = startOfLocalDay(new Date());
     const endExclusive = new Date(start);
@@ -652,6 +659,7 @@
       seenObjects.add(node);
 
       const objectDate = parseShowtimeDate(firstString(
+        node.__nearbyFallbackDate, node.__nearbyRequestedDate, node.__nearbyApiDate,
         node.date, node.day, node.jour, node.showDate, node.sessionDate,
         node.dateLabel, node.dayLabel, node.label, node.tabLabel, node.displayDate, node.displayDay
       ), fallbackDate) || fallbackDate;
@@ -695,6 +703,7 @@
     const possibleArrays = [item.horaires, item.times, item.showtimes, item.seances, item.sessions, item.scr, item.version?.times];
     const fallback = [];
     const itemDate = parseShowtimeDate(firstString(
+      item.__nearbyFallbackDate, item.__nearbyRequestedDate, item.__nearbyApiDate,
       item.date, item.day, item.jour, item.showDate, item.sessionDate,
       item.dateLabel, item.dayLabel, item.label, item.tabLabel, item.displayDate, item.displayDay
     ));
@@ -999,7 +1008,9 @@
     const allocineId = await getCinemaAllocineId(cinema);
     if (!allocineId) return [];
 
-    const requestedDate = new Date().toISOString().split('T')[0];
+    // ZIP 3.5.4 : surtout ne pas utiliser toISOString() ici.
+    // toISOString() passe en UTC et peut demander la veille après minuit en France.
+    const requestedDate = formatLocalDateYYYYMMDD(new Date());
     const url = `${NEARBY_CATALOGUE_API}/seances-auto?id=${encodeURIComponent(allocineId)}&date=${requestedDate}&days=7`;
     const data = await fetchJsonWithDebug(url, `seances-auto pour ${cinema?.nom}`);
 
@@ -1010,7 +1021,18 @@
       attempts: data?.attempts || []
     });
 
-    const rawShowtimes = extractSeancesArray(data);
+    const apiFallbackDate = data?.date || data?.requested_date || requestedDate;
+    const rawShowtimes = extractSeancesArray(data).map(item => {
+      if (item && typeof item === 'object') {
+        return {
+          ...item,
+          __nearbyFallbackDate: item.__nearbyFallbackDate || apiFallbackDate,
+          __nearbyRequestedDate: item.__nearbyRequestedDate || requestedDate,
+          __nearbyApiDate: item.__nearbyApiDate || data?.date || ''
+        };
+      }
+      return item;
+    });
     console.log(`[Catalogue proche][DEBUG] Tableau extrait pour ${cinema?.nom} :`, rawShowtimes);
     if (rawShowtimes[0]) {
       console.log(`[Catalogue proche][DEBUG] Premier objet brut pour ${cinema?.nom} :`, rawShowtimes[0]);
@@ -1108,7 +1130,7 @@
         <div class="nearby-catalogue-head">
           <div>
             <h2>Films proches trouvés</h2>
-            <p>ZIP 3.5 : uniquement les films avec une séance entre aujourd’hui et J+7, avec horaires lisibles.</p>
+            <p>ZIP 3.5.4 : uniquement les films avec une séance entre aujourd’hui et J+7, avec horaires lisibles.</p>
           </div>
           <div class="nearby-catalogue-stats">
             <div class="nearby-catalogue-stat"><strong>${stats.total}</strong> films</div>
