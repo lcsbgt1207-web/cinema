@@ -691,10 +691,13 @@
           film.showtimes?.forEach(sh => {
             if (!sh.startsAt || !sh.startsAt.startsWith(dateStr)) return;
             const h = new Date(sh.startsAt);
-            // Filtre de bon sens : séances entre 9h et 23h30 seulement
             const heure = h.getHours();
             if (heure < 9 || heure > 23) return;
-            set.add(h.getHours().toString().padStart(2,'0')+'h'+h.getMinutes().toString().padStart(2,'0'));
+            const vMap = {'DUBBED':'VF','ORIGINAL':'VO','SUBTITLED':'VOST','LOCAL':'VOSTFR','ORIGINAL_SUBTITLED':'VOST','SUBTITLED_LOCAL':'VOSTFR'};
+            const vRaw = (sh.diffusionVersion||sh.version||'').toUpperCase();
+            const v = vMap[vRaw] || vRaw;
+            const label = h.getHours().toString().padStart(2,'0')+'h'+h.getMinutes().toString().padStart(2,'0') + (v ? ' '+v : '');
+            set.add(label);
           });
         });
         return [...set].sort().slice(0,8);
