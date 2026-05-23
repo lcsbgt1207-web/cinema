@@ -427,54 +427,97 @@
   async function chargerSeancesProches(film) {
     const zone = document.getElementById('popup-seances-content');
     if (!zone) return;
+
     const lat = parseFloat(localStorage.getItem('cinepro_user_lat'));
     const lng = parseFloat(localStorage.getItem('cinepro_user_lng'));
+
     if (!lat || !lng) {
       zone.innerHTML = '<span style="color:#aaa;">📍 <a href="#" onclick="demanderPosition();return false;" style="color:#555;text-decoration:underline;">Activez votre position</a> pour voir les séances proches.</span>';
       return;
     }
+
     const titre = film.title || film.original_title || '';
     if (!titre) { zone.innerHTML = '<span style="color:#bbb;">Titre introuvable.</span>'; return; }
-    zone.innerHTML = '<span style="color:#bbb;">Recherche des séances proches…</span>';
+
+    zone.innerHTML = '<span style="color:#bbb;">Recherche des séances proches...</span>';
+
     try {
-      const res = await fetch(`${BACKEND}/search-cinema?lat=${lat}&lng=${lng}&radius=15000`);
-      if (!res.ok) throw new Error();
-      const cinemas = await res.json();
-      if (!cinemas || cinemas.length === 0) { zone.innerHTML = '<span style="color:#aaa;">Aucun cinéma dans un rayon de 15 km.</span>'; return; }
+      // Étape 1 : cinémas proches via Google Places
+      let cinemas = [];
+      if (typeof PLACES !== 'undefined' && PLACES.placesService) {
+        PLACES.userLocation = { lat, lng };
+        cinemas = await PLACES.findNearbycinemas({ lat, lng }, 15000);
+      }
+
+      if (!cinemas || cinemas.length === 0) {
+        zone.innerHTML = '<span style="color:#aaa;">Aucun cinéma trouvé dans un rayon de 15 km.</span>';
+        return;
+      }
+
+      // Étape 2 : pour chaque cinéma, récupérer l'ID AlloCiné puis les séances
       let toutesSeances = [];
       await Promise.all(cinemas.slice(0, 5).map(async cinema => {
         try {
-          const r = await fetch(`${BACKEND}/seances?allocine_id=${cinema.allocine_id}`);
-          if (!r.ok) return;
-          const data = await r.json();
+          // Chercher l'ID AlloCiné par nom
+          const params = new URLSearchParams({ name: cinema.nom, lat: cinema.location.lat, lng: cinema.location.lng });
+          const r1 = await fetch(`${BACKEND}/search-cinema?${params}`);
+          if (!r1.ok) return;
+          const data1 = await r1.json();
+          // L'API renvoie un tableau de candidats avec un champ id
+          const allocineId = data1?.[0]?.id || data1?.id || data1?.allocine_id;
+          if (!allocineId) return;
+
+          // Charger les séances
+          const today = new Date().toISOString().slice(0, 10);
+          const r2 = await fetch(`${BACKEND}/seances?id=${encodeURIComponent(allocineId)}&date=${today}`);
+          if (!r2.ok) return;
+          const data2 = await r2.json();
+
+          // Filtrer par titre du film
           const mot = titre.toLowerCase().slice(0, 10);
-          (data.seances || []).filter(s => s.titre && s.titre.toLowerCase().includes(mot))
-            .forEach(s => toutesSeances.push({ ...s, cinema_nom: cinema.name }));
+          const seancesFilm = (data2.seances || data2.showtimes || data2 || [])
+            .filter(s => {
+              const t = (s.titre || s.title || s.film || '').toLowerCase();
+              return t.includes(mot);
+            });
+          seancesFilm.forEach(s => toutesSeances.push({ ...s, cinema_nom: cinema.nom }));
         } catch {}
       }));
-      if (toutesSeances.length === 0) { zone.innerHTML = `<span style="color:#aaa;">Pas de séance trouvée pour <em>${titre}</em> près de chez vous.</span>`; return; }
+
+      if (toutesSeances.length === 0) {
+        zone.innerHTML = `<span style="color:#aaa;">Pas de séance trouvée pour <em>${titre}</em> près de chez vous.</span>`;
+        return;
+      }
+
+      // Afficher groupé par cinéma
       const parCinema = {};
-      toutesSeances.forEach(s => { if (!parCinema[s.cinema_nom]) parCinema[s.cinema_nom] = []; parCinema[s.cinema_nom].push(s); });
+      toutesSeances.forEach(s => {
+        if (!parCinema[s.cinema_nom]) parCinema[s.cinema_nom] = [];
+        parCinema[s.cinema_nom].push(s);
+      });
+
       let html = '<div style="display:flex;flex-direction:column;gap:14px;">';
       for (const [nom, seances] of Object.entries(parCinema)) {
         html += `<div><div style="font-size:12px;font-weight:600;color:#333;margin-bottom:6px;">${nom}</div><div style="display:flex;flex-wrap:wrap;gap:6px;">`;
         seances.forEach(s => {
-          const h = s.heure || s.time || '';
+          const h = s.heure || s.time || s.horaire || '';
           const v = s.version ? ` <span style='font-size:10px;color:#888;'>${s.version}</span>` : '';
-          const tEsc = titre.replace(/'/g,"\'");
-          const nEsc = nom.replace(/'/g,"\'");
+          const tEsc = titre.replace(/'/g, "\'");
+          const nEsc = nom.replace(/'/g, "\'");
           html += `<button onclick="openReservation('${tEsc}','${nEsc}','${h}')" style="font-size:12px;padding:4px 10px;border-radius:5px;border:1px solid #ddd;background:#fff;cursor:pointer;color:#222;">${h}${v}</button>`;
         });
         html += '</div></div>';
       }
       html += '</div>';
       zone.innerHTML = html;
-    } catch {
-      zone.innerHTML = '<span style="color:#aaa;">Impossible de charger les s\u00e9ances pour l\u2019instant.</span>';
+
+    } catch(e) {
+      console.error('chargerSeancesProches:', e);
+      zone.innerHTML = "<span style='color:#aaa;'>Impossible de charger les séances pour l'instant.</span>";
     }
   }
 
-  document.addEventListener('DOMContentLoaded', initBanniere);
+    document.addEventListener('DOMContentLoaded', initBanniere);
 
   // Init
   loadFilms('now');
