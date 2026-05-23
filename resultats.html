@@ -898,18 +898,34 @@
       // Construire les films avec posters + horaires aujourd'hui et demain
       const filmsHtml = await Promise.all(films.slice(0,10).map(async f => {
         const titre = f.title || f.name || '';
+        // Map version AlloCiné → label lisible
+        const vMap = { 'DUBBED':'VF','ORIGINAL':'VO','SUBTITLED':'VOST','LOCAL':'VOSTFR','ORIGINAL_SUBTITLED':'VOST','SUBTITLED_LOCAL':'VOSTFR' };
+        function fmtSeance(s) {
+          const h = new Date(s.startsAt);
+          const heure = h.getHours().toString().padStart(2,'0')+'h'+h.getMinutes().toString().padStart(2,'0');
+          const vRaw = (s.diffusionVersion||s.version||'').toUpperCase();
+          const v = vMap[vRaw] || vRaw;
+          return { heure, version: v, key: heure+'_'+v };
+        }
+
         // Horaires aujourd'hui
-        const hToday = (f.showtimes||[])
+        const seancesToday = (f.showtimes||[])
           .filter(s => s.startsAt?.startsWith(todayStr))
-          .map(s => { const h = new Date(s.startsAt); return h.getHours().toString().padStart(2,'0')+'h'+h.getMinutes().toString().padStart(2,'0'); })
-          .filter((v,i,a)=>a.indexOf(v)===i).sort().slice(0,6);
+          .map(fmtSeance)
+          .filter((s,i,a) => a.findIndex(x=>x.key===s.key)===i)
+          .sort((a,b)=>a.heure.localeCompare(b.heure)).slice(0,8);
 
         // Horaires demain depuis d2
         const filmDemain = (d2.seances||[]).find(fd => normTitre(fd.title||fd.name||'') === normTitre(titre));
-        const hTomorrow = (filmDemain?.showtimes||[])
+        const seancesTomorrow = (filmDemain?.showtimes||[])
           .filter(s => s.startsAt?.startsWith(tomorrowStr))
-          .map(s => { const h = new Date(s.startsAt); return h.getHours().toString().padStart(2,'0')+'h'+h.getMinutes().toString().padStart(2,'0'); })
-          .filter((v,i,a)=>a.indexOf(v)===i).sort().slice(0,6);
+          .map(fmtSeance)
+          .filter((s,i,a) => a.findIndex(x=>x.key===s.key)===i)
+          .sort((a,b)=>a.heure.localeCompare(b.heure)).slice(0,8);
+        
+        // Compat ancienne variable
+        const hToday = seancesToday.map(s=>s.heure);
+        const hTomorrow = seancesTomorrow.map(s=>s.heure);
 
         // Poster TMDB
         let posterHtml = `<i class="ti ti-photo" style="font-size:20px;color:var(--gray-300);margin:auto;display:flex;"></i>`;
@@ -923,11 +939,11 @@
           }
         } catch(e) {}
 
-        const horairesBtnToday = hToday.map(h =>
-          `<button class="seance-pill" onclick="openReservation('${titre.replace(/'/g,"\'")}','${cinema.nom.replace(/'/g,"\'")}','${h}')">${h}</button>`
+        const horairesBtnToday = seancesToday.map(s =>
+          `<button class="seance-pill" onclick="openReservation('${titre.replace(/'/g,"\'")}','${cinema.nom.replace(/'/g,"\'")}','${s.heure}')">${s.heure}${s.version ? ` <span style="font-size:10px;opacity:0.7;">${s.version}</span>` : ''}</button>`
         ).join('');
-        const horairesBtnTomorrow = hTomorrow.map(h =>
-          `<button class="seance-pill" onclick="openReservation('${titre.replace(/'/g,"\'")}','${cinema.nom.replace(/'/g,"\'")}','${h}')">${h}</button>`
+        const horairesBtnTomorrow = seancesTomorrow.map(s =>
+          `<button class="seance-pill" onclick="openReservation('${titre.replace(/'/g,"\'")}','${cinema.nom.replace(/'/g,"\'")}','${s.heure}')">${s.heure}${s.version ? ` <span style="font-size:10px;opacity:0.7;">${s.version}</span>` : ''}</button>`
         ).join('');
 
         const clickFn = tmdbId
