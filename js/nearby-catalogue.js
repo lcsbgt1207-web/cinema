@@ -1,4 +1,4 @@
-/* CinéProche — Catalogue proche — ZIP 3.5
+/* CinéProche — Catalogue proche — ZIP 3.5.2
    Objectif : conserver la fusion proche + enrichir les fiches film utilisées par le Catalogue.
    - Les films reconnus dans js/data.js gardent leur note locale.
    - Les films absents trouvés sur TMDB deviennent utilisables directement dans la liste finale.
@@ -11,6 +11,7 @@
   const NEARBY_CATALOGUE_API = 'https://cinepro-api-yal8.onrender.com';
   const tmdbRatingCache = new Map();
   const tmdbEnrichmentCache = new Map();
+  let nearbyWindowAnchorDate = null;
 
   function stripAccents(value) {
     return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -533,11 +534,62 @@
   }
 
   function getNearbyWindowBounds() {
-    const start = startOfLocalDay(new Date());
+    const anchor = nearbyWindowAnchorDate instanceof Date && !Number.isNaN(nearbyWindowAnchorDate.getTime())
+      ? nearbyWindowAnchorDate
+      : new Date();
+    const start = startOfLocalDay(anchor);
     const endExclusive = new Date(start);
     // J+7 inclus = on garde tout jusqu'au début de J+8.
     endExclusive.setDate(endExclusive.getDate() + 8);
     return { start, endExclusive };
+  }
+
+  function setNearbyWindowAnchorFromRawShowtimes(rawShowtimes) {
+    const dates = [];
+    const seenObjects = new WeakSet();
+
+    function visit(node, path = '$', fallbackDate = null, depth = 0) {
+      if (node === null || node === undefined || depth > 10) return;
+
+      if (typeof node === 'string' || typeof node === 'number' || node instanceof Date) {
+        if (keyLooksLikeShowtimeDate(path)) {
+          const parsed = parseShowtimeDate(node, fallbackDate);
+          if (parsed && !Number.isNaN(parsed.getTime())) dates.push(parsed);
+        }
+        return;
+      }
+
+      if (typeof node !== 'object') return;
+      if (seenObjects.has(node)) return;
+      seenObjects.add(node);
+
+      const objectDate = parseShowtimeDate(firstString(node.date, node.day, node.jour, node.showDate, node.sessionDate), fallbackDate) || fallbackDate;
+      const directValues = [
+        node.startsAt, node.startAt, node.start, node.datetime, node.dateTime,
+        node.showtime, node.showTime, node.time, node.horaire, node.hour, node.heure
+      ];
+      for (const value of directValues) {
+        const parsed = parseShowtimeDate(value, objectDate);
+        if (parsed && !Number.isNaN(parsed.getTime())) dates.push(parsed);
+      }
+
+      if (Array.isArray(node)) {
+        node.forEach((child, index) => visit(child, `${path}[${index}]`, objectDate, depth + 1));
+        return;
+      }
+
+      for (const [key, value] of Object.entries(node)) {
+        visit(value, `${path}.${key}`, objectDate, depth + 1);
+      }
+    }
+
+    for (const item of Array.isArray(rawShowtimes) ? rawShowtimes : []) visit(item);
+    const validDates = dates.filter(date => date instanceof Date && !Number.isNaN(date.getTime()));
+    if (!validDates.length) return;
+
+    const earliest = validDates.reduce((min, date) => date < min ? date : min, validDates[0]);
+    nearbyWindowAnchorDate = startOfLocalDay(earliest);
+    console.log('[Catalogue proche] Fenêtre séances ancrée sur la première date disponible :', nearbyWindowAnchorDate.toISOString().slice(0, 10));
   }
 
   function parseShowtimeDate(value, fallbackDate = null) {
@@ -574,7 +626,7 @@
 
   function formatNearbyShowtime(date) {
     if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
-    const today = startOfLocalDay(new Date());
+    const today = getNearbyWindowBounds().start;
     const day = startOfLocalDay(date);
     const diffDays = Math.round((day - today) / 86400000);
     const time = date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }).replace(':', 'h');
@@ -965,6 +1017,11 @@
       console.log(`[Catalogue proche][DEBUG] Premier objet brut pour ${cinema?.nom} :`, rawShowtimes[0]);
       console.log(`[Catalogue proche][DEBUG] Clés premier objet pour ${cinema?.nom} :`, Object.keys(rawShowtimes[0] || {}));
     }
+    // ZIP 3.5.2 : on ancre la fenêtre J à J+7 sur la première date réellement renvoyée
+    // par l'API. Cela évite de supprimer des séances valides quand l'ordinateur,
+    // le backend ou les données de test ne sont pas exactement sur le même jour.
+    setNearbyWindowAnchorFromRawShowtimes(rawShowtimes);
+
     return rawShowtimes.map(normalizeShowtimeItem).filter(Boolean);
   }
 
@@ -1273,7 +1330,7 @@
     }
     if (!location) location = await window.PLACES.geolocate();
 
-    console.log('[Catalogue proche] ZIP 3.5 actif — Catalogue limité aux séances de J à J+7.');
+    console.log('[Catalogue proche] ZIP 3.5.2 actif — Correction filtre séances proches J à J+7.');
     console.log('[Catalogue proche] Position utilisée :', location);
 
     const cinemas = await window.PLACES.findNearbycinemas(location, radius);
