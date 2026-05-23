@@ -383,13 +383,22 @@
         renderFn: (pageCinemas, pagerHtml) => {
           list.innerHTML = pageCinemas.map((c, ci) => renderCinemaCard(c, ci)).join('');
           document.getElementById('cinemas-pager').innerHTML = pagerHtml;
-          // Charger les vrais films AlloCiné séquentiellement avec délai
-          (async () => {
-            for (let ci = 0; ci < pageCinemas.length; ci++) {
-              setTimeout(() => loadFilmsForCinema(pageCinemas[ci], ci), ci * 500);
-              await new Promise(r => setTimeout(r, 800));
-            }
-          })();
+          // Charger les films seulement quand le cinéma est visible (Intersection Observer)
+          const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+              if (entry.isIntersecting) {
+                const ci = parseInt(entry.target.dataset.ci);
+                const cinema = pageCinemas[ci];
+                if (cinema) loadFilmsForCinema(cinema, ci);
+                observer.unobserve(entry.target);
+              }
+            });
+          }, { rootMargin: '100px' });
+          // Observer chaque carte cinéma
+          pageCinemas.forEach((c, ci) => {
+            const card = document.getElementById('cinema-card-' + ci);
+            if (card) { card.dataset.ci = ci; observer.observe(card); }
+          });
         }
       });
 
