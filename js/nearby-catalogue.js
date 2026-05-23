@@ -1,5 +1,5 @@
-/* CinéProche — Catalogue proche — ZIP 3.5.5
-   Objectif : correction fusion des séances UGC et conservation des horaires par cinéma.
+/* CinéProche — Catalogue proche — ZIP 3.5.6
+   Objectif : conservation définitive des horaires UGC jusqu’à la popup Catalogue.
    - Les films reconnus dans js/data.js gardent leur note locale.
    - Les films absents trouvés sur TMDB deviennent utilisables directement dans la liste finale.
    - Ajout d'un catalogue temporaire exportable window.NEARBY_CATALOGUE_RUNTIME_DATA.
@@ -720,20 +720,48 @@
     return [...new Set(fallback)];
   }
 
+
+  function extractRawShowtimeObjects(rawItem) {
+    if (!rawItem || typeof rawItem !== 'object') return [];
+    const found = [];
+    const seenObjects = new WeakSet();
+
+    function visit(node, depth = 0) {
+      if (!node || typeof node !== 'object' || depth > 5) return;
+      if (seenObjects.has(node)) return;
+      seenObjects.add(node);
+
+      for (const key of ['showtimes', 'horaires', 'times', 'seances', 'sessions']) {
+        const value = node[key];
+        if (Array.isArray(value) && value.length) found.push(...value);
+      }
+
+      for (const value of Object.values(node)) {
+        if (value && typeof value === 'object') visit(value, depth + 1);
+      }
+    }
+
+    visit(rawItem);
+    return found;
+  }
+
   function normalizeShowtimeItem(rawItem) {
     const movieObject = extractMovieObject(rawItem);
     const title = extractMovieTitle(movieObject) || extractMovieTitle(rawItem);
     if (!title || !looksLikeRealMovieTitle(title)) return null;
     const horaires = extractShowtimes(rawItem);
+    const rawShowtimeObjects = extractRawShowtimeObjects(rawItem);
     // ZIP 3.5 : le Catalogue ne garde que les films avec au moins une séance entre aujourd'hui et J+7.
-    if (!horaires.length) return null;
+    if (!horaires.length && !rawShowtimeObjects.length) return null;
     return {
       title,
       normalizedKey: normalizeNearbyTitle(title),
       rawMovie: movieObject || rawItem,
       rawItem,
       poster: extractPoster(movieObject, rawItem),
-      horaires
+      horaires,
+      showtimes: rawShowtimeObjects,
+      rawShowtimeObjects
     };
   }
 
@@ -1025,7 +1053,7 @@
     const allocineId = await getCinemaAllocineId(cinema);
     if (!allocineId) return [];
 
-    // ZIP 3.5.4 : surtout ne pas utiliser toISOString() ici.
+    // ZIP 3.5.6 : surtout ne pas utiliser toISOString() ici.
     // toISOString() passe en UTC et peut demander la veille après minuit en France.
     const requestedDate = formatLocalDateYYYYMMDD(new Date());
     const url = `${NEARBY_CATALOGUE_API}/seances-auto?id=${encodeURIComponent(allocineId)}&date=${requestedDate}&days=7`;
@@ -1147,7 +1175,7 @@
         <div class="nearby-catalogue-head">
           <div>
             <h2>Films proches trouvés</h2>
-            <p>ZIP 3.5.4 : uniquement les films avec une séance entre aujourd’hui et J+7, avec horaires lisibles.</p>
+            <p>ZIP 3.5.6 : uniquement les films avec une séance entre aujourd’hui et J+7, avec horaires lisibles.</p>
           </div>
           <div class="nearby-catalogue-stats">
             <div class="nearby-catalogue-stat"><strong>${stats.total}</strong> films</div>
@@ -1194,7 +1222,7 @@
         tmdbId: movie.tmdbDraft?.tmdbId || movie.tmdbId || '',
         tmdbScore: movie.tmdbDraft?.score || 0,
         bestLocalCandidates: movie.bestLocalCandidates || [],
-        cinemas: movie.cinemas.map(c => ({ nom: c.nom, horaires: c.horaires || [] }))
+        cinemas: movie.cinemas.map(c => ({ nom: c.nom, horaires: c.horaires || [], showtimes: c.showtimes || [], rawShowtimes: c.rawShowtimes || [] }))
       }));
   }
 
@@ -1222,7 +1250,7 @@
         tmdbId: movie.tmdbDraft.tmdbId || '',
         source: 'tmdb-enrichment-draft',
         seanceTitle: movie.title,
-        cinemas: movie.cinemas.map(c => ({ nom: c.nom, horaires: c.horaires || [] }))
+        cinemas: movie.cinemas.map(c => ({ nom: c.nom, horaires: c.horaires || [], showtimes: c.showtimes || [], rawShowtimes: c.rawShowtimes || [] }))
       }));
   }
 
@@ -1261,7 +1289,7 @@
         tmdbId: movie.tmdbDraft.tmdbId || '',
         source: 'tmdb-runtime-fusion',
         seanceTitle: movie.title,
-        cinemas: movie.cinemas.map(c => ({ nom: c.nom, horaires: c.horaires || [] }))
+        cinemas: movie.cinemas.map(c => ({ nom: c.nom, horaires: c.horaires || [], showtimes: c.showtimes || [], rawShowtimes: c.rawShowtimes || [] }))
       }));
 
     const seen = new Set();
@@ -1339,9 +1367,11 @@
           nom: c.nom,
           adresse: c.adresse || '',
           distanceKm: c.distanceKm ?? null,
-          horaires: c.horaires || []
+          horaires: c.horaires || [],
+          showtimes: c.showtimes || [],
+          rawShowtimes: c.rawShowtimes || []
         })),
-        cinemas: movie.cinemas.map(c => ({ nom: c.nom, horaires: c.horaires || [] }))
+        cinemas: movie.cinemas.map(c => ({ nom: c.nom, horaires: c.horaires || [], showtimes: c.showtimes || [], rawShowtimes: c.rawShowtimes || [] }))
       };
     }).sort((a, b) => {
       const ar = Number(a.bestNote ?? a.nearbyRatingValue ?? 0);
@@ -1439,18 +1469,23 @@
 
           const movie = moviesByKey.get(key);
           const newHoraires = Array.isArray(item.horaires) ? item.horaires : [];
+          const newShowtimes = Array.isArray(item.showtimes) ? item.showtimes : (Array.isArray(item.rawShowtimeObjects) ? item.rawShowtimeObjects : []);
           const existingCinema = movie.cinemas.find(c => c.nom === cinema.nom);
           if (!existingCinema) {
             movie.cinemas.push({
               nom: cinema.nom,
               adresse: cinema.adresse,
               distanceKm: cinema.dist,
-              horaires: newHoraires
+              horaires: newHoraires,
+              showtimes: newShowtimes,
+              rawShowtimes: newShowtimes
             });
-          } else if (newHoraires.length) {
-            // ZIP 3.5.5 : si le même cinéma est rencontré plusieurs fois pour le même film,
-            // on complète les horaires au lieu de garder un ancien bloc vide.
+          } else {
+            // ZIP 3.5.6 : si le même cinéma est rencontré plusieurs fois pour le même film,
+            // on complète les horaires ET les objets bruts au lieu de garder un ancien bloc vide.
             existingCinema.horaires = [...new Set([...(existingCinema.horaires || []), ...newHoraires])];
+            existingCinema.showtimes = [...(existingCinema.showtimes || []), ...newShowtimes];
+            existingCinema.rawShowtimes = [...(existingCinema.rawShowtimes || []), ...newShowtimes];
           }
           movie.rawShowtimes.push(item.rawItem || item);
         }
@@ -1489,7 +1524,7 @@
     const runtimeFusion = buildRuntimeCatalogueFusion(ranked);
     const nearbyRankedCatalogue = buildNearbyCatalogueRankedExport(ranked);
 
-    console.log(`[Catalogue proche] Résultat ZIP 3.4 : ${stats.total} film(s), ${stats.rated} avec note, ${stats.tmdbEnriched} film(s) fusionné(s) TMDB, ${stats.missing} à vérifier.`);
+    console.log(`[Catalogue proche] Résultat ZIP 3.5.6 : ${stats.total} film(s), ${stats.rated} avec note, ${stats.tmdbEnriched} film(s) fusionné(s) TMDB, ${stats.missing} à vérifier.`);
     console.group('[Catalogue proche] Debug correspondances titres');
     console.table(matchDebug);
     console.groupEnd();
@@ -1564,14 +1599,14 @@
 
     try {
       const storedPayload = {
-        version: '3.4',
+        version: '3.5.6',
         updatedAt: new Date().toISOString(),
         films: runtimeFusion.films,
         tmdbRuntimeFilms: runtimeFusion.tmdbRuntimeFilms,
         stats: window.NEARBY_CATALOGUE_STATS
       };
       const nearbyPayload = {
-        version: '3.4',
+        version: '3.5.6',
         updatedAt: new Date().toISOString(),
         address: options.address || '',
         radius,
@@ -1580,7 +1615,7 @@
       };
       localStorage.setItem('cinepro_runtime_catalogue', JSON.stringify(storedPayload));
       localStorage.setItem('cinepro_nearby_ranked_catalogue', JSON.stringify(nearbyPayload));
-      console.log(`[Catalogue proche] ZIP 3.4 : catalogue runtime sauvegardé pour catalogue.html (${runtimeFusion.total} films).`);
+      console.log(`[Catalogue proche] ZIP 3.5.6 : catalogue runtime sauvegardé pour catalogue.html (${runtimeFusion.total} films).`);
       window.dispatchEvent(new CustomEvent('nearby-catalogue-runtime-ready', { detail: storedPayload }));
       window.dispatchEvent(new CustomEvent('nearby-catalogue-ranked-ready', { detail: nearbyPayload }));
     } catch (storageError) {
