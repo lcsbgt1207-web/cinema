@@ -1,5 +1,5 @@
-/* CinéProche — Catalogue proche — ZIP 3.5.3
-   Objectif : correction date locale et fallback séances UGC + enrichir les fiches film utilisées par le Catalogue.
+/* CinéProche — Catalogue proche — ZIP 3.5.5
+   Objectif : correction fusion des séances UGC et conservation des horaires par cinéma.
    - Les films reconnus dans js/data.js gardent leur note locale.
    - Les films absents trouvés sur TMDB deviennent utilisables directement dans la liste finale.
    - Ajout d'un catalogue temporaire exportable window.NEARBY_CATALOGUE_RUNTIME_DATA.
@@ -976,18 +976,35 @@
 
     visit(data);
 
-    const unique = [];
-    const seenKeys = new Set();
+    const uniqueByTitle = new Map();
     for (const candidate of found) {
       const normalized = normalizeNearbyTitle(candidate.title);
-      if (!normalized || seenKeys.has(normalized)) continue;
-      seenKeys.add(normalized);
+      if (!normalized) continue;
       const raw = candidate.rawItem || { title: candidate.title };
       if (raw && typeof raw === 'object' && !extractMovieTitle(raw)) {
         raw.title = candidate.title;
       }
-      unique.push(raw);
+
+      const existing = uniqueByTitle.get(normalized);
+      if (!existing) {
+        uniqueByTitle.set(normalized, raw);
+        continue;
+      }
+
+      // ZIP 3.5.5 : l'API UGC peut faire apparaître le même film plusieurs fois
+      // dans le JSON analysé. Avant, on gardait seulement le premier objet trouvé.
+      // Si ce premier objet ne portait pas les horaires, les séances UGC étaient perdues.
+      // On fusionne donc les tableaux d'horaires au lieu d'écraser/ignorer les doublons.
+      if (existing && typeof existing === 'object' && raw && typeof raw === 'object') {
+        for (const key of ['showtimes', 'horaires', 'times', 'seances', 'sessions']) {
+          const a = Array.isArray(existing[key]) ? existing[key] : [];
+          const b = Array.isArray(raw[key]) ? raw[key] : [];
+          if (b.length) existing[key] = [...a, ...b];
+        }
+      }
     }
+
+    const unique = Array.from(uniqueByTitle.values());
 
     if (!unique.length) {
       console.warn('[Catalogue proche][DEBUG] Aucun film extrait de /seances. JSON complet analysé :', data);
@@ -1421,13 +1438,19 @@
           }
 
           const movie = moviesByKey.get(key);
-          if (!movie.cinemas.some(c => c.nom === cinema.nom)) {
+          const newHoraires = Array.isArray(item.horaires) ? item.horaires : [];
+          const existingCinema = movie.cinemas.find(c => c.nom === cinema.nom);
+          if (!existingCinema) {
             movie.cinemas.push({
               nom: cinema.nom,
               adresse: cinema.adresse,
               distanceKm: cinema.dist,
-              horaires: item.horaires || []
+              horaires: newHoraires
             });
+          } else if (newHoraires.length) {
+            // ZIP 3.5.5 : si le même cinéma est rencontré plusieurs fois pour le même film,
+            // on complète les horaires au lieu de garder un ancien bloc vide.
+            existingCinema.horaires = [...new Set([...(existingCinema.horaires || []), ...newHoraires])];
           }
           movie.rawShowtimes.push(item.rawItem || item);
         }

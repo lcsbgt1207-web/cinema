@@ -702,7 +702,7 @@ function getStartOfLocalDay(date) {
 
 function parsePopupShowtimeDate(value) {
   if (!value) return null;
-  const raw = typeof value === 'string' ? value : (value?.time || value?.horaire || value?.startsAt || value?.date || '');
+  const raw = typeof value === 'string' ? value : (value?.startsAt || value?.startAt || value?.datetime || value?.dateTime || value?.time || value?.horaire || value?.date || '');
   if (!raw) return null;
 
   // Cas simple : déjà un horaire court comme "13:00".
@@ -727,7 +727,7 @@ function isPopupShowtimeInNextSevenDays(value) {
 }
 
 function formatPopupShowtime(value) {
-  const raw = typeof value === 'string' ? value : (value?.time || value?.horaire || value?.startsAt || value?.date || 'Horaire');
+  const raw = typeof value === 'string' ? value : (value?.startsAt || value?.startAt || value?.datetime || value?.dateTime || value?.time || value?.horaire || value?.date || 'Horaire');
   const text = String(raw || '').trim();
   const date = parsePopupShowtimeDate(value);
 
