@@ -541,7 +541,7 @@
       const films = data.seances || [];
 
       if (!films.length) {
-        container.innerHTML = '<span style="font-size:12px;color:var(--gray-400);padding:4px 0;">Aucune séance aujourd'hui.</span>';
+        container.innerHTML = "<span style='font-size:12px;color:var(--gray-400);padding:4px 0;'>Aucune s\u00e9ance aujourd'hui.</span>";
         return;
       }
 
@@ -583,7 +583,7 @@
 
     } catch(e) {
       // Retry échoué — afficher message propre
-      if (container) container.innerHTML = '<span style="font-size:12px;color:var(--gray-400);padding:4px 0;">Séances non disponibles pour l'instant.</span>';
+      if (container) container.innerHTML = "<span style='font-size:12px;color:var(--gray-400);padding:4px 0;'>S\u00e9ances non disponibles pour l'instant.</span>";
     }
   }
 
