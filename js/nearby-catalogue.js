@@ -1,9 +1,9 @@
-/* CinéProche — Catalogue proche — ZIP 2.9.8
-   Objectif unique : enrichir les films absents avec TMDB sans modifier js/data.js.
+/* CinéProche — Catalogue proche — ZIP 2.9.9
+   Objectif unique : fusionner les films TMDB enrichis dans le résultat Catalogue proche.
    - Les films reconnus dans js/data.js gardent leur note locale.
-   - Les films absents sont recherchés sur TMDB pour récupérer titre officiel, affiche, synopsis FR, année et note.
-   - Ajout d'un brouillon exportable window.NEARBY_CATALOGUE_ENRICHED_DRAFT.
-   - Aucun ajout automatique définitif dans le Catalogue : on prépare, on vérifie, puis on intégrera ensuite.
+   - Les films absents trouvés sur TMDB deviennent utilisables directement dans la liste finale.
+   - Ajout d'un catalogue temporaire exportable window.NEARBY_CATALOGUE_RUNTIME_DATA.
+   - Aucun ajout définitif dans js/data.js : la fusion reste côté navigateur pour validation.
 */
 (function () {
   'use strict';
@@ -734,7 +734,7 @@
   }
 
   function extractSeancesArray(data) {
-    // ZIP 2.9.8 : on ne suppose plus une structure précise.
+    // ZIP 2.9.9 : on ne suppose plus une structure précise.
     // L'API /seances peut renvoyer les films dans data, results, showtimes, movie, film,
     // ou même dans des fragments HTML/JSON imbriqués. On scanne tout récursivement.
     const found = [];
@@ -856,7 +856,10 @@
       .nearby-catalogue-stat{border:1px solid rgba(0,0,0,.08);border-radius:999px;padding:9px 13px;background:#fafafa;font-size:13px;white-space:nowrap;}
       .nearby-catalogue-stat strong{font-size:16px;margin-right:4px;}
       .nearby-catalogue-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;padding:20px;}
-      .nearby-movie-card{border:1px solid rgba(0,0,0,.08);border-radius:22px;padding:16px;background:#fff;display:flex;flex-direction:column;gap:10px;min-height:145px;}
+      .nearby-movie-card{border:1px solid rgba(0,0,0,.08);border-radius:22px;padding:14px;background:#fff;display:grid;grid-template-columns:64px 1fr;gap:12px;min-height:145px;}
+      .nearby-movie-poster{width:64px;height:96px;border-radius:14px;object-fit:cover;background:#f3f3f3;border:1px solid rgba(0,0,0,.06);}
+      .nearby-movie-poster-empty{width:64px;height:96px;border-radius:14px;background:linear-gradient(135deg,#f5f5f5,#e9e9e9);border:1px solid rgba(0,0,0,.06);display:flex;align-items:center;justify-content:center;color:#999;font-size:22px;}
+      .nearby-movie-body{display:flex;flex-direction:column;gap:8px;min-width:0;}
       .nearby-movie-top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;}
       .nearby-movie-title{font-weight:800;font-size:16px;line-height:1.2;letter-spacing:-.02em;}
       .nearby-badge{border-radius:999px;padding:6px 9px;font-size:12px;font-weight:800;white-space:nowrap;}
@@ -864,6 +867,7 @@
       .nearby-badge-new{background:#fff3d8;color:#8a5a00;}
       .nearby-movie-meta{color:#666;font-size:13px;line-height:1.45;}
       .nearby-movie-cinemas{color:#333;font-size:13px;line-height:1.45;}
+      .nearby-movie-synopsis{color:#777;font-size:12.5px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
       .nearby-missing-box{padding:18px 24px;border-top:1px solid rgba(0,0,0,.07);background:#fafafa;}
       .nearby-missing-box h3{margin:0 0 8px;font-size:16px;}
       .nearby-missing-list{margin:0;color:#666;font-size:13px;line-height:1.6;}
@@ -897,17 +901,27 @@
         ? `<span class="nearby-badge nearby-badge-rated">★ ${movie.ratingValue} ${movie.ratingSource || ''}</span>`
         : (movie.enrichmentStatus === 'tmdb-enriched'
           ? '<span class="nearby-badge nearby-badge-rated">TMDB trouvé</span>'
-          : '<span class="nearby-badge nearby-badge-new">À enrichir</span>');
+          : '<span class="nearby-badge nearby-badge-new">À vérifier</span>');
       const cinemas = movie.cinemas.map(c => c.nom).join(', ');
-      const matched = movie.localFilm ? `Catalogue : ${escapeHtml(movie.matchedTitle)}` : (movie.tmdbDraft?.titre ? `TMDB : ${escapeHtml(movie.tmdbDraft.titre)}` : 'Absent du catalogue');
+      const displayTitle = movie.tmdbDraft?.titre || movie.matchedTitle || movie.title;
+      const year = movie.tmdbDraft?.annee || movie.localFilm?.annee || movie.localFilm?.year || '';
+      const matched = movie.localFilm
+        ? `Catalogue local${year ? ` · ${year}` : ''}`
+        : (movie.tmdbDraft?.titre ? `TMDB fusionné${year ? ` · ${year}` : ''}` : 'Absent du catalogue');
+      const poster = movie.poster || movie.tmdbDraft?.poster || movie.localFilm?.poster || '';
+      const synopsis = movie.tmdbDraft?.synopsis || movie.localFilm?.synopsis || movie.localFilm?.desc || '';
       return `
         <article class="nearby-movie-card">
-          <div class="nearby-movie-top">
-            <div class="nearby-movie-title">${index + 1}. ${escapeHtml(movie.title)}</div>
-            ${badge}
+          ${poster ? `<img class="nearby-movie-poster" src="${escapeHtml(poster)}" alt="Affiche ${escapeHtml(displayTitle)}" loading="lazy">` : '<div class="nearby-movie-poster-empty">🎬</div>'}
+          <div class="nearby-movie-body">
+            <div class="nearby-movie-top">
+              <div class="nearby-movie-title">${index + 1}. ${escapeHtml(displayTitle)}</div>
+              ${badge}
+            </div>
+            <div class="nearby-movie-meta">Séance : ${escapeHtml(movie.title)} · ${matched}</div>
+            ${synopsis ? `<div class="nearby-movie-synopsis">${escapeHtml(synopsis)}</div>` : ''}
+            <div class="nearby-movie-cinemas">${escapeHtml(cinemas || 'Cinéma non précisé')}</div>
           </div>
-          <div class="nearby-movie-meta">${matched}</div>
-          <div class="nearby-movie-cinemas">${escapeHtml(cinemas || 'Cinéma non précisé')}</div>
         </article>
       `;
     }).join('');
@@ -917,13 +931,13 @@
         <div class="nearby-catalogue-head">
           <div>
             <h2>Films proches trouvés</h2>
-            <p>ZIP 2.9.8 : séances réelles + enrichissement TMDB des films absents, sans modifier js/data.js.</p>
+            <p>ZIP 2.9.9 : séances réelles + fusion Catalogue + TMDB des films absents, sans modifier js/data.js.</p>
           </div>
           <div class="nearby-catalogue-stats">
             <div class="nearby-catalogue-stat"><strong>${stats.total}</strong> films</div>
             <div class="nearby-catalogue-stat"><strong>${stats.rated}</strong> classés</div>
-            <div class="nearby-catalogue-stat"><strong>${stats.tmdbEnriched || 0}</strong> enrichis TMDB</div>
-            <div class="nearby-catalogue-stat"><strong>${stats.missing}</strong> à enrichir</div>
+            <div class="nearby-catalogue-stat"><strong>${stats.tmdbEnriched || 0}</strong> fusionnés TMDB</div>
+            <div class="nearby-catalogue-stat"><strong>${stats.missing}</strong> à vérifier</div>
           </div>
         </div>
         <div class="nearby-catalogue-list">${cards || '<p>Aucun film trouvé.</p>'}</div>
@@ -996,6 +1010,62 @@
       }));
   }
 
+
+  function buildRuntimeCatalogueFusion(ranked) {
+    const localFilms = getGlobalFilms().map(film => ({
+      ...film,
+      source: film?.source || 'local-js-data'
+    }));
+
+    const tmdbRuntimeFilms = ranked
+      .filter(movie => movie.enrichmentStatus === 'tmdb-enriched' && movie.tmdbDraft?.found)
+      .map(movie => ({
+        id: `runtime-tmdb-${movie.tmdbDraft.tmdbId || canonicalNearbyTitleKey(movie.title)}`,
+        titre: movie.tmdbDraft.titre || movie.title,
+        title: movie.tmdbDraft.titre || movie.title,
+        original: movie.tmdbDraft.original || '',
+        originalTitle: movie.tmdbDraft.original || '',
+        genre: movie.tmdbDraft.genres?.join(', ') || 'À compléter',
+        genres: movie.tmdbDraft.genres || [],
+        duree: movie.tmdbDraft.runtime ? `${movie.tmdbDraft.runtime} min` : '',
+        runtime: movie.tmdbDraft.runtime || null,
+        real: movie.tmdbDraft.real || '',
+        acteurs: movie.tmdbDraft.acteurs || '',
+        synopsis: movie.tmdbDraft.synopsis || '',
+        poster: movie.tmdbDraft.poster || '',
+        color: 'p1',
+        badge: 'TMDB',
+        lb: null,
+        imdb: null,
+        tmdb: movie.tmdbDraft.tmdb ?? null,
+        sc: movie.tmdbDraft.tmdb ?? null,
+        annee: movie.tmdbDraft.annee ?? null,
+        year: movie.tmdbDraft.annee ?? null,
+        imdbID: movie.tmdbDraft.imdbID || '',
+        tmdbId: movie.tmdbDraft.tmdbId || '',
+        source: 'tmdb-runtime-fusion',
+        seanceTitle: movie.title,
+        cinemas: movie.cinemas.map(c => ({ nom: c.nom, horaires: c.horaires || [] }))
+      }));
+
+    const seen = new Set();
+    const merged = [];
+    for (const film of [...localFilms, ...tmdbRuntimeFilms]) {
+      const key = film?.tmdbId ? `tmdb:${film.tmdbId}` : canonicalNearbyTitleKey(film?.titre || film?.title || film?.original || '');
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      merged.push(film);
+    }
+
+    return {
+      localCount: localFilms.length,
+      tmdbRuntimeCount: tmdbRuntimeFilms.length,
+      total: merged.length,
+      films: merged,
+      tmdbRuntimeFilms
+    };
+  }
+
   async function getNearbyRankedMovies(options = {}) {
     if (!window.PLACES) throw new Error('PLACES n’est pas chargé. Vérifie js/places.js.');
 
@@ -1008,7 +1078,7 @@
     }
     if (!location) location = await window.PLACES.geolocate();
 
-    console.log('[Catalogue proche] ZIP 2.9.8 actif — enrichissement TMDB des films absents.');
+    console.log('[Catalogue proche] ZIP 2.9.9 actif — fusion Catalogue + TMDB des films absents.');
     console.log('[Catalogue proche] Position utilisée :', location);
 
     const cinemas = await window.PLACES.findNearbycinemas(location, radius);
@@ -1125,8 +1195,9 @@
 
     const missingDraft = buildMissingCatalogueDraft(ranked);
     const enrichedDraft = buildEnrichedCatalogueDraft(ranked);
+    const runtimeFusion = buildRuntimeCatalogueFusion(ranked);
 
-    console.log(`[Catalogue proche] Résultat ZIP 2.9.8 : ${stats.total} film(s), ${stats.rated} avec note, ${stats.tmdbEnriched} enrichi(s) TMDB, ${stats.missing} à enrichir.`);
+    console.log(`[Catalogue proche] Résultat ZIP 2.9.9 : ${stats.total} film(s), ${stats.rated} avec note, ${stats.tmdbEnriched} film(s) fusionné(s) TMDB, ${stats.missing} à vérifier.`);
     console.group('[Catalogue proche] Debug correspondances titres');
     console.table(matchDebug);
     console.groupEnd();
@@ -1163,11 +1234,25 @@
       console.warn('[Catalogue proche][TMDB] Brouillon Catalogue enrichi prêt : window.NEARBY_CATALOGUE_ENRICHED_DRAFT', enrichedDraft);
     }
 
+    console.group('[Catalogue proche] Fusion runtime Catalogue + TMDB');
+    console.log('Catalogue local :', runtimeFusion.localCount, 'films');
+    console.log('Films TMDB ajoutés temporairement :', runtimeFusion.tmdbRuntimeCount);
+    console.log('Total runtime exportable :', runtimeFusion.total);
+    console.table(runtimeFusion.tmdbRuntimeFilms.map(film => ({
+      titre: film.titre,
+      annee: film.annee || '—',
+      note: film.tmdb || '—',
+      tmdbId: film.tmdbId || '—',
+      synopsis: film.synopsis ? 'oui' : 'non',
+      affiche: film.poster ? 'oui' : 'non'
+    })));
+    console.groupEnd();
+
     console.table(ranked.map((movie, index) => ({
       rang: index + 1,
       film: movie.title,
-      statut: movie.enrichmentStatus === 'tmdb-enriched' ? 'TMDB trouvé' : (movie.enrichmentStatus === 'missing' ? 'À enrichir' : 'Catalogue'),
-      catalogue: movie.localFilm ? (movie.matchedTitle || 'Catalogue') : 'ABSENT',
+      statut: movie.enrichmentStatus === 'tmdb-enriched' ? 'TMDB fusionné' : (movie.enrichmentStatus === 'missing' ? 'À vérifier' : 'Catalogue'),
+      catalogue: movie.localFilm ? (movie.matchedTitle || 'Catalogue') : (movie.tmdbDraft?.titre ? 'TMDB runtime' : 'ABSENT'),
       tmdb: movie.tmdbDraft?.titre || '—',
       scoreMatch: movie.matchScore || '—',
       meilleurCandidat: movie.enrichmentStatus === 'missing' ? (movie.bestLocalCandidates?.[0] ? `${movie.bestLocalCandidates[0].titre} (${movie.bestLocalCandidates[0].score})` : '—') : '—',
@@ -1179,10 +1264,12 @@
     window.NEARBY_RANKED_MOVIES_LAST_RESULT = ranked;
     window.NEARBY_CATALOGUE_MISSING_DRAFT = missingDraft;
     window.NEARBY_CATALOGUE_ENRICHED_DRAFT = enrichedDraft;
+    window.NEARBY_CATALOGUE_RUNTIME_DATA = runtimeFusion.films;
+    window.NEARBY_CATALOGUE_RUNTIME_TMDB_ONLY = runtimeFusion.tmdbRuntimeFilms;
     window.NEARBY_TMDB_ENRICHMENT_CACHE = tmdbEnrichmentCache;
-    window.NEARBY_CATALOGUE_STATS = stats;
+    window.NEARBY_CATALOGUE_STATS = { ...stats, runtimeTotal: runtimeFusion.total, runtimeTmdbAdded: runtimeFusion.tmdbRuntimeCount };
 
-    renderNearbyRankedMovies(ranked, stats);
+    renderNearbyRankedMovies(ranked, { ...stats, runtimeTotal: runtimeFusion.total, runtimeTmdbAdded: runtimeFusion.tmdbRuntimeCount });
     return ranked;
   }
 
