@@ -386,7 +386,7 @@
           // Charger les vrais films AlloCiné séquentiellement avec délai
           (async () => {
             for (let ci = 0; ci < pageCinemas.length; ci++) {
-              setTimeout(() => loadFilmsForCinema(pageCinemas[ci], ci), ci * 200);
+              setTimeout(() => loadFilmsForCinema(pageCinemas[ci], ci), ci * 500);
               await new Promise(r => setTimeout(r, 800));
             }
           })();
@@ -501,7 +501,7 @@
   }
 
   // Fetch avec retry automatique
-  async function fetchWithRetry(url, timeout = 25000, retries = 1) {
+  async function fetchWithRetry(url, timeout = 45000, retries = 2) {
     for (let i = 0; i <= retries; i++) {
       try {
         const r = await fetchWithTimeout(url, timeout);
@@ -527,7 +527,7 @@
         lat: cinema.location?.lat || '',
         lng: cinema.location?.lng || ''
       });
-      const searchR = await fetchWithRetry(`${CINEPRO_API}/search-cinema?${searchParams}`, 25000, 1);
+      const searchR = await fetchWithRetry(`${CINEPRO_API}/search-cinema?${searchParams}`, 45000, 2);
       const searchData = await searchR.json();
       if (!searchData.id) {
         container.innerHTML = '<span style="font-size:12px;color:var(--gray-400);padding:4px 0;">Séances non disponibles.</span>';
@@ -536,7 +536,7 @@
 
       // 2. Récupérer les séances (avec retry)
       const todayStr = new Date().toISOString().split('T')[0];
-      const s = await fetchWithRetry(`${CINEPRO_API}/seances?id=${searchData.id}&date=${todayStr}`, 25000, 1);
+      const s = await fetchWithRetry(`${CINEPRO_API}/seances?id=${searchData.id}&date=${todayStr}`, 45000, 2);
       const data = await s.json();
       const films = data.seances || [];
 
