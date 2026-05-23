@@ -159,3 +159,7 @@ const PLACES = {
   getMapsUrl(c) { return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(c.nom+' '+c.adresse)}&destination_place_id=${c.id}`; },
   getWazeUrl(c) { return `https://waze.com/ul?ll=${c.location.lat},${c.location.lng}&navigate=yes`; }
 };
+
+
+// Expose le service pour les autres fichiers (catalogue proche, console, etc.)
+window.PLACES = PLACES;
