@@ -485,7 +485,9 @@
             for (const s of showtimes) {
               const startsAt = s.startsAt || s.heure || s.time || '';
               const heure = startsAt ? startsAt.slice(11, 16) : ''; // "2026-05-23T16:30:00" → "16:30"
-              const version = s.diffusionVersion || s.version || s.lang || '';
+              const versionRaw = (s.diffusionVersion || s.version || s.lang || '').toUpperCase();
+              const versionMap = { 'DUBBED': 'VF', 'ORIGINAL': 'VO', 'SUBTITLED': 'VOST', 'LOCAL': 'VOSTFR', 'ORIGINAL_SUBTITLED': 'VOST', 'SUBTITLED_LOCAL': 'VOSTFR' };
+              const version = versionMap[versionRaw] || versionRaw;
               if (heure) toutesSeances.push({ heure, version, cinema_nom: cinema.nom });
             }
           }
