@@ -57,6 +57,8 @@
     .btn-nav-primary { background: var(--black); color: var(--white); border-color: var(--black); }
     .btn-nav-primary:hover { opacity: 0.85; background: var(--black); }
 
+
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     .cinema-films-label { font-size: 11px; font-weight: 500; color: var(--gray-400); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 8px; margin-left: 28px; }
     .cinema-films { display: flex; gap: 8px; margin-left: 28px; overflow-x: auto; padding-bottom: 4px; }
     .film-thumb { flex-shrink: 0; width: 68px; cursor: pointer; }
@@ -498,33 +500,48 @@
     }
   }
 
+  // Fetch avec retry automatique
+  async function fetchWithRetry(url, timeout = 10000, retries = 2) {
+    for (let i = 0; i <= retries; i++) {
+      try {
+        const r = await fetchWithTimeout(url, timeout);
+        if (r.ok) return r;
+      } catch(e) {
+        if (i === retries) throw e;
+        await new Promise(res => setTimeout(res, 1000));
+      }
+    }
+  }
+
   async function loadFilmsForCinema(cinema, ci) {
     const container = document.getElementById('films-cinema-' + ci);
     if (!container) return;
+
+    // Afficher spinner pendant le chargement
+    container.innerHTML = '<span style="font-size:12px;color:var(--gray-400);padding:4px 0;display:flex;align-items:center;gap:6px;"><i class="ti ti-loader" style="animation:spin 1s linear infinite;"></i> Chargement...</span>';
+
     try {
-      // 1. Trouver l'ID AlloCiné du cinéma (timeout 8s)
+      // 1. Trouver l'ID AlloCiné (avec retry)
       const searchParams = new URLSearchParams({
         name: cinema.nom,
         lat: cinema.location?.lat || '',
         lng: cinema.location?.lng || ''
       });
-      const searchR = await fetchWithTimeout(`${CINEPRO_API}/search-cinema?${searchParams}`, 8000);
-      if (!searchR.ok) throw new Error('API indisponible');
+      const searchR = await fetchWithRetry(`${CINEPRO_API}/search-cinema?${searchParams}`, 10000, 2);
       const searchData = await searchR.json();
       if (!searchData.id) {
-        container.innerHTML = renderFilmsFallback(cinema);
+        container.innerHTML = '<span style="font-size:12px;color:var(--gray-400);padding:4px 0;">Séances non disponibles.</span>';
         return;
       }
 
-      // 2. Récupérer les séances du cinéma (= les films à l'affiche)
+      // 2. Récupérer les séances (avec retry)
       const todayStr = new Date().toISOString().split('T')[0];
-      const s = await fetchWithTimeout(`${CINEPRO_API}/seances?id=${searchData.id}&date=${todayStr}`, 8000);
-      if (!s.ok) throw new Error('Séances indisponibles');
+      const s = await fetchWithRetry(`${CINEPRO_API}/seances?id=${searchData.id}&date=${todayStr}`, 10000, 2);
       const data = await s.json();
       const films = data.seances || [];
 
       if (!films.length) {
-        container.innerHTML = renderFilmsFallback(cinema);
+        container.innerHTML = '<span style="font-size:12px;color:var(--gray-400);padding:4px 0;">Aucune séance aujourd'hui.</span>';
         return;
       }
 
@@ -565,7 +582,8 @@
       container.innerHTML = filmsHtml.join('');
 
     } catch(e) {
-      container.innerHTML = renderFilmsFallback(cinema);
+      // Retry échoué — afficher message propre
+      if (container) container.innerHTML = '<span style="font-size:12px;color:var(--gray-400);padding:4px 0;">Séances non disponibles pour l'instant.</span>';
     }
   }
 
