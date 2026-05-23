@@ -1,4 +1,4 @@
-/* CinéProche — Catalogue proche — ZIP 3.4
+/* CinéProche — Catalogue proche — ZIP 3.5
    Objectif : conserver la fusion proche + enrichir les fiches film utilisées par le Catalogue.
    - Les films reconnus dans js/data.js gardent leur note locale.
    - Les films absents trouvés sur TMDB deviennent utilisables directement dans la liste finale.
@@ -528,26 +528,152 @@
     );
   }
 
+  function startOfLocalDay(date = new Date()) {
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  }
+
+  function getNearbyWindowBounds() {
+    const start = startOfLocalDay(new Date());
+    const endExclusive = new Date(start);
+    // J+7 inclus = on garde tout jusqu'au début de J+8.
+    endExclusive.setDate(endExclusive.getDate() + 8);
+    return { start, endExclusive };
+  }
+
+  function parseShowtimeDate(value, fallbackDate = null) {
+    if (value === null || value === undefined) return null;
+    if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
+    const text = String(value).trim();
+    if (!text) return null;
+
+    // Format ISO : 2026-05-23T17:00:00 ou 2026-05-23 17:00.
+    const isoMatch = text.match(/(20\d{2}-\d{2}-\d{2})(?:[T\s]+(\d{1,2})[:h](\d{2}))?/);
+    if (isoMatch) {
+      const [, day, hour = '0', minute = '0'] = isoMatch;
+      const parsed = new Date(`${day}T${String(hour).padStart(2, '0')}:${minute}:00`);
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    }
+
+    // Format heure seule : 17:00 ou 17h00. On rattache à la date de la séance si elle existe, sinon aujourd'hui.
+    const timeMatch = text.match(/\b(\d{1,2})[:h](\d{2})\b/);
+    if (timeMatch) {
+      const base = fallbackDate ? startOfLocalDay(fallbackDate) : startOfLocalDay(new Date());
+      base.setHours(Number(timeMatch[1]), Number(timeMatch[2]), 0, 0);
+      return base;
+    }
+
+    const parsed = new Date(text);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  function isShowtimeInNearbyWindow(date) {
+    if (!(date instanceof Date) || Number.isNaN(date.getTime())) return false;
+    const { start, endExclusive } = getNearbyWindowBounds();
+    return date >= start && date < endExclusive;
+  }
+
+  function formatNearbyShowtime(date) {
+    if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
+    const today = startOfLocalDay(new Date());
+    const day = startOfLocalDay(date);
+    const diffDays = Math.round((day - today) / 86400000);
+    const time = date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }).replace(':', 'h');
+    if (diffDays === 0) return `Aujourd’hui à ${time}`;
+    if (diffDays === 1) return `Demain à ${time}`;
+    const dayLabel = date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+    return `${dayLabel.charAt(0).toUpperCase()}${dayLabel.slice(1)} à ${time}`;
+  }
+
+  function keyLooksLikeShowtimeDate(key = '') {
+    return /(startsAt|startAt|datetime|dateTime|showtime|showTime|horaire|time|date|jour|day|seance|séance|session)/i.test(String(key));
+  }
+
+  function extractShowtimeEntries(item) {
+    const entries = [];
+    const seenObjects = new WeakSet();
+
+    function pushDate(rawValue, fallbackDate = null) {
+      const parsed = parseShowtimeDate(rawValue, fallbackDate);
+      if (!parsed || !isShowtimeInNearbyWindow(parsed)) return;
+      entries.push({ date: parsed, label: formatNearbyShowtime(parsed), raw: rawValue });
+    }
+
+    function visit(node, path = '$', fallbackDate = null, depth = 0) {
+      if (node === null || node === undefined || depth > 8) return;
+
+      if (typeof node === 'string' || typeof node === 'number' || node instanceof Date) {
+        if (keyLooksLikeShowtimeDate(path)) pushDate(node, fallbackDate);
+        return;
+      }
+
+      if (typeof node !== 'object') return;
+      if (seenObjects.has(node)) return;
+      seenObjects.add(node);
+
+      const objectDate = parseShowtimeDate(firstString(node.date, node.day, node.jour, node.showDate, node.sessionDate), fallbackDate) || fallbackDate;
+
+      const directValues = [
+        node.startsAt, node.startAt, node.start, node.datetime, node.dateTime,
+        node.showtime, node.showTime, node.time, node.horaire, node.hour, node.heure
+      ];
+      for (const value of directValues) pushDate(value, objectDate);
+
+      if (Array.isArray(node)) {
+        node.forEach((child, index) => visit(child, `${path}[${index}]`, objectDate, depth + 1));
+        return;
+      }
+
+      for (const [key, value] of Object.entries(node)) {
+        visit(value, `${path}.${key}`, objectDate, depth + 1);
+      }
+    }
+
+    visit(item);
+
+    const unique = [];
+    const seen = new Set();
+    for (const entry of entries.sort((a, b) => a.date - b.date)) {
+      const key = entry.date.toISOString().slice(0, 16);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      unique.push(entry.label);
+    }
+    return unique;
+  }
+
   function extractShowtimes(item) {
     if (!item || typeof item !== 'object') return [];
+    const filtered = extractShowtimeEntries(item);
+    if (filtered.length) return filtered;
+
+    // Sécurité : si l'API ne donne que des heures sans date dans un tableau classique,
+    // on les rattache à aujourd'hui uniquement si elles sont exploitables.
     const possibleArrays = [item.horaires, item.times, item.showtimes, item.seances, item.sessions, item.scr, item.version?.times];
-    for (const arr of possibleArrays) if (Array.isArray(arr)) return arr;
-    if (typeof item.time === 'string') return [item.time];
-    if (typeof item.horaire === 'string') return [item.horaire];
-    return [];
+    const fallback = [];
+    for (const arr of possibleArrays) {
+      if (!Array.isArray(arr)) continue;
+      for (const value of arr) {
+        const parsed = parseShowtimeDate(typeof value === 'string' ? value : firstString(value?.startsAt, value?.time, value?.horaire));
+        if (parsed && isShowtimeInNearbyWindow(parsed)) fallback.push(formatNearbyShowtime(parsed));
+      }
+    }
+    return [...new Set(fallback)];
   }
 
   function normalizeShowtimeItem(rawItem) {
     const movieObject = extractMovieObject(rawItem);
     const title = extractMovieTitle(movieObject) || extractMovieTitle(rawItem);
     if (!title || !looksLikeRealMovieTitle(title)) return null;
+    const horaires = extractShowtimes(rawItem);
+    // ZIP 3.5 : le Catalogue ne garde que les films avec au moins une séance entre aujourd'hui et J+7.
+    if (!horaires.length) return null;
     return {
       title,
       normalizedKey: normalizeNearbyTitle(title),
       rawMovie: movieObject || rawItem,
       rawItem,
       poster: extractPoster(movieObject, rawItem),
-      horaires: extractShowtimes(rawItem)
+      horaires
     };
   }
 
@@ -931,7 +1057,7 @@
         <div class="nearby-catalogue-head">
           <div>
             <h2>Films proches trouvés</h2>
-            <p>ZIP 3.4 : séances réelles + fiche film enrichie avec note, métadonnées et cinémas proches.</p>
+            <p>ZIP 3.5 : uniquement les films avec une séance entre aujourd’hui et J+7, avec horaires lisibles.</p>
           </div>
           <div class="nearby-catalogue-stats">
             <div class="nearby-catalogue-stat"><strong>${stats.total}</strong> films</div>
@@ -1147,7 +1273,7 @@
     }
     if (!location) location = await window.PLACES.geolocate();
 
-    console.log('[Catalogue proche] ZIP 3.4 actif — mode unique Films proches classés exporté vers le Catalogue.');
+    console.log('[Catalogue proche] ZIP 3.5 actif — Catalogue limité aux séances de J à J+7.');
     console.log('[Catalogue proche] Position utilisée :', location);
 
     const cinemas = await window.PLACES.findNearbycinemas(location, radius);
