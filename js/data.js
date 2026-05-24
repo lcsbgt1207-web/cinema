@@ -630,7 +630,7 @@ function buildPopupHTML(film) {
   const duree = film.duree || (film.runtime ? `${film.runtime} min` : '') || 'Durée inconnue';
   const annee = film.annee || film.year || '';
   const cinemas = getPopupCinemas(film);
-  console.log('[Popup] ZIP 3.5.8 : cinémas utilisés pour la fiche film', title, cinemas);
+  console.log('[Popup] ZIP 3.6.4 : cinémas utilisés pour la fiche film', title, cinemas);
   const seancesHTML = buildPopupSeancesHTML(cinemas);
 
   return `
@@ -713,12 +713,14 @@ function normalizePopupVersion(value) {
 function getPopupShowtimeRaw(value) {
   if (value === null || value === undefined) return '';
   if (typeof value === 'string' || typeof value === 'number' || value instanceof Date) return value;
-  return value.startsAt || value.startAt || value.datetime || value.dateTime || value.showtime || value.showTime || value.time || value.horaire || value.hour || value.heure || value.date || '';
+  return value.startsAt || value.startAt || value.datetime || value.dateTime || value.showtime || value.showTime || value.time || value.horaire || value.hour || value.heure || value.date || value.label || '';
 }
 
 function parsePopupShowtimeDate(value) {
   const raw = getPopupShowtimeRaw(value);
   if (!raw) return null;
+
+  if (raw instanceof Date && !Number.isNaN(raw.getTime())) return raw;
 
   const text = String(raw).trim();
   if (!text) return null;
@@ -737,15 +739,15 @@ function parsePopupShowtimeDate(value) {
     return d;
   }
 
-  // Cas simple : heure seule comme 13h10. On ne peut pas deviner le jour.
-  if (/^\d{1,2}[h:]\d{2}$/i.test(text)) return null;
-
   const isoMatch = text.match(/(20\d{2}-\d{2}-\d{2})(?:[T\s]+(\d{1,2})[:h](\d{2}))?/);
   if (isoMatch) {
     const [, day, hour = '0', minute = '0'] = isoMatch;
     const d = new Date(`${day}T${String(hour).padStart(2, '0')}:${minute}:00`);
     return Number.isNaN(d.getTime()) ? null : d;
   }
+
+  // Cas simple : heure seule comme 13h10. Le jour sera géré par le groupe "Séances".
+  if (/^\d{1,2}[h:]\d{2}$/i.test(text)) return null;
 
   const date = new Date(text);
   if (Number.isNaN(date.getTime())) return null;
@@ -794,7 +796,12 @@ function formatPopupShowtime(value) {
   return `${day} · ${time}`;
 }
 
-function getPopupDayLabel(date) {
+function getPopupDayLabel(date, fallbackText = '') {
+  const text = String(fallbackText || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  if (/aujourd/.test(text)) return 'Aujourd’hui';
+  if (/demain/.test(text)) return 'Demain';
+
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return 'Séances';
   const today = getStartOfLocalDay(new Date());
   const day = getStartOfLocalDay(date);
   const diff = Math.round((day - today) / 86400000);
@@ -802,6 +809,12 @@ function getPopupDayLabel(date) {
   if (diff === 1) return 'Demain';
   const label = new Intl.DateTimeFormat('fr-FR', { weekday: 'short', day: 'numeric' }).format(date);
   return label.charAt(0).toUpperCase() + label.slice(1).replace('.', '');
+}
+
+function getPopupDayKey(date, fallbackText = '') {
+  const label = getPopupDayLabel(date, fallbackText);
+  if (date instanceof Date && !Number.isNaN(date.getTime())) return getStartOfLocalDay(date).toISOString().slice(0, 10);
+  return label.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-');
 }
 
 function getPopupShowtimeTime(date, fallback = '') {
@@ -819,24 +832,30 @@ function collectPopupCinemaShowtimes(cinema) {
   function add(value, inheritedVersion = '') {
     if (value === null || value === undefined || value === '') return;
     const raw = getPopupShowtimeRaw(value);
+    const rawText = String(raw || value || '').trim();
+    if (!rawText) return;
+
     const date = parsePopupShowtimeDate(value);
     if (date && !isPopupShowtimeInNextSevenDays(value)) return;
+
     const version = getPopupShowtimeVersion(value) || inheritedVersion || '';
-    const time = getPopupShowtimeTime(date, raw);
+    const time = getPopupShowtimeTime(date, rawText);
     if (!time) return;
+
     collected.push({
       raw: value,
       date,
-      dayKey: date ? getStartOfLocalDay(date).toISOString().slice(0, 10) : 'unknown',
-      dayLabel: date ? getPopupDayLabel(date) : 'Séances',
+      dayKey: getPopupDayKey(date, rawText),
+      dayLabel: getPopupDayLabel(date, rawText),
       time,
       version,
-      sortTime: date ? date.getTime() : 0
+      sortTime: date ? date.getTime() : Number.MAX_SAFE_INTEGER,
+      rawText
     });
   }
 
   function visit(node, inheritedVersion = '', depth = 0) {
-    if (node === null || node === undefined || depth > 7) return;
+    if (node === null || node === undefined || depth > 8) return;
     if (typeof node === 'string' || typeof node === 'number' || node instanceof Date) {
       add(node, inheritedVersion);
       return;
@@ -849,16 +868,19 @@ function collectPopupCinemaShowtimes(cinema) {
     const direct = getPopupShowtimeRaw(node);
     if (direct) add(node, version);
 
-    for (const key of ['horaires', 'showtimes', 'seances', 'séances', 'sessions', 'times', 'rawShowtimes']) {
+    for (const key of ['structuredHoraires', 'horaires', 'showtimes', 'seances', 'séances', 'sessions', 'times', 'rawShowtimes']) {
       const value = node[key];
       if (Array.isArray(value)) value.forEach(child => visit(child, version, depth + 1));
     }
   }
 
+  // ZIP 3.6.4 : on donne la priorité aux horaires déjà présents dans la fiche.
+  // Le bug 3.6.3 venait d'un rendu trop strict qui pouvait ignorer des chaînes
+  // pourtant valides comme "Aujourd’hui à 10h50".
   visit(cinema?.structuredHoraires || []);
+  visit(cinema?.horaires || []);
   visit(cinema?.showtimes || []);
   visit(cinema?.rawShowtimes || []);
-  visit(cinema?.horaires || []);
   visit(cinema?.seances || []);
   visit(cinema?.sessions || []);
   visit(cinema?.times || []);
