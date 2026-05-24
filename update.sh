@@ -139,6 +139,25 @@ copy_file() {
   fi
 }
 
+cleanup_project_structure() {
+  echo "Nettoyage de la structure du projet..."
+
+  # Supprime les dossiers imbriqués créés par erreur.
+  rm -rf "$PROJECT_DIR/cinema-main"
+
+  # Supprime les anciens ZIP qui ne doivent jamais rester dans le dépôt.
+  find "$PROJECT_DIR" -maxdepth 1 -type f \( -name 'cinema-update*.zip' -o -name 'cinema-updates*.zip' \) -delete 2>/dev/null || true
+
+  # Supprime les anciens fichiers de sauvegarde inutiles.
+  find "$PROJECT_DIR" -type f \( -name '*.backup.js' -o -name '*.backup.css' -o -name '*.backup.*' -o -name '*.bak' \) -delete 2>/dev/null || true
+
+  # Supprime les anciens doublons HTML qui ne sont pas utilisés par GitHub Pages.
+  rm -f "$PROJECT_DIR/html/catalogue.html"
+
+  # Supprime le fichier encodé accidentellement.
+  rm -f "$PROJECT_DIR/[Cin#U00e9Proche]"
+}
+
 if ! command -v git >/dev/null 2>&1; then
   echo "Erreur : Git n'est pas installé ou pas détecté."
   pause_exit 1
@@ -203,6 +222,8 @@ copy_file "overlays.html"
 copy_file "update.sh"
 copy_file ".gitignore"
 copy_file ".env.example"
+
+cleanup_project_structure
 
 rm -rf "$PROJECT_DIR/$UPDATE_DIR"
 
