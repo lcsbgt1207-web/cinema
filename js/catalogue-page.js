@@ -1,4 +1,4 @@
-// ZIP 3.9.2 — Stabilisation du catalogue proche.
+// ZIP 3.9.3 — Stabilisation du catalogue proche + stockage local centralisé.
 // Rôle : lire le catalogue proche sauvegardé, afficher vite la liste, puis enrichir uniquement les films visibles incomplets.
 // Important : ce fichier ne doit pas recalculer toute la recherche cinéma ; il consomme les données produites par nearby-catalogue.js.
 
@@ -7,13 +7,13 @@
 const STATIC_CATALOGUE = FILMS.filter(f => f && !f.isMock);
 let catalogue = [];
 let catalogueMode = 'nearby';
-localStorage.setItem('cinepro_catalogue_mode', 'nearby');
+window.CineProStorage?.writeRaw(window.CineProStorage.KEYS.catalogueMode, 'nearby') ?? localStorage.setItem('cinepro_catalogue_mode', 'nearby');
 const LETTERBOXD_API_URL = 'http://localhost:3000/api/films-letterboxd';
 const LETTERBOXD_MIN_VALID_RATING = 0.5;
 const ACTIVE_CATALOGUE_KEY = 'cinepro_active_catalogue';
 const NEARBY_RANKED_KEY = 'cinepro_nearby_ranked_catalogue';
 const RUNTIME_CATALOGUE_KEY = 'cinepro_runtime_catalogue';
-const favs = new Set(JSON.parse(localStorage.getItem('cinepro_favs') || '[]'));
+const favs = new Set(window.CineProStorage?.readFavourites?.() || JSON.parse(localStorage.getItem('cinepro_favs') || '[]')); 
 let sortKey = 'imdb', sortDir = -1;
 let currentPage = 1;
 let pageSize = 8;
@@ -119,7 +119,7 @@ function isFreshNearbyPayload(payload) {
 
 function readStoredPayload(key) {
   try {
-    const payload = JSON.parse(localStorage.getItem(key) || 'null');
+    const payload = window.CineProStorage?.readJSON?.(key, null) ?? JSON.parse(localStorage.getItem(key) || 'null');
     return isFreshNearbyPayload(payload) && Array.isArray(payload?.films) ? payload.films : [];
   } catch (_) {
     return [];
@@ -144,7 +144,11 @@ function writeActiveCatalogueFromFilms(films, meta = {}) {
     stats: { total: films.length }
   };
   try {
-    localStorage.setItem(ACTIVE_CATALOGUE_KEY, JSON.stringify(payload));
+    if (window.CineProStorage?.writeJSON) {
+      window.CineProStorage.writeJSON(ACTIVE_CATALOGUE_KEY, payload);
+    } else {
+      localStorage.setItem(ACTIVE_CATALOGUE_KEY, JSON.stringify(payload));
+    }
     window.CINEPRO_ACTIVE_CATALOGUE = films;
   } catch (error) {
     console.warn('[Catalogue] ZIP 3.8.1 : sauvegarde cinepro_active_catalogue impossible :', error?.message || error);
@@ -177,14 +181,14 @@ function getActiveRawCatalogueSource() {
 
   if (active.length) {
     catalogueMode = 'nearby';
-    localStorage.setItem('cinepro_catalogue_mode', 'nearby');
+    window.CineProStorage?.writeRaw(window.CineProStorage.KEYS.catalogueMode, 'nearby') ?? localStorage.setItem('cinepro_catalogue_mode', 'nearby');
     return { source: active, label: 'catalogue proche actif' };
   }
 
   if (nearby.length) {
     writeActiveCatalogueFromFilms(nearby);
     catalogueMode = 'nearby';
-    localStorage.setItem('cinepro_catalogue_mode', 'nearby');
+    window.CineProStorage?.writeRaw(window.CineProStorage.KEYS.catalogueMode, 'nearby') ?? localStorage.setItem('cinepro_catalogue_mode', 'nearby');
     return { source: nearby, label: 'films proches classés' };
   }
   // ZIP 3.8.1 : en mode films proches, on ne retombe plus sur les 80 films classiques.
@@ -243,7 +247,7 @@ function updateCatalogueModeControl() {
   const select = document.getElementById('catalogue-mode-filter');
   if (!select) return;
   catalogueMode = 'nearby';
-  localStorage.setItem('cinepro_catalogue_mode', 'nearby');
+  window.CineProStorage?.writeRaw(window.CineProStorage.KEYS.catalogueMode, 'nearby') ?? localStorage.setItem('cinepro_catalogue_mode', 'nearby');
   select.value = 'nearby';
   const nearbyOption = select.querySelector('option[value="nearby"]');
   if (nearbyOption) {
@@ -260,7 +264,7 @@ function setCatalogueMode(_mode) {
   // ZIP 3.4 : on supprime le mode “Tous les films” du parcours utilisateur.
   // Le menu Catalogue doit répondre à : “Quels bons films passent près de moi ?”.
   catalogueMode = 'nearby';
-  localStorage.setItem('cinepro_catalogue_mode', 'nearby');
+  window.CineProStorage?.writeRaw(window.CineProStorage.KEYS.catalogueMode, 'nearby') ?? localStorage.setItem('cinepro_catalogue_mode', 'nearby');
   sortKey = 'bestNote';
   sortDir = -1;
   currentPage = 1;
@@ -498,7 +502,7 @@ function toggleFav(id, btn) {
   id = String(id);
   if (favs.has(id)) { favs.delete(id); btn.classList.remove('active'); }
   else { favs.add(id); btn.classList.add('active'); }
-  localStorage.setItem('cinepro_favs', JSON.stringify([...favs]));
+  window.CineProStorage?.writeFavourites?.([...favs]) ?? localStorage.setItem('cinepro_favs', JSON.stringify([...favs]));
 }
 
 
@@ -683,7 +687,7 @@ function openCatalogueFilmPopup(id) {
 
 function readLastNearbySearch() {
   try {
-    const payload = JSON.parse(localStorage.getItem('cinepro_last_nearby_search') || 'null');
+    const payload = window.CineProStorage?.readLastNearbySearch?.() || JSON.parse(localStorage.getItem('cinepro_last_nearby_search') || 'null');
     if (!payload || typeof payload !== 'object') return null;
     return payload;
   } catch (_) {
@@ -696,9 +700,13 @@ async function autoBuildNearbyCatalogueFromLastSearch() {
   if (hasNearbyCatalogue() || nearbyAutoBuildRunning) return true;
   // ZIP 3.8.1 : avant de reconstruire, on nettoie les caches périmés.
   try {
-    localStorage.removeItem(RUNTIME_CATALOGUE_KEY);
-    localStorage.removeItem(NEARBY_RANKED_KEY);
-    localStorage.removeItem(ACTIVE_CATALOGUE_KEY);
+    if (window.CineProStorage?.clearNearbyCatalogue) {
+      window.CineProStorage.clearNearbyCatalogue();
+    } else {
+      localStorage.removeItem(RUNTIME_CATALOGUE_KEY);
+      localStorage.removeItem(NEARBY_RANKED_KEY);
+      localStorage.removeItem(ACTIVE_CATALOGUE_KEY);
+    }
   } catch (_) {}
   const lastSearch = readLastNearbySearch();
   if (!lastSearch) return false;
@@ -752,7 +760,7 @@ window.addEventListener('cinepro-active-catalogue-ready', (event) => {
     window.CINEPRO_ACTIVE_CATALOGUE = event.detail.films;
   }
   catalogueMode = 'nearby';
-  localStorage.setItem('cinepro_catalogue_mode', 'nearby');
+  window.CineProStorage?.writeRaw(window.CineProStorage.KEYS.catalogueMode, 'nearby') ?? localStorage.setItem('cinepro_catalogue_mode', 'nearby');
   catalogue = getCatalogueSource();
   sortKey = 'bestNote';
   sortDir = -1;
