@@ -1,4 +1,4 @@
-// ZIP 3.8.5 — Catalogue JS externalisé + cache TMDB détaillé conservé.
+// ZIP 3.8.6 — Catalogue JS externalisé + chargement TMDB optimisé en arrière-plan.
 // Objectif : garder catalogue.html centré sur la structure HTML, sans changement fonctionnel visible.
 
 // ZIP 3.4 — Catalogue centré sur les films proches : un seul mode, données enrichies conservées.
@@ -94,7 +94,7 @@ function isFreshNearbyPayload(payload) {
   // ZIP 3.8.1 : un seul catalogue proche actif, valable toute la journée.
   // On ne rejette plus un bon catalogue après 30 minutes : cela faisait retomber la page sur les 80 films.
   if (!payload || typeof payload !== 'object') return false;
-  const acceptedVersions = new Set(['3.7.3', '3.7.4', '3.8.1', '3.8.3', '3.8.5']);
+  const acceptedVersions = new Set(['3.7.3', '3.7.4', '3.8.1', '3.8.3', '3.8.4', '3.8.5', '3.8.6']);
   if (payload.version && !acceptedVersions.has(String(payload.version))) return false;
   if (!Array.isArray(payload.films) || !payload.films.length) return false;
   const stamp = payload.searchDate || payload.updatedAt || payload.createdAt;
@@ -119,7 +119,7 @@ function writeActiveCatalogueFromFilms(films, meta = {}) {
   if (!Array.isArray(films) || !films.length) return null;
   const now = new Date();
   const payload = {
-    version: '3.8.5',
+    version: '3.8.6',
     source: 'active-nearby-catalogue',
     searchDate: getLocalDateKey(now),
     updatedAt: now.toISOString(),
@@ -565,6 +565,47 @@ function applyLetterboxdRatings(apiFilms) {
   return updated;
 }
 
+function needsCatalogueTmdbRefresh(film) {
+  if (!film || film.isApiFilm || film.isMock) return false;
+
+  const hasReal = isUsefulCatalogueText(film.real) || isUsefulCatalogueText(film.realisateur) || isUsefulCatalogueText(film.director);
+  const hasGenre = isUsefulCatalogueText(film.genre) || (Array.isArray(film.genres) && film.genres.length > 0);
+  const hasPoster = isUsefulCatalogueText(film.poster) || isUsefulCatalogueText(film.affiche);
+
+  // ZIP 3.8.6 : on évite de refaire TMDB/OMDb sur les films déjà complets.
+  // Le chargement long venait surtout d'appels API relancés sur tout le catalogue.
+  return !hasReal || !hasGenre || !hasPoster;
+}
+
+let catalogueBackgroundEnrichmentRunning = false;
+async function enrichCatalogueInBackground() {
+  if (catalogueBackgroundEnrichmentRunning || typeof enrichFilmsWithOmdb !== 'function') return;
+
+  const candidates = catalogue.filter(needsCatalogueTmdbRefresh);
+  if (!candidates.length) return;
+
+  catalogueBackgroundEnrichmentRunning = true;
+  const countLabel = document.getElementById('film-count');
+
+  try {
+    if (countLabel) countLabel.textContent = `${catalogue.length} films proches · infos en cours…`;
+
+    await enrichFilmsWithOmdb(candidates, (done, total) => {
+      // On rafraîchit par petits paliers pour éviter une page qui semble bloquée.
+      if (done === 1 || done === total || done % 3 === 0) filterTable();
+      if (countLabel) countLabel.textContent = `${catalogue.length} films proches · infos ${done}/${total}`;
+    });
+
+    writeActiveCatalogueFromFilms(catalogue, { source: 'tmdb-background-refresh' });
+    filterTable();
+  } catch (error) {
+    console.warn('[Catalogue] ZIP 3.8.6 : enrichissement TMDB en arrière-plan ignoré :', error?.message || error);
+  } finally {
+    catalogueBackgroundEnrichmentRunning = false;
+    updateCatalogueModeControl();
+  }
+}
+
 async function loadLetterboxdCatalogue() {
   const countLabel = document.getElementById('film-count');
   if (countLabel) countLabel.textContent = 'Chargement Letterboxd…';
@@ -718,16 +759,10 @@ async function initCatalogue() {
     filterTable();
   }
 
-  // 3) TMDB/OMDb enrichissent les affiches et IMDb, mais ne doivent jamais vider le tableau.
-  if (typeof enrichFilmsWithOmdb === 'function') {
-    try {
-      await enrichFilmsWithOmdb(catalogue.filter(f => !f.isApiFilm), () => filterTable());
-    } catch (error) {
-      console.warn('OMDb/TMDB ignoré, notes IMDb locales conservées :', error.message);
-    }
-  }
-
+  // 3) ZIP 3.8.6 : TMDB/OMDb ne bloque plus l'ouverture du catalogue.
+  // La liste s'affiche tout de suite, puis seuls les films incomplets sont enrichis en arrière-plan.
   filterTable();
+  enrichCatalogueInBackground();
 }
 
 initCatalogue();
