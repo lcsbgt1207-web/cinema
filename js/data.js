@@ -1,4 +1,6 @@
 /* ═══════════════════════════════════════
+   ZIP 3.6.2 : onglets jours complets + versions VF/VO dans les séances.
+
    CinéProche — Données & utilitaires partagés — ZIP 3.6
    ═══════════════════════════════════════ */
 
@@ -839,11 +841,19 @@ function getPopupDayLabel(date) {
 }
 
 function formatPopupShowtimeHourOnly(item) {
+  const label = String(item?.label || item || '').trim();
+  const versionMatch = label.match(/(?:·|-)\s*(VF|VO|VOSTFR|VOST)\s*$/i);
+  const versionLabel = versionMatch ? ` ${versionMatch[1].toUpperCase()}` : '';
   const date = item?.date || parsePopupShowtimeDate(item?.raw || item);
   if (date instanceof Date && !Number.isNaN(date.getTime())) {
-    return new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' }).format(date).replace(':', 'h');
+    const time = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' }).format(date).replace(':', 'h');
+    return `${time}${versionLabel}`;
   }
-  return String(item?.label || item || '').replace(/^Aujourd’hui\s*[·à-]*\s*/i, '').replace(/^Demain\s*[·à-]*\s*/i, '').trim();
+  return label
+    .replace(/^Aujourd’hui\s*[·à-]*\s*/i, '')
+    .replace(/^Demain\s*[·à-]*\s*/i, '')
+    .replace(/^[A-ZÀ-ÿ][A-Za-zÀ-ÿ.]*\s+\d{1,2}\s+[A-Za-zÀ-ÿ.]+\s*[·à-]*\s*/i, '')
+    .trim();
 }
 
 function groupPopupHorairesByDay(horaires) {
