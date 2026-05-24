@@ -709,6 +709,19 @@ function parsePopupShowtimeDate(value) {
   if (/^\d{1,2}[h:]\d{2}$/i.test(String(raw).trim())) return null;
 
   const normalized = String(raw).trim();
+  const normalizedLower = normalized.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const timeMatch = normalized.match(/(\d{1,2})[h:](\d{2})/);
+  if (timeMatch && /aujourd/.test(normalizedLower)) {
+    const d = getStartOfLocalDay(new Date());
+    d.setHours(Number(timeMatch[1]), Number(timeMatch[2]), 0, 0);
+    return d;
+  }
+  if (timeMatch && /demain/.test(normalizedLower)) {
+    const d = getStartOfLocalDay(new Date());
+    d.setDate(d.getDate() + 1);
+    d.setHours(Number(timeMatch[1]), Number(timeMatch[2]), 0, 0);
+    return d;
+  }
   const date = new Date(normalized);
   if (Number.isNaN(date.getTime())) return null;
   return date;

@@ -709,6 +709,19 @@ function parsePopupShowtimeDate(value) {
   if (/^\d{1,2}[h:]\d{2}$/i.test(String(raw).trim())) return null;
 
   const normalized = String(raw).trim();
+  const normalizedLower = normalized.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const timeMatch = normalized.match(/(\d{1,2})[h:](\d{2})/);
+  if (timeMatch && /aujourd/.test(normalizedLower)) {
+    const d = getStartOfLocalDay(new Date());
+    d.setHours(Number(timeMatch[1]), Number(timeMatch[2]), 0, 0);
+    return d;
+  }
+  if (timeMatch && /demain/.test(normalizedLower)) {
+    const d = getStartOfLocalDay(new Date());
+    d.setDate(d.getDate() + 1);
+    d.setHours(Number(timeMatch[1]), Number(timeMatch[2]), 0, 0);
+    return d;
+  }
   const date = new Date(normalized);
   if (Number.isNaN(date.getTime())) return null;
   return date;
@@ -748,45 +761,6 @@ function formatPopupShowtime(value) {
   return `${day} · ${time}`;
 }
 
-
-function collectPopupCinemaHoraires(cinema) {
-  const collected = [];
-  const seenObjects = new WeakSet();
-
-  function add(value) {
-    if (value === null || value === undefined || value === '') return;
-    collected.push(value);
-  }
-
-  function visit(node, depth = 0) {
-    if (node === null || node === undefined || depth > 5) return;
-    if (typeof node === 'string' || typeof node === 'number' || node instanceof Date) {
-      add(node);
-      return;
-    }
-    if (typeof node !== 'object') return;
-    if (seenObjects.has(node)) return;
-    seenObjects.add(node);
-
-    const direct = node.startsAt || node.startAt || node.datetime || node.dateTime || node.showtime || node.showTime || node.time || node.horaire || node.hour || node.heure;
-    if (direct) add(direct);
-
-    for (const key of ['horaires', 'showtimes', 'seances', 'séances', 'sessions', 'times', 'rawShowtimes']) {
-      const value = node[key];
-      if (Array.isArray(value)) value.forEach(child => visit(child, depth + 1));
-    }
-  }
-
-  visit(cinema?.horaires || []);
-  visit(cinema?.showtimes || []);
-  visit(cinema?.seances || []);
-  visit(cinema?.sessions || []);
-  visit(cinema?.times || []);
-  visit(cinema?.rawShowtimes || []);
-
-  return collected;
-}
-
 function buildPopupSeancesHTML(cinemas) {
   if (!cinemas.length) {
     return `<div class="empty-seances">Aucune séance proche n’est encore associée à ce film. Lance une recherche de cinémas proches pour remplir cette zone.</div>`;
@@ -796,7 +770,7 @@ function buildPopupSeancesHTML(cinemas) {
     const nom = cinema.nom || cinema.name || 'Cinéma';
     const distance = Number(cinema.distanceKm ?? cinema.dist);
     const distanceLabel = Number.isFinite(distance) ? ` · ${distance.toFixed(1)} km` : '';
-    const horaires = collectPopupCinemaHoraires(cinema);
+    const horaires = Array.isArray(cinema.horaires) ? cinema.horaires : [];
     const horairesFiltres = horaires
       .filter(isPopupShowtimeInNextSevenDays)
       .map(formatPopupShowtime)
