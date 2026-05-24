@@ -1,5 +1,6 @@
-/* CinéProche — Catalogue proche — ZIP 3.8.5
-   Objectif : normalisation des horaires UGC pour la popup catalogue.
+/* CinéProche — Catalogue proche — ZIP 3.9.2
+   Objectif : stabiliser le catalogue proche et réduire les logs/traitements inutiles.
+   Objectif précédent : normalisation des horaires UGC pour la popup catalogue.
    - Les films reconnus dans js/data.js gardent leur note locale.
    - Les films absents trouvés sur TMDB deviennent utilisables directement dans la liste finale.
    - Ajout d'un catalogue temporaire exportable window.NEARBY_CATALOGUE_RUNTIME_DATA.
@@ -17,7 +18,7 @@
   const debugLog = (...args) => { if (NEARBY_CATALOGUE_DEBUG) console.log(...args); };
   const debugWarn = (...args) => { if (NEARBY_CATALOGUE_DEBUG) console.warn(...args); };
   const debugGroup = (...args) => { if (NEARBY_CATALOGUE_DEBUG) console.group(...args); };
-  const debugGroupEnd = () => { if (NEARBY_CATALOGUE_DEBUG) debugGroupEnd(); };
+  const debugGroupEnd = () => { if (NEARBY_CATALOGUE_DEBUG) console.groupEnd(); };
   const debugTable = (...args) => { if (NEARBY_CATALOGUE_DEBUG) console.table(...args); };
   const tmdbRatingCache = new Map();
   const tmdbEnrichmentCache = new Map();
@@ -1493,8 +1494,8 @@
     }
     if (!location) location = await window.PLACES.geolocate();
 
-    console.log('[Catalogue proche] ZIP 3.8.5 actif — cache TMDB ratingOnly corrigé + métadonnées complètes.');
-    console.log('[Catalogue proche] Position utilisée :', location);
+    console.log('[Catalogue proche] ZIP 3.9.2 actif — catalogue proche stabilisé.');
+    debugLog('[Catalogue proche] Position utilisée :', location);
 
     // ZIP 3.6.7 : une nouvelle recherche remplace toujours l'ancien cache.
     // Cela évite de garder des horaires d'hier dans la popup.
@@ -1505,18 +1506,19 @@
     } catch (_) {}
 
     const cinemas = await window.PLACES.findNearbycinemas(location, radius);
-    const maxCinemas = Number.isFinite(Number(options.maxCinemas)) ? Number(options.maxCinemas) : 8;
-    console.log(`[Catalogue proche] ${cinemas.length} cinéma(s) trouvé(s).`, cinemas);
-    console.log(`[Catalogue proche] Analyse sur ${Math.min(cinemas.length, maxCinemas)} cinéma(s).`);
+    const defaultMaxCinemas = radius >= 50000 ? 18 : (radius >= 30000 ? 14 : 8);
+    const maxCinemas = Number.isFinite(Number(options.maxCinemas)) ? Number(options.maxCinemas) : defaultMaxCinemas;
+    console.log(`[Catalogue proche] ${cinemas.length} cinéma(s) trouvé(s). Analyse sur ${Math.min(cinemas.length, maxCinemas)} cinéma(s).`);
+    debugLog('[Catalogue proche] Cinémas trouvés :', cinemas);
 
     const moviesByKey = new Map();
     const matchDebug = [];
 
     for (const cinema of cinemas.slice(0, maxCinemas)) {
       try {
-        console.log(`[Catalogue proche] Recherche films pour ${cinema.nom}...`);
+        debugLog(`[Catalogue proche] Recherche films pour ${cinema.nom}...`);
         const showtimes = await getCinemaShowtimes(cinema);
-        console.log(`[Catalogue proche] ${cinema.nom} : ${showtimes.length} film(s) trouvé(s).`, showtimes);
+        debugLog(`[Catalogue proche] ${cinema.nom} : ${showtimes.length} film(s) trouvé(s).`, showtimes);
 
         for (const item of showtimes) {
           const title = item.title;
@@ -1631,15 +1633,15 @@
     const runtimeFusion = buildRuntimeCatalogueFusion(ranked);
     const nearbyRankedCatalogue = buildNearbyCatalogueRankedExport(ranked);
 
-    console.log(`[Catalogue proche] Résultat ZIP 3.8.1 : ${stats.total} film(s), ${stats.rated} avec note, ${stats.tmdbEnriched} film(s) fusionné(s) TMDB, ${stats.missing} à vérifier.`);
-    console.group('[Catalogue proche] Debug correspondances titres');
-    console.table(matchDebug);
+    console.log(`[Catalogue proche] Résultat ZIP 3.9.2 : ${stats.total} film(s), ${stats.rated} avec note, ${stats.tmdbEnriched} film(s) fusionné(s) TMDB.`);
+    debugGroup('[Catalogue proche] Debug correspondances titres');
+    debugTable(matchDebug);
     debugGroupEnd();
 
     if (missingDraft.length) {
-      console.warn('[Catalogue proche] Films absents de js/data.js — brouillon prêt pour futur enrichissement :', missingDraft);
-      console.group('[Catalogue proche] Meilleurs candidats locaux pour les films à enrichir');
-      console.table(missingDraft.map(item => ({
+      debugWarn('[Catalogue proche] Films absents de js/data.js — brouillon prêt pour futur enrichissement :', missingDraft);
+      debugGroup('[Catalogue proche] Meilleurs candidats locaux pour les films à enrichir');
+      debugTable(missingDraft.map(item => ({
         film: item.titre,
         cinemas: item.cinemas.map(c => c.nom).join(', '),
         choix1: item.bestLocalCandidates?.[0] ? `${item.bestLocalCandidates[0].titre} (${item.bestLocalCandidates[0].score})` : '—',
@@ -1650,8 +1652,8 @@
     }
 
     if (tmdbEnrichment && !tmdbEnrichment.disabled) {
-      console.group('[Catalogue proche][TMDB] Résultat enrichissement films absents');
-      console.table(ranked.filter(movie => movie.enrichmentStatus === 'tmdb-enriched' || movie.enrichmentStatus === 'missing').map(movie => ({
+      debugGroup('[Catalogue proche][TMDB] Résultat enrichissement films absents');
+      debugTable(ranked.filter(movie => movie.enrichmentStatus === 'tmdb-enriched' || movie.enrichmentStatus === 'missing').map(movie => ({
         film: movie.title,
         statut: movie.enrichmentStatus === 'tmdb-enriched' ? 'TMDB trouvé' : 'À vérifier',
         titreTmdb: movie.tmdbDraft?.titre || movie.tmdbEnrichment?.bestTitle || '—',
@@ -1665,14 +1667,14 @@
     }
 
     if (enrichedDraft.length) {
-      console.warn('[Catalogue proche][TMDB] Brouillon Catalogue enrichi prêt : window.NEARBY_CATALOGUE_ENRICHED_DRAFT', enrichedDraft);
+      debugWarn('[Catalogue proche][TMDB] Brouillon Catalogue enrichi prêt : window.NEARBY_CATALOGUE_ENRICHED_DRAFT', enrichedDraft);
     }
 
-    console.group('[Catalogue proche] Fusion runtime Catalogue + TMDB');
-    console.log('Catalogue local :', runtimeFusion.localCount, 'films');
-    console.log('Films TMDB ajoutés temporairement :', runtimeFusion.tmdbRuntimeCount);
-    console.log('Total runtime exportable :', runtimeFusion.total);
-    console.table(runtimeFusion.tmdbRuntimeFilms.map(film => ({
+    debugGroup('[Catalogue proche] Fusion runtime Catalogue + TMDB');
+    debugLog('Catalogue local :', runtimeFusion.localCount, 'films');
+    debugLog('Films TMDB ajoutés temporairement :', runtimeFusion.tmdbRuntimeCount);
+    debugLog('Total runtime exportable :', runtimeFusion.total);
+    debugTable(runtimeFusion.tmdbRuntimeFilms.map(film => ({
       titre: film.titre,
       annee: film.annee || '—',
       note: film.tmdb || '—',
@@ -1682,7 +1684,7 @@
     })));
     debugGroupEnd();
 
-    console.table(ranked.map((movie, index) => ({
+    debugTable(ranked.map((movie, index) => ({
       rang: index + 1,
       film: movie.title,
       statut: movie.enrichmentStatus === 'tmdb-enriched' ? 'TMDB fusionné' : (movie.enrichmentStatus === 'missing' ? 'À vérifier' : 'Catalogue'),
@@ -1706,14 +1708,14 @@
 
     try {
       const storedPayload = {
-        version: '3.8.5',
+        version: '3.9.2',
         updatedAt: new Date().toISOString(),
         films: runtimeFusion.films,
         tmdbRuntimeFilms: runtimeFusion.tmdbRuntimeFilms,
         stats: window.NEARBY_CATALOGUE_STATS
       };
       const activePayload = {
-        version: '3.8.5',
+        version: '3.9.2',
         source: 'active-nearby-catalogue',
         searchDate: formatLocalDateYYYYMMDD(new Date()),
         updatedAt: new Date().toISOString(),
@@ -1727,7 +1729,7 @@
       localStorage.setItem('cinepro_nearby_ranked_catalogue', JSON.stringify(nearbyPayload));
       localStorage.setItem('cinepro_active_catalogue', JSON.stringify(activePayload));
       window.CINEPRO_ACTIVE_CATALOGUE = nearbyRankedCatalogue;
-      console.log(`[Catalogue proche] ZIP 3.8.5 : catalogue actif enrichi et sauvegardé (${nearbyRankedCatalogue.length} films).`);
+      console.log(`[Catalogue proche] ZIP 3.9.2 : catalogue actif sauvegardé (${nearbyRankedCatalogue.length} films).`);
       window.dispatchEvent(new CustomEvent('nearby-catalogue-runtime-ready', { detail: storedPayload }));
       window.dispatchEvent(new CustomEvent('nearby-catalogue-ranked-ready', { detail: nearbyPayload }));
       window.dispatchEvent(new CustomEvent('cinepro-active-catalogue-ready', { detail: activePayload }));
