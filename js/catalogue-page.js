@@ -1,4 +1,4 @@
-// ZIP 3.8.2 — Code JavaScript extrait de catalogue.html.
+// ZIP 3.8.3 — Catalogue JS externalisé + conservation réalisateur/genre TMDB.
 // Objectif : garder catalogue.html centré sur la structure HTML, sans changement fonctionnel visible.
 
 // ZIP 3.4 — Catalogue centré sur les films proches : un seul mode, données enrichies conservées.
@@ -38,6 +38,26 @@ function normalizeRuntimeCatalogueKey(value) {
     .trim();
 }
 
+
+function isUsefulCatalogueText(value) {
+  const text = String(value || '').trim();
+  if (!text) return false;
+  const normalized = text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return !['a completer', 'non renseigne', 'non renseignee', '-', '—', 'n/a'].includes(normalized);
+}
+
+function pickUsefulCatalogueText(...values) {
+  for (const value of values) {
+    if (isUsefulCatalogueText(value)) return String(value).trim();
+  }
+  return '';
+}
+
 function prepareCatalogueFilm(film, index = 0) {
   const copy = { ...film };
   if (copy.id === undefined || copy.id === null || copy.id === '') {
@@ -46,10 +66,10 @@ function prepareCatalogueFilm(film, index = 0) {
   }
   copy.titre = copy.titre || copy.title || 'Film sans titre';
   copy.original = copy.original || copy.originalTitle || copy.original_title || '';
-  copy.genre = copy.genre || (Array.isArray(copy.genres) ? copy.genres.join(', ') : '') || 'À compléter';
-  copy.real = copy.real || copy.realisateur || copy.director || 'Non renseigné';
-  copy.acteurs = copy.acteurs || copy.cast || 'Non renseigné';
-  copy.synopsis = copy.synopsis || copy.overview || 'Synopsis à compléter.';
+  copy.genre = pickUsefulCatalogueText(copy.genre, Array.isArray(copy.genres) ? copy.genres.join(', ') : '') || 'À compléter';
+  copy.real = pickUsefulCatalogueText(copy.real, copy.realisateur, copy.director) || 'Non renseigné';
+  copy.acteurs = pickUsefulCatalogueText(copy.acteurs, copy.cast) || 'Non renseigné';
+  copy.synopsis = pickUsefulCatalogueText(copy.synopsis, copy.overview) || 'Synopsis à compléter.';
   copy.color = copy.color || ['p1','p2','p3','p4','p5','p6'][index % 6];
   copy.badge = copy.badge || (copy.source === 'tmdb-runtime-fusion' ? 'TMDB' : 'Catalogue');
   copy.lb = normalizePositiveRating(copy.lb);
@@ -74,7 +94,7 @@ function isFreshNearbyPayload(payload) {
   // ZIP 3.8.1 : un seul catalogue proche actif, valable toute la journée.
   // On ne rejette plus un bon catalogue après 30 minutes : cela faisait retomber la page sur les 80 films.
   if (!payload || typeof payload !== 'object') return false;
-  const acceptedVersions = new Set(['3.7.3', '3.7.4', '3.8.1']);
+  const acceptedVersions = new Set(['3.7.3', '3.7.4', '3.8.1', '3.8.3']);
   if (payload.version && !acceptedVersions.has(String(payload.version))) return false;
   if (!Array.isArray(payload.films) || !payload.films.length) return false;
   const stamp = payload.searchDate || payload.updatedAt || payload.createdAt;

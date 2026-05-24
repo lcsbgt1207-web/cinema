@@ -1366,15 +1366,38 @@
     return normalizeExportedNearbyShowtimes(raw);
   }
 
+  function isUsefulNearbyCatalogueText(value) {
+    const text = String(value || '').trim();
+    if (!text) return false;
+    const normalized = text
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    return !['a completer', 'non renseigne', 'non renseignee', '-', '—', 'n/a'].includes(normalized);
+  }
+
+  function pickUsefulNearbyCatalogueText(...values) {
+    for (const value of values) {
+      if (isUsefulNearbyCatalogueText(value)) return String(value).trim();
+    }
+    return '';
+  }
+
   function buildNearbyCatalogueRankedExport(ranked) {
     return ranked.map((movie, index) => {
       const local = movie.localFilm || null;
       const tmdb = movie.tmdbDraft || null;
-      const bestTitle = local?.titre || tmdb?.titre || movie.title;
-      const bestOriginal = local?.original || tmdb?.original || '';
-      const bestGenres = local?.genre || (Array.isArray(tmdb?.genres) ? tmdb.genres.join(', ') : '') || 'À compléter';
+      const tmdbGenreText = Array.isArray(tmdb?.genres) ? tmdb.genres.join(', ') : '';
+      const localGenreText = Array.isArray(local?.genres) ? local.genres.join(', ') : local?.genre;
+      const bestTitle = pickUsefulNearbyCatalogueText(local?.titre, tmdb?.titre, movie.title) || 'Film sans titre';
+      const bestOriginal = pickUsefulNearbyCatalogueText(local?.original, tmdb?.original);
+      const bestGenres = pickUsefulNearbyCatalogueText(localGenreText, tmdbGenreText) || 'À compléter';
+      const bestReal = pickUsefulNearbyCatalogueText(local?.real, local?.realisateur, local?.director, tmdb?.real) || 'Non renseigné';
+      const bestActors = pickUsefulNearbyCatalogueText(local?.acteurs, tmdb?.acteurs) || 'Non renseigné';
       const bestPoster = local?.poster || tmdb?.poster || movie.poster || '';
-      const bestSynopsis = local?.synopsis || tmdb?.synopsis || 'Synopsis à compléter.';
+      const bestSynopsis = pickUsefulNearbyCatalogueText(local?.synopsis, tmdb?.synopsis) || 'Synopsis à compléter.';
       const bestYear = local?.annee ?? tmdb?.annee ?? null;
       const bestTmdb = Number.isFinite(Number(local?.tmdb)) ? Number(local.tmdb) : (Number.isFinite(Number(tmdb?.tmdb)) ? Number(tmdb.tmdb) : null);
       const bestImdb = Number.isFinite(Number(local?.imdb)) ? Number(local.imdb) : null;
@@ -1394,8 +1417,8 @@
         genres: Array.isArray(tmdb?.genres) ? tmdb.genres : (Array.isArray(local?.genres) ? local.genres : []),
         duree: local?.duree || (tmdb?.runtime ? `${tmdb.runtime} min` : ''),
         runtime: local?.runtime || tmdb?.runtime || null,
-        real: local?.real || tmdb?.real || 'Non renseigné',
-        acteurs: local?.acteurs || tmdb?.acteurs || 'Non renseigné',
+        real: bestReal,
+        acteurs: bestActors,
         synopsis: bestSynopsis,
         poster: bestPoster,
         color: local?.color || 'p1',
@@ -1667,14 +1690,14 @@
 
     try {
       const storedPayload = {
-        version: '3.8.1',
+        version: '3.8.3',
         updatedAt: new Date().toISOString(),
         films: runtimeFusion.films,
         tmdbRuntimeFilms: runtimeFusion.tmdbRuntimeFilms,
         stats: window.NEARBY_CATALOGUE_STATS
       };
       const activePayload = {
-        version: '3.8.1',
+        version: '3.8.3',
         source: 'active-nearby-catalogue',
         searchDate: formatLocalDateYYYYMMDD(new Date()),
         updatedAt: new Date().toISOString(),
@@ -1688,7 +1711,7 @@
       localStorage.setItem('cinepro_nearby_ranked_catalogue', JSON.stringify(nearbyPayload));
       localStorage.setItem('cinepro_active_catalogue', JSON.stringify(activePayload));
       window.CINEPRO_ACTIVE_CATALOGUE = nearbyRankedCatalogue;
-      console.log(`[Catalogue proche] ZIP 3.8.1 : catalogue actif rafraîchi et sauvegardé (${nearbyRankedCatalogue.length} films).`);
+      console.log(`[Catalogue proche] ZIP 3.8.3 : catalogue actif rafraîchi et sauvegardé (${nearbyRankedCatalogue.length} films).`);
       window.dispatchEvent(new CustomEvent('nearby-catalogue-runtime-ready', { detail: storedPayload }));
       window.dispatchEvent(new CustomEvent('nearby-catalogue-ranked-ready', { detail: nearbyPayload }));
       window.dispatchEvent(new CustomEvent('cinepro-active-catalogue-ready', { detail: activePayload }));
