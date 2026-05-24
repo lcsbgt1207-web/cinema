@@ -9,7 +9,7 @@
 (function () {
   'use strict';
 
-  const NEARBY_CATALOGUE_API = 'https://cinepro-api-yal8.onrender.com';
+  const NEARBY_CATALOGUE_API = 'https://cinepro-api-production.up.railway.app';
   // ZIP 3.8.1 : logs debug désactivés par défaut.
   // Pour les réactiver ponctuellement : localStorage.setItem('cinepro_debug', '1') puis recharger.
   const NEARBY_CATALOGUE_DEBUG = (() => {

@@ -604,12 +604,12 @@
 
       // 2. Récupérer les séances (avec retry)
       const todayStr = new Date().toISOString().split('T')[0];
-      const s = await fetchWithRetry(`${CINEPRO_API}/seances?id=${searchData.id}&date=${todayStr}`, 45000, 2);
+      const s = await fetchWithRetry(`${CINEPRO_API}/seances-auto?id=${searchData.id}&date=${todayStr}&days=3`, 45000, 2);
       const data = await s.json();
       const films = data.seances || [];
 
       if (!films.length) {
-        container.innerHTML = "<span style='font-size:12px;color:var(--gray-400);padding:4px 0;'>Aucune s\u00e9ance aujourd'hui.</span>";
+        container.innerHTML = "<span style='font-size:12px;color:var(--gray-400);padding:4px 0;'>Séances non disponibles.</span>";
         return;
       }
 
@@ -967,11 +967,12 @@
       const todayStr = new Date().toISOString().split('T')[0];
       const tomorrowStr = new Date(Date.now()+86400000).toISOString().split('T')[0];
       const [r1, r2] = await Promise.all([
-        fetch(`${CINEPRO_API}/seances?id=${searchData.id}&date=${todayStr}`),
+        fetch(`${CINEPRO_API}/seances-auto?id=${searchData.id}&date=${todayStr}&days=3`),
         fetch(`${CINEPRO_API}/seances?id=${searchData.id}&date=${tomorrowStr}`)
       ]);
       const d1 = await r1.json();
       const d2 = r2.ok ? await r2.json() : { seances: [] };
+      const foundDate = d1.date || todayStr;
 
       const films = d1.seances || [];
       if (!films.length) {
@@ -994,9 +995,9 @@
           return { heure, version: v, key: heure+'_'+v };
         }
 
-        // Horaires aujourd'hui
+        // Horaires depuis la date trouvee automatiquement
         const seancesToday = (f.showtimes||[])
-          .filter(s => s.startsAt?.startsWith(todayStr))
+          .filter(s => s.startsAt?.startsWith(foundDate))
           .map(fmtSeance)
           .filter((s,i,a) => a.findIndex(x=>x.key===s.key)===i)
           .sort((a,b)=>a.heure.localeCompare(b.heure)).slice(0,8);
@@ -1040,7 +1041,7 @@
           <div class="cinema-popup-film-poster" style="cursor:pointer;" onclick="${clickFn}">${posterHtml}</div>
           <div class="cinema-popup-film-info">
             <div class="cinema-popup-film-title" style="cursor:pointer;" onclick="${clickFn}">${titre}</div>
-            ${hToday.length ? `<div style="margin-bottom:4px;"><span style="font-size:10px;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.3px;margin-right:6px;">Aujourd'hui</span><div class="cinema-popup-film-horaires">${horairesBtnToday}</div></div>` : ''}
+            ${hToday.length ? `<div style="margin-bottom:4px;"><span style="font-size:10px;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.3px;margin-right:6px;">${foundDate === todayStr ? "Aujourd'hui" : foundDate === tomorrowStr ? "Demain" : new Date(foundDate+'T12:00:00').toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short'})}</span><div class="cinema-popup-film-horaires">${horairesBtnToday}</div></div>` : ''}
             ${hTomorrow.length ? `<div><span style="font-size:10px;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.3px;margin-right:6px;">Demain</span><div class="cinema-popup-film-horaires">${horairesBtnTomorrow}</div></div>` : ''}
             ${!hToday.length && !hTomorrow.length ? `<span style="font-size:12px;color:var(--gray-400);">Pas de séance trouvée</span>` : ''}
           </div>
