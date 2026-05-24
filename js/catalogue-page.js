@@ -142,7 +142,7 @@ function isFreshNearbyPayload(payload) {
   // ZIP 3.8.1 : un seul catalogue proche actif, valable toute la journée.
   // On ne rejette plus un bon catalogue après 30 minutes : cela faisait retomber la page sur les 80 films.
   if (!payload || typeof payload !== 'object') return false;
-  const acceptedVersions = new Set(['3.7.3', '3.7.4', '3.8.1', '3.8.3', '3.8.4', '3.8.5', '3.8.6', '3.9.2', '3.9.4']);
+  const acceptedVersions = new Set(['3.7.3', '3.7.4', '3.8.1', '3.8.3', '3.8.4', '3.8.5', '3.8.6', '3.9.2', '3.9.4', '3.9.8']);
   if (payload.version && !acceptedVersions.has(String(payload.version))) return false;
   if (!Array.isArray(payload.films) || !payload.films.length) return false;
   const stamp = payload.searchDate || payload.updatedAt || payload.createdAt;
@@ -154,10 +154,16 @@ function isFreshNearbyPayload(payload) {
   if (lastSearch) {
     const wantedRadius = Number(lastSearch.radius || 0);
     const payloadRadius = Number(payload.radius || 0);
+
+    // ZIP 3.9.8 : si une recherche avec rayon existe, un cache sans rayon n'est plus fiable.
+    if (wantedRadius && !payloadRadius) return false;
     if (wantedRadius && payloadRadius && Math.abs(wantedRadius - payloadRadius) > 50) return false;
 
     const wantedAddress = normalizeRuntimeCatalogueKey(lastSearch.address || lastSearch.query || '');
     const payloadAddress = normalizeRuntimeCatalogueKey(payload.address || payload.query || '');
+
+    // Même logique pour l'adresse : éviter qu'un ancien cache sans lieu gagne sur la recherche active.
+    if (wantedAddress && !payloadAddress) return false;
     if (wantedAddress && payloadAddress && wantedAddress !== payloadAddress) return false;
   }
 
@@ -180,13 +186,15 @@ function readStoredNearbyCatalogue() { return readStoredPayload(NEARBY_RANKED_KE
 function writeActiveCatalogueFromFilms(films, meta = {}) {
   if (!Array.isArray(films) || !films.length) return null;
   const now = new Date();
+  const lastSearch = readLastNearbySearch();
   const payload = {
-    version: '3.9.4',
-    source: 'active-nearby-catalogue',
+    version: '3.9.8',
+    source: meta.source || 'active-nearby-catalogue',
     searchDate: getLocalDateKey(now),
     updatedAt: now.toISOString(),
-    address: meta.address || '',
-    radius: meta.radius || null,
+    address: meta.address || lastSearch?.address || lastSearch?.query || '',
+    query: meta.query || lastSearch?.query || lastSearch?.address || '',
+    radius: Number(meta.radius || lastSearch?.radius || 0) || null,
     films,
     stats: { total: films.length }
   };
