@@ -65,6 +65,9 @@ let sortKey = 'imdb', sortDir = -1;
 let currentPage = 1;
 let pageSize = 8;
 let lastFilteredData = [];
+let catalogueRebuildInProgress = false;
+let lastNonEmptyCatalogue = [];
+
 
 const LABELS = { lb:'Letterboxd', imdb:'IMDb', sc:'SensCritique', annee:'Année', titre:'Titre', real:'Réalisateur', genre:'Genre' };
 
@@ -327,9 +330,35 @@ window.setCatalogueMode = setCatalogueMode;
 
 function refreshCatalogueFromRuntime() {
   updateCatalogueModeControl();
-  catalogue = getCatalogueSource();
+  const nextCatalogue = getCatalogueSource();
+  const countLabel = document.getElementById('film-count');
+  const modeLabel = document.getElementById('catalogue-mode-filter');
+  const lastSearch = readLastNearbySearch();
+  const radiusKm = lastSearch?.radius ? Math.round(Number(lastSearch.radius) / 1000) : null;
+
+  if (nextCatalogue.length) {
+    catalogueRebuildInProgress = false;
+    catalogue = nextCatalogue;
+    lastNonEmptyCatalogue = [...nextCatalogue];
+    currentPage = 1;
+    filterTable();
+    return;
+  }
+
+  // ZIP 3.9.9 : si le rayon invalide le cache, on garde l'ancien affichage pendant la reconstruction.
+  if (!catalogue.length && lastNonEmptyCatalogue.length) catalogue = [...lastNonEmptyCatalogue];
+  if (catalogue.length) {
+    catalogueRebuildInProgress = true;
+    filterTable();
+    if (countLabel) countLabel.textContent = `Reconstruction ${radiusKm ? radiusKm + ' km' : 'du catalogue'}…`;
+    if (modeLabel?.options?.[0]) modeLabel.options[0].textContent = `Reconstruction ${radiusKm ? radiusKm + ' km' : 'en cours'}…`;
+    return;
+  }
+
+  catalogueRebuildInProgress = true;
   currentPage = 1;
   filterTable();
+  if (countLabel) countLabel.textContent = `Reconstruction ${radiusKm ? radiusKm + ' km' : 'du catalogue'}…`;
 }
 
 window.addEventListener('nearby-catalogue-runtime-ready', () => {
@@ -376,6 +405,7 @@ function compareValues(a, b) {
 }
 
 function renderTable(data) {
+  if (data.length) lastNonEmptyCatalogue = [...data];
   lastFilteredData = data;
   const renderer = window.CINEPRO_CATALOGUE_RENDER;
   if (!renderer || typeof renderer.renderTable !== 'function') {
@@ -399,6 +429,16 @@ function renderTable(data) {
     formatClassicRating,
     formatImdbNote
   });
+
+  if (catalogueRebuildInProgress) {
+    const countLabel = document.getElementById('film-count');
+    const countText = countLabel?.textContent || '';
+    if (!/Reconstruction/.test(countText)) {
+      const lastSearch = readLastNearbySearch();
+      const radiusKm = lastSearch?.radius ? Math.round(Number(lastSearch.radius) / 1000) : null;
+      if (countLabel) countLabel.textContent = `Reconstruction ${radiusKm ? radiusKm + ' km' : 'du catalogue'}…`;
+    }
+  }
 
   scheduleVisibleCatalogueEnrichment();
 }
@@ -662,12 +702,19 @@ async function autoBuildNearbyCatalogueFromLastSearch() {
   nearbyAutoBuildRunning = true;
   try {
     if (isCatalogueDebugEnabled()) console.log('[Catalogue] ZIP 3.9.4 : génération automatique du catalogue proche depuis la dernière recherche.', lastSearch);
+    const countLabel = document.getElementById('film-count');
+    const radiusKm = lastSearch?.radius ? Math.round(Number(lastSearch.radius) / 1000) : null;
+    catalogueRebuildInProgress = true;
+    if (countLabel) countLabel.textContent = `Reconstruction ${radiusKm ? radiusKm + ' km' : 'du catalogue'}…`;
+
     await getNearbyRankedMovies({
       address: lastSearch.address || lastSearch.query || '',
       location: lastSearch.location || null,
       radius: Number(lastSearch.radius) || 15000
     });
     catalogue = getCatalogueSource();
+    if (catalogue.length) lastNonEmptyCatalogue = [...catalogue];
+    catalogueRebuildInProgress = false;
     sortKey = 'bestNote';
     sortDir = -1;
     currentPage = 1;
