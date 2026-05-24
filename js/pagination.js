@@ -4,9 +4,9 @@
    ═══════════════════════════════════════ */
 
 const PAGINATION = {
-  create({ items, perPage = 8, pageSizes = [8, 12, 25], containerId, renderFn, scrollTo = null }) {
+  create({ items, perPage = 5, containerId, renderFn, scrollTo = null }) {
     let currentPage = 1;
-    let currentPerPage = Number(perPage) || 8;
+    let currentPerPage = 5;
     const allItems = Array.isArray(items) ? items : [];
 
     function totalPages() {
@@ -37,6 +37,7 @@ const PAGINATION = {
 
     function buildPager() {
       const total = totalPages();
+      if (total <= 1) return '';
       const pages = getVisiblePages(total);
 
       return `
@@ -50,9 +51,6 @@ const PAGINATION = {
             ).join('')}
             <button class="page-btn" ${currentPage === total ? 'disabled' : ''} onclick="PAGINATION._go('${containerId}', ${currentPage + 1})"><i class="ti ti-chevron-right"></i></button>
           </div>
-          <select class="page-size-select" onchange="PAGINATION._setPageSize('${containerId}', this.value)">
-            ${pageSizes.map(size => `<option value="${size}" ${Number(size) === currentPerPage ? 'selected' : ''}>${size} par page</option>`).join('')}
-          </select>
         </div>`;
     }
 
@@ -71,11 +69,6 @@ const PAGINATION = {
     PAGINATION._instances = PAGINATION._instances || {};
     PAGINATION._instances[containerId] = {
       render,
-      setPageSize(value) {
-        currentPerPage = Number(value) || 8;
-        currentPage = 1;
-        render(1);
-      },
       totalPages,
       items: allItems
     };
@@ -87,12 +80,6 @@ const PAGINATION = {
     const inst = this._instances?.[containerId];
     if (!inst) return;
     inst.render(page);
-  },
-
-  _setPageSize(containerId, value) {
-    const inst = this._instances?.[containerId];
-    if (!inst) return;
-    inst.setPageSize(value);
   },
 
   _instances: {}
