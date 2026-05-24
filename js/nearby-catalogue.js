@@ -1332,6 +1332,8 @@
 
   function collectExportedCinemaShowtimes(cinema) {
     const raw = [];
+    // ZIP 3.6.6 : priorité absolue aux objets bruts de l'API.
+    // Ils contiennent startsAt + diffusionVersion, donc ils permettent d'afficher VF/VO.
     for (const key of ['rawShowtimes', 'showtimes', 'structuredHoraires', 'horaires', 'seances', 'sessions', 'times']) {
       const value = cinema?.[key];
       if (Array.isArray(value)) raw.push(...value);
@@ -1427,8 +1429,15 @@
     }
     if (!location) location = await window.PLACES.geolocate();
 
-    console.log('[Catalogue proche] ZIP 3.5 actif — Catalogue limité aux séances de J à J+7.');
+    console.log('[Catalogue proche] ZIP 3.6.6 actif — rafraîchissement séances + versions VF/VO.');
     console.log('[Catalogue proche] Position utilisée :', location);
+
+    // ZIP 3.6.6 : une nouvelle recherche remplace toujours l'ancien cache.
+    // Cela évite de garder des horaires d'hier dans la popup.
+    try {
+      localStorage.removeItem('cinepro_runtime_catalogue');
+      localStorage.removeItem('cinepro_nearby_ranked_catalogue');
+    } catch (_) {}
 
     const cinemas = await window.PLACES.findNearbycinemas(location, radius);
     const maxCinemas = Number.isFinite(Number(options.maxCinemas)) ? Number(options.maxCinemas) : 8;
@@ -1632,14 +1641,14 @@
 
     try {
       const storedPayload = {
-        version: '3.5.7',
+        version: '3.6.6',
         updatedAt: new Date().toISOString(),
         films: runtimeFusion.films,
         tmdbRuntimeFilms: runtimeFusion.tmdbRuntimeFilms,
         stats: window.NEARBY_CATALOGUE_STATS
       };
       const nearbyPayload = {
-        version: '3.5.7',
+        version: '3.6.6',
         updatedAt: new Date().toISOString(),
         address: options.address || '',
         radius,
@@ -1648,7 +1657,7 @@
       };
       localStorage.setItem('cinepro_runtime_catalogue', JSON.stringify(storedPayload));
       localStorage.setItem('cinepro_nearby_ranked_catalogue', JSON.stringify(nearbyPayload));
-      console.log(`[Catalogue proche] ZIP 3.6.3 : catalogue runtime sauvegardé pour catalogue.html (${runtimeFusion.total} films).`);
+      console.log(`[Catalogue proche] ZIP 3.6.6 : catalogue proche rafraîchi et sauvegardé (${nearbyRankedCatalogue.length} films).`);
       window.dispatchEvent(new CustomEvent('nearby-catalogue-runtime-ready', { detail: storedPayload }));
       window.dispatchEvent(new CustomEvent('nearby-catalogue-ranked-ready', { detail: nearbyPayload }));
     } catch (storageError) {

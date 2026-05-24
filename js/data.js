@@ -630,7 +630,7 @@ function buildPopupHTML(film) {
   const duree = film.duree || (film.runtime ? `${film.runtime} min` : '') || 'Durée inconnue';
   const annee = film.annee || film.year || '';
   const cinemas = getPopupCinemas(film);
-  console.log('[Popup] ZIP 3.6.5 : cinémas utilisés pour la fiche film', title, cinemas);
+  console.log('[Popup] ZIP 3.6.6 : cinémas utilisés pour la fiche film', title, cinemas);
   const seancesHTML = buildPopupSeancesHTML(cinemas);
 
   return `

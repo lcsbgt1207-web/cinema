@@ -312,10 +312,26 @@
     return copy;
   }
 
+  function getLocalDateKey(date = new Date()) {
+    const d = new Date(date);
+    if (Number.isNaN(d.getTime())) return '';
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
+  function isFreshNearbyPayload(payload) {
+    // ZIP 3.6.6 : on refuse les anciens caches pour éviter les séances d'hier.
+    if (!payload || payload.version !== '3.6.6') return false;
+    if (!Array.isArray(payload.films) || !payload.films.length) return false;
+    return getLocalDateKey(payload.updatedAt) === getLocalDateKey(new Date());
+  }
+
   function readStoredRuntimeCatalogue() {
     try {
       const payload = JSON.parse(localStorage.getItem('cinepro_runtime_catalogue') || 'null');
-      return Array.isArray(payload?.films) ? payload.films : [];
+      return isFreshNearbyPayload(payload) && Array.isArray(payload?.films) ? payload.films : [];
     } catch (_) {
       return [];
     }
@@ -324,7 +340,7 @@
   function readStoredNearbyCatalogue() {
     try {
       const payload = JSON.parse(localStorage.getItem('cinepro_nearby_ranked_catalogue') || 'null');
-      return Array.isArray(payload?.films) ? payload.films : [];
+      return isFreshNearbyPayload(payload) && Array.isArray(payload?.films) ? payload.films : [];
     } catch (_) {
       return [];
     }
@@ -400,7 +416,7 @@
       merged.push(prepared);
     });
 
-    console.log(`[Catalogue] ZIP 3.4 : ${active.label} utilisé (${merged.length} films).`);
+    console.log(`[Catalogue] ZIP 3.6.6 : ${active.label} utilisé (${merged.length} films).`);
     return merged;
   }
 
@@ -786,13 +802,18 @@
   let nearbyAutoBuildRunning = false;
   async function autoBuildNearbyCatalogueFromLastSearch() {
     if (hasNearbyCatalogue() || nearbyAutoBuildRunning) return true;
+    // ZIP 3.6.6 : avant de reconstruire, on nettoie les caches périmés.
+    try {
+      localStorage.removeItem('cinepro_runtime_catalogue');
+      localStorage.removeItem('cinepro_nearby_ranked_catalogue');
+    } catch (_) {}
     const lastSearch = readLastNearbySearch();
     if (!lastSearch) return false;
     if (typeof getNearbyRankedMovies !== 'function' || !window.PLACES) return false;
 
     nearbyAutoBuildRunning = true;
     try {
-      console.log('[Catalogue] ZIP 3.5.8 : génération automatique du catalogue proche depuis la dernière recherche.', lastSearch);
+      console.log('[Catalogue] ZIP 3.6.6 : génération automatique du catalogue proche depuis la dernière recherche.', lastSearch);
       await getNearbyRankedMovies({
         address: lastSearch.address || lastSearch.query || '',
         location: lastSearch.location || null,
@@ -805,7 +826,7 @@
       filterTable();
       return true;
     } catch (error) {
-      console.warn('[Catalogue] ZIP 3.5.8 : génération automatique impossible pour le moment :', error?.message || error);
+      console.warn('[Catalogue] ZIP 3.6.6 : génération automatique impossible pour le moment :', error?.message || error);
       return false;
     } finally {
       nearbyAutoBuildRunning = false;
@@ -826,7 +847,7 @@
   }
 
   window.addEventListener('nearby-catalogue-ranked-ready', () => {
-    console.log('[Catalogue] ZIP 3.5.8 : fusion runtime reçue depuis Catalogue proche. Rafraîchissement de la liste.');
+    console.log('[Catalogue] ZIP 3.6.6 : fusion runtime reçue depuis Catalogue proche. Rafraîchissement de la liste.');
     catalogue = getCatalogueSource();
     sortKey = 'bestNote';
     sortDir = -1;
