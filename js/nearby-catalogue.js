@@ -1,4 +1,4 @@
-/* CinéProche — Catalogue proche — ZIP 3.7.3
+/* CinéProche — Catalogue proche — ZIP 3.7.4
    Objectif : normalisation des horaires UGC pour la popup catalogue.
    - Les films reconnus dans js/data.js gardent leur note locale.
    - Les films absents trouvés sur TMDB deviennent utilisables directement dans la liste finale.
@@ -9,6 +9,16 @@
   'use strict';
 
   const NEARBY_CATALOGUE_API = 'https://cinepro-api-yal8.onrender.com';
+  // ZIP 3.7.4 : logs debug désactivés par défaut.
+  // Pour les réactiver ponctuellement : localStorage.setItem('cinepro_debug', '1') puis recharger.
+  const NEARBY_CATALOGUE_DEBUG = (() => {
+    try { return localStorage.getItem('cinepro_debug') === '1'; } catch (_) { return false; }
+  })();
+  const debugLog = (...args) => { if (NEARBY_CATALOGUE_DEBUG) console.log(...args); };
+  const debugWarn = (...args) => { if (NEARBY_CATALOGUE_DEBUG) console.warn(...args); };
+  const debugGroup = (...args) => { if (NEARBY_CATALOGUE_DEBUG) console.group(...args); };
+  const debugGroupEnd = () => { if (NEARBY_CATALOGUE_DEBUG) debugGroupEnd(); };
+  const debugTable = (...args) => { if (NEARBY_CATALOGUE_DEBUG) console.table(...args); };
   const tmdbRatingCache = new Map();
   const tmdbEnrichmentCache = new Map();
 
@@ -741,14 +751,14 @@
   }
 
   async function fetchJsonWithDebug(url, label) {
-    console.log(`[Catalogue proche][DEBUG] Appel ${label} :`, url);
+    debugLog(`[Catalogue proche][DEBUG] Appel ${label} :`, url);
     const response = await fetch(url);
     const contentType = response.headers.get('content-type') || '';
     let json = null;
     let text = '';
     if (contentType.includes('application/json')) json = await response.json();
     else text = await response.text();
-    console.log(`[Catalogue proche][DEBUG] Réponse ${label} :`, {
+    debugLog(`[Catalogue proche][DEBUG] Réponse ${label} :`, {
       status: response.status,
       ok: response.ok,
       contentType,
@@ -864,24 +874,24 @@
 
     const candidates = collectCinemaIdCandidates(data, cinema?.nom || '');
     if (candidates.length) {
-      console.group(`[Catalogue proche][DEBUG] IDs candidats pour ${cinema?.nom}`);
-      console.table(candidates.slice(0, 20).map(candidate => ({
+      debugGroup(`[Catalogue proche][DEBUG] IDs candidats pour ${cinema?.nom}`);
+      debugTable(candidates.slice(0, 20).map(candidate => ({
         id: candidate.id,
         score: candidate.score,
         chemin: candidate.path,
         raison: candidate.reason,
         aperçu: String(candidate.raw || '').slice(0, 90)
       })));
-      console.groupEnd();
+      debugGroupEnd();
     }
 
     const best = candidates.find(candidate => candidate.score >= 0) || candidates[0] || null;
     const id = best?.id || null;
 
     if (id) {
-      console.log(`[Catalogue proche][DEBUG] ID extrait pour ${cinema?.nom} :`, id, best);
+      debugLog(`[Catalogue proche][DEBUG] ID extrait pour ${cinema?.nom} :`, id, best);
     } else {
-      console.warn(`[Catalogue proche][DEBUG] Aucun ID cinéma trouvé pour ${cinema?.nom}. JSON complet ci-dessous :`, data);
+      debugWarn(`[Catalogue proche][DEBUG] Aucun ID cinéma trouvé pour ${cinema?.nom}. JSON complet ci-dessous :`, data);
     }
     return id;
   }
@@ -1010,15 +1020,15 @@
     const unique = Array.from(uniqueByTitle.values());
 
     if (!unique.length) {
-      console.warn('[Catalogue proche][DEBUG] Aucun film extrait de /seances. JSON complet analysé :', data);
+      debugWarn('[Catalogue proche][DEBUG] Aucun film extrait de /seances. JSON complet analysé :', data);
     } else {
-      console.group('[Catalogue proche][DEBUG] Candidats films extraits de /seances');
-      console.table(unique.slice(0, 60).map((item, index) => ({
+      debugGroup('[Catalogue proche][DEBUG] Candidats films extraits de /seances');
+      debugTable(unique.slice(0, 60).map((item, index) => ({
         index,
         titre: extractMovieTitle(extractMovieObject(item)) || extractMovieTitle(item),
         cles: item && typeof item === 'object' ? Object.keys(item).slice(0, 8).join(', ') : typeof item
       })));
-      console.groupEnd();
+      debugGroupEnd();
     }
 
     return unique;
@@ -1034,8 +1044,8 @@
     const url = `${NEARBY_CATALOGUE_API}/seances-auto?id=${encodeURIComponent(allocineId)}&date=${requestedDate}&days=7`;
     const data = await fetchJsonWithDebug(url, `seances-auto pour ${cinema?.nom}`);
 
-    console.log(`[Catalogue proche][DEBUG] JSON complet /seances-auto pour ${cinema?.nom} :`, data);
-    console.log(`[Catalogue proche][DEBUG] Date demandée / date utilisée pour ${cinema?.nom} :`, {
+    debugLog(`[Catalogue proche][DEBUG] JSON complet /seances-auto pour ${cinema?.nom} :`, data);
+    debugLog(`[Catalogue proche][DEBUG] Date demandée / date utilisée pour ${cinema?.nom} :`, {
       requestedDate: data?.requested_date || requestedDate,
       usedDate: data?.date || requestedDate,
       attempts: data?.attempts || []
@@ -1053,10 +1063,10 @@
       }
       return item;
     });
-    console.log(`[Catalogue proche][DEBUG] Tableau extrait pour ${cinema?.nom} :`, rawShowtimes);
+    debugLog(`[Catalogue proche][DEBUG] Tableau extrait pour ${cinema?.nom} :`, rawShowtimes);
     if (rawShowtimes[0]) {
-      console.log(`[Catalogue proche][DEBUG] Premier objet brut pour ${cinema?.nom} :`, rawShowtimes[0]);
-      console.log(`[Catalogue proche][DEBUG] Clés premier objet pour ${cinema?.nom} :`, Object.keys(rawShowtimes[0] || {}));
+      debugLog(`[Catalogue proche][DEBUG] Premier objet brut pour ${cinema?.nom} :`, rawShowtimes[0]);
+      debugLog(`[Catalogue proche][DEBUG] Clés premier objet pour ${cinema?.nom} :`, Object.keys(rawShowtimes[0] || {}));
     }
     return rawShowtimes.map(normalizeShowtimeItem).filter(Boolean);
   }
@@ -1444,7 +1454,7 @@
     }
     if (!location) location = await window.PLACES.geolocate();
 
-    console.log('[Catalogue proche] ZIP 3.7.3 actif — rafraîchissement forcé des séances futures + versions VF/VO.');
+    console.log('[Catalogue proche] ZIP 3.7.4 actif — rafraîchissement forcé des séances futures + versions VF/VO.');
     console.log('[Catalogue proche] Position utilisée :', location);
 
     // ZIP 3.6.7 : une nouvelle recherche remplace toujours l'ancien cache.
@@ -1548,7 +1558,7 @@
           movie.rawShowtimes.push(item.rawItem || item);
         }
       } catch (error) {
-        console.warn(`[Catalogue proche][DEBUG] Impossible de charger les films pour ${cinema.nom} :`, error?.message || error);
+        debugWarn(`[Catalogue proche][DEBUG] Impossible de charger les films pour ${cinema.nom} :`, error?.message || error);
       }
     }
 
@@ -1582,10 +1592,10 @@
     const runtimeFusion = buildRuntimeCatalogueFusion(ranked);
     const nearbyRankedCatalogue = buildNearbyCatalogueRankedExport(ranked);
 
-    console.log(`[Catalogue proche] Résultat ZIP 3.7.3 : ${stats.total} film(s), ${stats.rated} avec note, ${stats.tmdbEnriched} film(s) fusionné(s) TMDB, ${stats.missing} à vérifier.`);
+    console.log(`[Catalogue proche] Résultat ZIP 3.7.4 : ${stats.total} film(s), ${stats.rated} avec note, ${stats.tmdbEnriched} film(s) fusionné(s) TMDB, ${stats.missing} à vérifier.`);
     console.group('[Catalogue proche] Debug correspondances titres');
     console.table(matchDebug);
-    console.groupEnd();
+    debugGroupEnd();
 
     if (missingDraft.length) {
       console.warn('[Catalogue proche] Films absents de js/data.js — brouillon prêt pour futur enrichissement :', missingDraft);
@@ -1597,7 +1607,7 @@
         choix2: item.bestLocalCandidates?.[1] ? `${item.bestLocalCandidates[1].titre} (${item.bestLocalCandidates[1].score})` : '—',
         choix3: item.bestLocalCandidates?.[2] ? `${item.bestLocalCandidates[2].titre} (${item.bestLocalCandidates[2].score})` : '—'
       })));
-      console.groupEnd();
+      debugGroupEnd();
     }
 
     if (tmdbEnrichment && !tmdbEnrichment.disabled) {
@@ -1612,7 +1622,7 @@
         synopsis: movie.tmdbDraft?.synopsis ? 'oui' : 'non',
         affiche: movie.tmdbDraft?.poster ? 'oui' : 'non'
       })));
-      console.groupEnd();
+      debugGroupEnd();
     }
 
     if (enrichedDraft.length) {
@@ -1631,7 +1641,7 @@
       synopsis: film.synopsis ? 'oui' : 'non',
       affiche: film.poster ? 'oui' : 'non'
     })));
-    console.groupEnd();
+    debugGroupEnd();
 
     console.table(ranked.map((movie, index) => ({
       rang: index + 1,
@@ -1657,14 +1667,14 @@
 
     try {
       const storedPayload = {
-        version: '3.7.3',
+        version: '3.7.4',
         updatedAt: new Date().toISOString(),
         films: runtimeFusion.films,
         tmdbRuntimeFilms: runtimeFusion.tmdbRuntimeFilms,
         stats: window.NEARBY_CATALOGUE_STATS
       };
       const activePayload = {
-        version: '3.7.3',
+        version: '3.7.4',
         source: 'active-nearby-catalogue',
         searchDate: formatLocalDateYYYYMMDD(new Date()),
         updatedAt: new Date().toISOString(),
@@ -1678,7 +1688,7 @@
       localStorage.setItem('cinepro_nearby_ranked_catalogue', JSON.stringify(nearbyPayload));
       localStorage.setItem('cinepro_active_catalogue', JSON.stringify(activePayload));
       window.CINEPRO_ACTIVE_CATALOGUE = nearbyRankedCatalogue;
-      console.log(`[Catalogue proche] ZIP 3.7.3 : catalogue actif rafraîchi et sauvegardé (${nearbyRankedCatalogue.length} films).`);
+      console.log(`[Catalogue proche] ZIP 3.7.4 : catalogue actif rafraîchi et sauvegardé (${nearbyRankedCatalogue.length} films).`);
       window.dispatchEvent(new CustomEvent('nearby-catalogue-runtime-ready', { detail: storedPayload }));
       window.dispatchEvent(new CustomEvent('nearby-catalogue-ranked-ready', { detail: nearbyPayload }));
       window.dispatchEvent(new CustomEvent('cinepro-active-catalogue-ready', { detail: activePayload }));
