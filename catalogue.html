@@ -249,11 +249,11 @@
 </div>
 
 <script src="js/config.js?v=3.3"></script>
-<script src="js/data.js?v=3.6.5"></script>
+<script src="js/data.js?v=3.7.1"></script>
 <script src="js/omdb.js?v=3.3"></script>
 <script src="js/tmdb.js?v=3.3"></script>
 <script src="js/places.js?v=3.3"></script>
-<script src="js/nearby-catalogue.js?v=3.6.5"></script>
+<script src="js/nearby-catalogue.js?v=3.7.1"></script>
 <script>
   // ZIP 3.4 — Catalogue centré sur les films proches : un seul mode, données enrichies conservées.
   // Sécurité : si aucun résultat proche n'existe, on garde le catalogue enrichi ZIP 3.0 puis js/data.js.
@@ -263,6 +263,9 @@
   localStorage.setItem('cinepro_catalogue_mode', 'nearby');
   const LETTERBOXD_API_URL = 'http://localhost:3000/api/films-letterboxd';
   const LETTERBOXD_MIN_VALID_RATING = 0.5;
+  const ACTIVE_CATALOGUE_KEY = 'cinepro_active_catalogue';
+  const NEARBY_RANKED_KEY = 'cinepro_nearby_ranked_catalogue';
+  const RUNTIME_CATALOGUE_KEY = 'cinepro_runtime_catalogue';
   const favs = new Set(JSON.parse(localStorage.getItem('cinepro_favs') || '[]'));
   let sortKey = 'imdb', sortDir = -1;
   let currentPage = 1;
@@ -322,44 +325,70 @@
   }
 
   function isFreshNearbyPayload(payload) {
-    // ZIP 3.6.7 : on refuse les anciens caches pour éviter les séances d'hier.
-    // En plus de la date locale, on impose une durée de vie courte : si la recherche
-    // date de plus de 30 minutes, le Catalogue reconstruit automatiquement les films proches.
-    if (!payload || payload.version !== '3.6.7') return false;
+    // ZIP 3.7.1 : un seul catalogue proche actif, daté, accepté depuis l'ancien cache 3.6.7
+    // pour ne pas vider une recherche encore valide pendant la migration.
+    if (!payload || typeof payload !== 'object') return false;
+    const acceptedVersions = new Set(['3.6.7', '3.7.1']);
+    if (payload.version && !acceptedVersions.has(String(payload.version))) return false;
     if (!Array.isArray(payload.films) || !payload.films.length) return false;
-    if (getLocalDateKey(payload.updatedAt) !== getLocalDateKey(new Date())) return false;
-    const updatedAt = new Date(payload.updatedAt).getTime();
+    const stamp = payload.searchDate || payload.updatedAt || payload.createdAt;
+    if (getLocalDateKey(stamp) !== getLocalDateKey(new Date())) return false;
+    const updatedAt = new Date(payload.updatedAt || payload.createdAt || Date.now()).getTime();
     if (!Number.isFinite(updatedAt)) return false;
     const maxAgeMs = 30 * 60 * 1000;
     return Date.now() - updatedAt <= maxAgeMs;
   }
 
-  function readStoredRuntimeCatalogue() {
+  function readStoredPayload(key) {
     try {
-      const payload = JSON.parse(localStorage.getItem('cinepro_runtime_catalogue') || 'null');
+      const payload = JSON.parse(localStorage.getItem(key) || 'null');
       return isFreshNearbyPayload(payload) && Array.isArray(payload?.films) ? payload.films : [];
     } catch (_) {
       return [];
     }
   }
 
-  function readStoredNearbyCatalogue() {
+  function readStoredActiveCatalogue() { return readStoredPayload(ACTIVE_CATALOGUE_KEY); }
+  function readStoredRuntimeCatalogue() { return readStoredPayload(RUNTIME_CATALOGUE_KEY); }
+  function readStoredNearbyCatalogue() { return readStoredPayload(NEARBY_RANKED_KEY); }
+
+  function writeActiveCatalogueFromFilms(films, meta = {}) {
+    if (!Array.isArray(films) || !films.length) return null;
+    const now = new Date();
+    const payload = {
+      version: '3.7.1',
+      source: 'active-nearby-catalogue',
+      searchDate: getLocalDateKey(now),
+      updatedAt: now.toISOString(),
+      address: meta.address || '',
+      radius: meta.radius || null,
+      films,
+      stats: { total: films.length }
+    };
     try {
-      const payload = JSON.parse(localStorage.getItem('cinepro_nearby_ranked_catalogue') || 'null');
-      return isFreshNearbyPayload(payload) && Array.isArray(payload?.films) ? payload.films : [];
-    } catch (_) {
-      return [];
+      localStorage.setItem(ACTIVE_CATALOGUE_KEY, JSON.stringify(payload));
+      window.CINEPRO_ACTIVE_CATALOGUE = films;
+    } catch (error) {
+      console.warn('[Catalogue] ZIP 3.7.1 : sauvegarde cinepro_active_catalogue impossible :', error?.message || error);
     }
+    return payload;
   }
 
   function hasNearbyCatalogue() {
-    return (Array.isArray(window.NEARBY_CATALOGUE_NEARBY_RANKED) && window.NEARBY_CATALOGUE_NEARBY_RANKED.length) || readStoredNearbyCatalogue().length;
+    return (Array.isArray(window.CINEPRO_ACTIVE_CATALOGUE) && window.CINEPRO_ACTIVE_CATALOGUE.length)
+      || (Array.isArray(window.NEARBY_CATALOGUE_NEARBY_RANKED) && window.NEARBY_CATALOGUE_NEARBY_RANKED.length)
+      || readStoredActiveCatalogue().length
+      || readStoredNearbyCatalogue().length;
   }
 
   function getActiveRawCatalogueSource() {
     // ZIP 3.4 : le Catalogue est centré sur les films proches.
     // On utilise toujours en priorité la liste complète enrichie des films proches,
     // afin de ne jamais perdre réalisateur, genre, affiche, année ou note après un changement de filtre.
+    const active = Array.isArray(window.CINEPRO_ACTIVE_CATALOGUE) && window.CINEPRO_ACTIVE_CATALOGUE.length
+      ? window.CINEPRO_ACTIVE_CATALOGUE
+      : readStoredActiveCatalogue();
+
     const nearby = Array.isArray(window.NEARBY_CATALOGUE_NEARBY_RANKED) && window.NEARBY_CATALOGUE_NEARBY_RANKED.length
       ? window.NEARBY_CATALOGUE_NEARBY_RANKED
       : readStoredNearbyCatalogue();
@@ -368,7 +397,14 @@
       ? window.NEARBY_CATALOGUE_RUNTIME_DATA
       : readStoredRuntimeCatalogue();
 
+    if (active.length) {
+      catalogueMode = 'nearby';
+      localStorage.setItem('cinepro_catalogue_mode', 'nearby');
+      return { source: active, label: 'catalogue proche actif' };
+    }
+
     if (nearby.length) {
+      writeActiveCatalogueFromFilms(nearby);
       catalogueMode = 'nearby';
       localStorage.setItem('cinepro_catalogue_mode', 'nearby');
       return { source: nearby, label: 'films proches classés' };
@@ -422,7 +458,7 @@
       merged.push(prepared);
     });
 
-    console.log(`[Catalogue] ZIP 3.6.7 : ${active.label} utilisé (${merged.length} films).`);
+    console.log(`[Catalogue] ZIP 3.7.1 : ${active.label} utilisé (${merged.length} films).`);
     return merged;
   }
 
@@ -434,9 +470,11 @@
     select.value = 'nearby';
     const nearbyOption = select.querySelector('option[value="nearby"]');
     if (nearbyOption) {
-      const count = (Array.isArray(window.NEARBY_CATALOGUE_NEARBY_RANKED) && window.NEARBY_CATALOGUE_NEARBY_RANKED.length)
-        ? window.NEARBY_CATALOGUE_NEARBY_RANKED.length
-        : readStoredNearbyCatalogue().length;
+      const count = (Array.isArray(window.CINEPRO_ACTIVE_CATALOGUE) && window.CINEPRO_ACTIVE_CATALOGUE.length)
+        ? window.CINEPRO_ACTIVE_CATALOGUE.length
+        : (readStoredActiveCatalogue().length || ((Array.isArray(window.NEARBY_CATALOGUE_NEARBY_RANKED) && window.NEARBY_CATALOGUE_NEARBY_RANKED.length)
+          ? window.NEARBY_CATALOGUE_NEARBY_RANKED.length
+          : readStoredNearbyCatalogue().length));
       nearbyOption.textContent = count ? `Films proches classés — ${count} films` : 'Films proches classés — lance une recherche';
     }
   }
@@ -815,8 +853,9 @@
     if (hasNearbyCatalogue() || nearbyAutoBuildRunning) return true;
     // ZIP 3.6.7 : avant de reconstruire, on nettoie les caches périmés.
     try {
-      localStorage.removeItem('cinepro_runtime_catalogue');
-      localStorage.removeItem('cinepro_nearby_ranked_catalogue');
+      localStorage.removeItem(RUNTIME_CATALOGUE_KEY);
+      localStorage.removeItem(NEARBY_RANKED_KEY);
+      localStorage.removeItem(ACTIVE_CATALOGUE_KEY);
     } catch (_) {}
     const lastSearch = readLastNearbySearch();
     if (!lastSearch) return false;
@@ -824,7 +863,7 @@
 
     nearbyAutoBuildRunning = true;
     try {
-      console.log('[Catalogue] ZIP 3.6.7 : génération automatique du catalogue proche depuis la dernière recherche.', lastSearch);
+      console.log('[Catalogue] ZIP 3.7.1 : génération automatique du catalogue proche depuis la dernière recherche.', lastSearch);
       await getNearbyRankedMovies({
         address: lastSearch.address || lastSearch.query || '',
         location: lastSearch.location || null,
@@ -837,7 +876,7 @@
       filterTable();
       return true;
     } catch (error) {
-      console.warn('[Catalogue] ZIP 3.6.7 : génération automatique impossible pour le moment :', error?.message || error);
+      console.warn('[Catalogue] ZIP 3.7.1 : génération automatique impossible pour le moment :', error?.message || error);
       return false;
     } finally {
       nearbyAutoBuildRunning = false;
@@ -858,7 +897,21 @@
   }
 
   window.addEventListener('nearby-catalogue-ranked-ready', () => {
-    console.log('[Catalogue] ZIP 3.6.7 : fusion runtime reçue depuis Catalogue proche. Rafraîchissement de la liste.');
+    console.log('[Catalogue] ZIP 3.7.1 : catalogue actif reçu depuis Catalogue proche. Rafraîchissement de la liste.');
+    catalogue = getCatalogueSource();
+    sortKey = 'bestNote';
+    sortDir = -1;
+    currentPage = 1;
+    filterTable();
+  });
+
+  window.addEventListener('cinepro-active-catalogue-ready', (event) => {
+    console.log('[Catalogue] ZIP 3.7.1 : cinepro_active_catalogue reçu. Rafraîchissement.');
+    if (Array.isArray(event?.detail?.films) && event.detail.films.length) {
+      window.CINEPRO_ACTIVE_CATALOGUE = event.detail.films;
+    }
+    catalogueMode = 'nearby';
+    localStorage.setItem('cinepro_catalogue_mode', 'nearby');
     catalogue = getCatalogueSource();
     sortKey = 'bestNote';
     sortDir = -1;

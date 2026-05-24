@@ -1653,25 +1653,31 @@
 
     try {
       const storedPayload = {
-        version: '3.6.7',
+        version: '3.7.1',
         updatedAt: new Date().toISOString(),
         films: runtimeFusion.films,
         tmdbRuntimeFilms: runtimeFusion.tmdbRuntimeFilms,
         stats: window.NEARBY_CATALOGUE_STATS
       };
-      const nearbyPayload = {
-        version: '3.6.7',
+      const activePayload = {
+        version: '3.7.1',
+        source: 'active-nearby-catalogue',
+        searchDate: formatLocalDateYYYYMMDD(new Date()),
         updatedAt: new Date().toISOString(),
         address: options.address || '',
         radius,
         films: nearbyRankedCatalogue,
         stats: { total: nearbyRankedCatalogue.length, rated: nearbyRankedCatalogue.filter(f => Number.isFinite(Number(f.bestNote))).length }
       };
+      const nearbyPayload = { ...activePayload, source: 'legacy-nearby-ranked' };
       localStorage.setItem('cinepro_runtime_catalogue', JSON.stringify(storedPayload));
       localStorage.setItem('cinepro_nearby_ranked_catalogue', JSON.stringify(nearbyPayload));
-      console.log(`[Catalogue proche] ZIP 3.6.7 : catalogue proche rafraîchi et sauvegardé (${nearbyRankedCatalogue.length} films).`);
+      localStorage.setItem('cinepro_active_catalogue', JSON.stringify(activePayload));
+      window.CINEPRO_ACTIVE_CATALOGUE = nearbyRankedCatalogue;
+      console.log(`[Catalogue proche] ZIP 3.7.1 : catalogue actif rafraîchi et sauvegardé (${nearbyRankedCatalogue.length} films).`);
       window.dispatchEvent(new CustomEvent('nearby-catalogue-runtime-ready', { detail: storedPayload }));
       window.dispatchEvent(new CustomEvent('nearby-catalogue-ranked-ready', { detail: nearbyPayload }));
+      window.dispatchEvent(new CustomEvent('cinepro-active-catalogue-ready', { detail: activePayload }));
     } catch (storageError) {
       console.warn('[Catalogue proche] Impossible de sauvegarder le catalogue runtime :', storageError?.message || storageError);
     }
