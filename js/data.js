@@ -630,7 +630,7 @@ function buildPopupHTML(film) {
   const duree = film.duree || (film.runtime ? `${film.runtime} min` : '') || 'Durée inconnue';
   const annee = film.annee || film.year || '';
   const cinemas = getPopupCinemas(film);
-  console.log('[Popup] ZIP 3.6.4 : cinémas utilisés pour la fiche film', title, cinemas);
+  console.log('[Popup] ZIP 3.6.5 : cinémas utilisés pour la fiche film', title, cinemas);
   const seancesHTML = buildPopupSeancesHTML(cinemas);
 
   return `
@@ -860,6 +860,15 @@ function collectPopupCinemaShowtimes(cinema) {
       add(node, inheritedVersion);
       return;
     }
+
+    // ZIP 3.6.5 : les horaires arrivent souvent directement sous forme de tableau
+    // ex: ["Aujourd’hui à 10h50", "Demain à 13h10"].
+    // Avant, un tableau était traité comme un objet et ses éléments n'étaient jamais parcourus.
+    if (Array.isArray(node)) {
+      node.forEach(child => visit(child, inheritedVersion, depth + 1));
+      return;
+    }
+
     if (typeof node !== 'object') return;
     if (seenObjects.has(node)) return;
     seenObjects.add(node);
@@ -874,7 +883,7 @@ function collectPopupCinemaShowtimes(cinema) {
     }
   }
 
-  // ZIP 3.6.4 : on donne la priorité aux horaires déjà présents dans la fiche.
+  // ZIP 3.6.5 : on donne la priorité aux horaires déjà présents dans la fiche.
   // Le bug 3.6.3 venait d'un rendu trop strict qui pouvait ignorer des chaînes
   // pourtant valides comme "Aujourd’hui à 10h50".
   visit(cinema?.structuredHoraires || []);
