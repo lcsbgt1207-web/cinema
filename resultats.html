@@ -468,31 +468,49 @@
       if (PLACES.userLocation) {
         const cinemas = await PLACES.findNearbycinemas(PLACES.userLocation);
         if (cinemas.length) {
-          const cinemasList = cinemas.slice(0, 5);
-          // Afficher d'abord avec loader
-          document.getElementById('film-cinemas-list').innerHTML = cinemasList.map((c, ci) => `
-            <div class="film-cinema-row" id="fcr-${ci}" style="animation-delay:${ci*0.06}s">
-              <div class="film-cinema-top">
-                <div>
-                  <div class="film-cinema-name">${ci+1}. ${c.nom}</div>
-                  <div class="film-cinema-addr"><i class="ti ti-map-pin"></i>${PLACES.formatDist(c.dist)} · ${c.adresse}</div>
-                </div>
-                <div style="display:flex;gap:6px;flex-shrink:0;">
-                  <button class="btn-nav" onclick="window.open('${PLACES.getWazeUrl(c)}','_blank')"><i class="ti ti-map-2"></i> Waze</button>
-                  <button class="btn-nav btn-nav-primary" onclick="window.open('${PLACES.getMapsUrl(c)}','_blank')"><i class="ti ti-navigation"></i> Y aller</button>
-                </div>
-              </div>
-              <div id="seances-fcr-${ci}" style="font-size:12px;color:var(--gray-400);padding:4px 0;">Chargement des séances…</div>
-            </div>`).join('');
-          // Charger les séances UNE PAR UNE pour ne pas saturer Railway
-          (async () => {
-            for (let ci = 0; ci < cinemasList.length; ci++) {
-              const seances = await fetchSeancesForCinema(cinemasList[ci].nom, film.title, cinemasList[ci].location?.lat, cinemasList[ci].location?.lng);
-              const el = document.getElementById('seances-fcr-'+ci);
-              if (el) el.outerHTML = '<div>'+formatSeancesHTML(seances, film.title, cinemasList[ci].nom)+'</div>';
-              if (ci < cinemasList.length - 1) await new Promise(res => setTimeout(res, 600));
+          // Chercher les 10 cinémas les plus proches et filtrer ceux qui ont des séances
+          const cinemasPool = cinemas.slice(0, 10);
+          document.getElementById('film-cinemas-list').innerHTML =
+            `<div style="padding:16px 0;font-size:12px;color:var(--gray-400);display:flex;align-items:center;gap:6px;">
+              <i class="ti ti-loader" style="animation:spin 1s linear infinite;"></i>
+              Recherche des cinémas qui passent ce film…
+            </div>`;
+
+          // Chercher les séances pour chaque cinéma, ne garder que ceux qui ont des résultats
+          const cinemasAvecSeances = [];
+          for (let i = 0; i < cinemasPool.length; i++) {
+            const c = cinemasPool[i];
+            const seances = await fetchSeancesForCinema(c.nom, film.title, c.location?.lat, c.location?.lng);
+            if (seances && Object.keys(seances).length > 0) {
+              cinemasAvecSeances.push({ cinema: c, seances });
             }
-          })();
+            if (i < cinemasPool.length - 1) await new Promise(res => setTimeout(res, 600));
+          }
+
+          if (!cinemasAvecSeances.length) {
+            document.getElementById('film-cinemas-list').innerHTML = `
+              <div style="padding:16px 0;font-size:13px;color:var(--gray-500);">
+                Aucun cinéma proche ne passe ce film en ce moment.
+                <a href="https://www.allocine.fr/recherche/?q=${encodeURIComponent(film.title)}" target="_blank" style="color:var(--black);font-weight:500;"> Voir sur AlloCiné →</a>
+              </div>`;
+          } else {
+            document.getElementById('results-info').innerHTML =
+              `<i class="ti ti-building"></i> ${cinemasAvecSeances.length} cinéma${cinemasAvecSeances.length > 1 ? 's' : ''} passe${cinemasAvecSeances.length > 1 ? 'nt' : ''} ce film`;
+            document.getElementById('film-cinemas-list').innerHTML = cinemasAvecSeances.map(({ cinema: c, seances }, ci) => `
+              <div class="film-cinema-row" id="fcr-${ci}" style="animation-delay:${ci*0.06}s">
+                <div class="film-cinema-top">
+                  <div>
+                    <div class="film-cinema-name">${ci+1}. ${c.nom}</div>
+                    <div class="film-cinema-addr"><i class="ti ti-map-pin"></i>${PLACES.formatDist(c.dist)} · ${c.adresse}</div>
+                  </div>
+                  <div style="display:flex;gap:6px;flex-shrink:0;">
+                    <button class="btn-nav" onclick="window.open('${PLACES.getWazeUrl(c)}','_blank')"><i class="ti ti-map-2"></i> Waze</button>
+                    <button class="btn-nav btn-nav-primary" onclick="window.open('${PLACES.getMapsUrl(c)}','_blank')"><i class="ti ti-navigation"></i> Y aller</button>
+                  </div>
+                </div>
+                <div>${formatSeancesHTML(seances, film.title, c.nom)}</div>
+              </div>`).join('');
+          }
         } else {
           document.getElementById('film-cinemas-list').innerHTML = `
             <div style="padding:16px 0;font-size:13px;color:var(--gray-500);">
