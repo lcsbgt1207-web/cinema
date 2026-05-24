@@ -214,6 +214,34 @@ function hasNearbyCatalogue() {
     || readStoredNearbyCatalogue().length;
 }
 
+
+function hydrateCatalogueRuntimeFromStorage() {
+  const activeFilms = readStoredActiveCatalogue();
+  if (activeFilms.length) {
+    window.CINEPRO_ACTIVE_CATALOGUE = activeFilms;
+  }
+
+  const nearbyFilms = readStoredNearbyCatalogue();
+  if (nearbyFilms.length) {
+    window.NEARBY_CATALOGUE_NEARBY_RANKED = nearbyFilms;
+  }
+
+  const runtimeFilms = readStoredRuntimeCatalogue();
+  if (runtimeFilms.length) {
+    window.NEARBY_CATALOGUE_RUNTIME_DATA = runtimeFilms;
+  }
+
+  if (activeFilms.length || nearbyFilms.length || runtimeFilms.length) {
+    window.dispatchEvent(new CustomEvent('cinepro-catalogue-hydrated', {
+      detail: { active: activeFilms.length, nearby: nearbyFilms.length, runtime: runtimeFilms.length }
+    }));
+  }
+
+  return { active: activeFilms.length, nearby: nearbyFilms.length, runtime: runtimeFilms.length };
+}
+
+window.hydrateCatalogueRuntimeFromStorage = hydrateCatalogueRuntimeFromStorage;
+
 function getActiveRawCatalogueSource() {
   // ZIP 3.4 : le Catalogue est centré sur les films proches.
   // On utilise toujours en priorité la liste complète enrichie des films proches,
@@ -291,7 +319,7 @@ function getCatalogueSource() {
   });
 
   if (isCatalogueDebugEnabled()) {
-    console.log(`[Catalogue] ZIP 3.9.4 : ${active.label} utilisé (${merged.length} films).`);
+    console.log(`[Catalogue] ZIP 3.9.9 : ${active.label} utilisé (${merged.length} films).`);
   }
   return merged;
 }
@@ -716,6 +744,9 @@ window.addEventListener('cinepro-active-catalogue-ready', (event) => {
 });
 
 async function initCatalogue() {
+  // ZIP 3.9.9 : réhydrater les variables runtime depuis localStorage avant toute reconstruction.
+  hydrateCatalogueRuntimeFromStorage();
+
   // ZIP 3.8.1 : on lance la reconstruction proche dès le début.
   // Si aucune donnée proche n'est prête, le tableau affiche un état d'attente au lieu des 80 films classiques.
   scheduleNearbyCatalogueAutoBuild();
