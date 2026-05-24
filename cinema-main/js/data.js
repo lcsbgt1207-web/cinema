@@ -630,6 +630,7 @@ function buildPopupHTML(film) {
   const duree = film.duree || (film.runtime ? `${film.runtime} min` : '') || 'Durée inconnue';
   const annee = film.annee || film.year || '';
   const cinemas = getPopupCinemas(film);
+  if (localStorage.getItem('cinepro_debug') === '1') console.log('[Popup] ZIP 3.8.1 : cinémas utilisés pour la fiche film', title, cinemas);
   const seancesHTML = buildPopupSeancesHTML(cinemas);
 
   return `
@@ -693,26 +694,298 @@ function getPopupCinemas(film) {
   return cinemas.filter(cinema => cinema && (cinema.nom || cinema.name));
 }
 
+
+function getStartOfLocalDay(date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function normalizePopupVersion(value) {
+  const raw = String(value || '').trim().toUpperCase();
+  if (!raw) return '';
+  if (raw.includes('VOST')) return 'VOST';
+  if (raw.includes('SUB') || raw.includes('ORIGINAL') || raw === 'VO') return 'VO';
+  if (raw.includes('DUB') || raw.includes('VF') || raw.includes('FRENCH') || raw.includes('FRANCAIS') || raw.includes('FRANÇAIS')) return 'VF';
+  return raw.length <= 8 ? raw : '';
+}
+
+function getPopupShowtimeRaw(value) {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'string' || typeof value === 'number' || value instanceof Date) return value;
+  return value.startsAt || value.startAt || value.datetime || value.dateTime || value.showtime || value.showTime || value.time || value.horaire || value.hour || value.heure || value.date || value.label || '';
+}
+
+function parsePopupShowtimeDate(value) {
+  const raw = getPopupShowtimeRaw(value);
+  if (!raw) return null;
+
+  if (raw instanceof Date && !Number.isNaN(raw.getTime())) return raw;
+
+  const text = String(raw).trim();
+  if (!text) return null;
+  const normalizedLower = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const timeMatch = text.match(/(\d{1,2})[h:](\d{2})/);
+
+  if (timeMatch && /aujourd/.test(normalizedLower)) {
+    const d = getStartOfLocalDay(new Date());
+    d.setHours(Number(timeMatch[1]), Number(timeMatch[2]), 0, 0);
+    return d;
+  }
+  if (timeMatch && /demain/.test(normalizedLower)) {
+    const d = getStartOfLocalDay(new Date());
+    d.setDate(d.getDate() + 1);
+    d.setHours(Number(timeMatch[1]), Number(timeMatch[2]), 0, 0);
+    return d;
+  }
+
+  const isoMatch = text.match(/(20\d{2}-\d{2}-\d{2})(?:[T\s]+(\d{1,2})[:h](\d{2}))?/);
+  if (isoMatch) {
+    const [, day, hour = '0', minute = '0'] = isoMatch;
+    const d = new Date(`${day}T${String(hour).padStart(2, '0')}:${minute}:00`);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+
+  // Cas simple : heure seule comme 13h10. Le jour sera géré par le groupe "Séances".
+  if (/^\d{1,2}[h:]\d{2}$/i.test(text)) return null;
+
+  const date = new Date(text);
+  if (Number.isNaN(date.getTime())) return null;
+  return date;
+}
+
+function isPopupShowtimeInNextSevenDays(value) {
+  const date = parsePopupShowtimeDate(value);
+  if (!date) return true;
+
+  // ZIP 3.8.1 : la popup n'affiche plus les séances déjà passées aujourd'hui.
+  // Cela aligne CinéProche avec UGC/Pathé qui retirent les horaires passés de la journée.
+  const now = new Date();
+  const min = new Date(now.getTime() - 5 * 60 * 1000);
+  const today = getStartOfLocalDay(now);
+  const maxDay = new Date(today);
+  maxDay.setDate(today.getDate() + 8);
+
+  return date >= min && date < maxDay;
+}
+
+function getPopupShowtimeVersion(value) {
+  if (!value || typeof value !== 'object') return '';
+  return normalizePopupVersion(
+    value.version || value.diffusionVersion || value.format || value.language || value.lang ||
+    value.versionLabel || value.localizedVersion || value.projectionVersion || value?.version?.label || value?.version?.name
+  );
+}
+
+function formatPopupShowtime(value) {
+  const raw = getPopupShowtimeRaw(value);
+  const text = String(raw || '').trim();
+  const date = parsePopupShowtimeDate(value);
+
+  if (!date) {
+    return text.replace('T', ' · ').replace(/\s+à\s+/i, ' · ');
+  }
+
+  const today = getStartOfLocalDay(new Date());
+  const tomorrow = new Date(today);
+  tomorrow.setDate(today.getDate() + 1);
+  const showtimeDay = getStartOfLocalDay(date);
+  const time = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' }).format(date).replace(':', 'h');
+
+  if (showtimeDay.getTime() === today.getTime()) return `Aujourd’hui · ${time}`;
+  if (showtimeDay.getTime() === tomorrow.getTime()) return `Demain · ${time}`;
+
+  const day = new Intl.DateTimeFormat('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' }).format(date);
+  return `${day} · ${time}`;
+}
+
+function getPopupDayLabel(date, fallbackText = '') {
+  const text = String(fallbackText || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  if (/aujourd/.test(text)) return 'Aujourd’hui';
+  if (/demain/.test(text)) return 'Demain';
+
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return 'Séances';
+  const today = getStartOfLocalDay(new Date());
+  const day = getStartOfLocalDay(date);
+  const diff = Math.round((day - today) / 86400000);
+  if (diff === 0) return 'Aujourd’hui';
+  if (diff === 1) return 'Demain';
+  const label = new Intl.DateTimeFormat('fr-FR', { weekday: 'short', day: 'numeric' }).format(date);
+  return label.charAt(0).toUpperCase() + label.slice(1).replace('.', '');
+}
+
+function getPopupDayKey(date, fallbackText = '') {
+  const label = getPopupDayLabel(date, fallbackText);
+  if (date instanceof Date && !Number.isNaN(date.getTime())) return getStartOfLocalDay(date).toISOString().slice(0, 10);
+  return label.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-');
+}
+
+function getPopupShowtimeTime(date, fallback = '') {
+  if (date instanceof Date && !Number.isNaN(date.getTime())) {
+    return new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' }).format(date).replace(':', 'h');
+  }
+  const match = String(fallback || '').match(/(\d{1,2})[h:](\d{2})/);
+  return match ? `${match[1].padStart(2, '0')}h${match[2]}` : String(fallback || '').trim();
+}
+
+function collectPopupCinemaShowtimes(cinema) {
+  const collected = [];
+  const seenObjects = new WeakSet();
+
+  function add(value, inheritedVersion = '') {
+    if (value === null || value === undefined || value === '') return;
+    const raw = getPopupShowtimeRaw(value);
+    const rawText = String(raw || value || '').trim();
+    if (!rawText) return;
+
+    const date = parsePopupShowtimeDate(value);
+    if (date && !isPopupShowtimeInNextSevenDays(value)) return;
+
+    const version = getPopupShowtimeVersion(value) || inheritedVersion || '';
+    const time = getPopupShowtimeTime(date, rawText);
+    if (!time) return;
+
+    collected.push({
+      raw: value,
+      date,
+      dayKey: getPopupDayKey(date, rawText),
+      dayLabel: getPopupDayLabel(date, rawText),
+      time,
+      version,
+      sortTime: date ? date.getTime() : Number.MAX_SAFE_INTEGER,
+      rawText
+    });
+  }
+
+  function visit(node, inheritedVersion = '', depth = 0) {
+    if (node === null || node === undefined || depth > 8) return;
+    if (typeof node === 'string' || typeof node === 'number' || node instanceof Date) {
+      add(node, inheritedVersion);
+      return;
+    }
+
+    // ZIP 3.6.5 : les horaires arrivent souvent directement sous forme de tableau
+    // ex: ["Aujourd’hui à 10h50", "Demain à 13h10"].
+    // Avant, un tableau était traité comme un objet et ses éléments n'étaient jamais parcourus.
+    if (Array.isArray(node)) {
+      node.forEach(child => visit(child, inheritedVersion, depth + 1));
+      return;
+    }
+
+    if (typeof node !== 'object') return;
+    if (seenObjects.has(node)) return;
+    seenObjects.add(node);
+
+    const version = getPopupShowtimeVersion(node) || inheritedVersion;
+    const direct = getPopupShowtimeRaw(node);
+    if (direct) add(node, version);
+
+    for (const key of ['structuredHoraires', 'horaires', 'showtimes', 'seances', 'séances', 'sessions', 'times', 'rawShowtimes']) {
+      const value = node[key];
+      if (Array.isArray(value)) value.forEach(child => visit(child, version, depth + 1));
+    }
+  }
+
+  // ZIP 3.6.5 : on donne la priorité aux horaires déjà présents dans la fiche.
+  // Le bug 3.6.3 venait d'un rendu trop strict qui pouvait ignorer des chaînes
+  // pourtant valides comme "Aujourd’hui à 10h50".
+  visit(cinema?.structuredHoraires || []);
+  visit(cinema?.horaires || []);
+  visit(cinema?.showtimes || []);
+  visit(cinema?.rawShowtimes || []);
+  visit(cinema?.seances || []);
+  visit(cinema?.sessions || []);
+  visit(cinema?.times || []);
+
+  // ZIP 3.8.1 : les horaires peuvent exister deux fois :
+  // - en texte simple : "Aujourd’hui à 13h10"
+  // - en objet structuré : { startsAt: ..., version: "VF" }
+  // On privilégie toujours l'objet structuré avec version pour afficher VF/VO,
+  // puis on déduplique proprement par jour + heure.
+  const byTime = new Map();
+  const extras = [];
+  for (const item of collected.sort((a, b) => a.sortTime - b.sortTime || a.time.localeCompare(b.time, 'fr'))) {
+    const baseKey = `${item.dayKey}|${item.time}`;
+    const existing = byTime.get(baseKey);
+    if (!existing) {
+      byTime.set(baseKey, item);
+      continue;
+    }
+    if (!existing.version && item.version) {
+      byTime.set(baseKey, item);
+      continue;
+    }
+    if (existing.version && item.version && existing.version !== item.version) {
+      extras.push(item);
+    }
+  }
+
+  return [...byTime.values(), ...extras]
+    .sort((a, b) => a.sortTime - b.sortTime || a.time.localeCompare(b.time, 'fr'));
+}
+
+function groupPopupShowtimesByDay(showtimes) {
+  const groups = [];
+  const byKey = new Map();
+  for (const showtime of showtimes) {
+    if (!byKey.has(showtime.dayKey)) {
+      const group = { key: showtime.dayKey, label: showtime.dayLabel, showtimes: [] };
+      byKey.set(showtime.dayKey, group);
+      groups.push(group);
+    }
+    byKey.get(showtime.dayKey).showtimes.push(showtime);
+  }
+  return groups;
+}
+
 function buildPopupSeancesHTML(cinemas) {
   if (!cinemas.length) {
     return `<div class="empty-seances">Aucune séance proche n’est encore associée à ce film. Lance une recherche de cinémas proches pour remplir cette zone.</div>`;
   }
 
-  return `<div class="popup-seances-list">${cinemas.slice(0, 8).map(cinema => {
-    const nom = cinema.nom || cinema.name || 'Cinéma';
-    const distance = Number(cinema.distanceKm ?? cinema.dist);
-    const distanceLabel = Number.isFinite(distance) ? ` · ${distance.toFixed(1)} km` : '';
-    const horaires = Array.isArray(cinema.horaires) ? cinema.horaires : [];
-    const horairesHTML = horaires.length
-      ? `<div class="popup-showtimes">${horaires.slice(0, 8).map(time => `<span>${escapeHTML(typeof time === 'string' ? time : (time?.time || time?.horaire || time?.startsAt || 'Horaire'))}</span>`).join('')}</div>`
-      : '<div class="popup-showtimes-muted">Horaires à vérifier sur le site du cinéma.</div>';
-    return `<div class="popup-cinema-row">
-      <div class="popup-cinema-name"><i class="ti ti-map-pin"></i>${escapeHTML(nom)}${distanceLabel}</div>
-      ${horairesHTML}
-    </div>`;
-  }).join('')}</div>`;
+  return `<div class="popup-seances-list">${cinemas
+    .slice()
+    .sort((a, b) => Number(a.distanceKm ?? a.dist ?? 9999) - Number(b.distanceKm ?? b.dist ?? 9999))
+    .slice(0, 8)
+    .map((cinema, cinemaIndex) => {
+      const nom = cinema.nom || cinema.name || 'Cinéma';
+      const distance = Number(cinema.distanceKm ?? cinema.dist);
+      const distanceLabel = Number.isFinite(distance) ? ` · ${distance.toFixed(1)} km` : '';
+      const showtimes = collectPopupCinemaShowtimes(cinema);
+      const groups = groupPopupShowtimesByDay(showtimes);
+      const next = showtimes[0] || null;
+      const nextLabel = next ? `${next.dayLabel} · ${next.time}${next.version ? ` ${next.version}` : ''}` : '';
+      const uid = `popup-${cinemaIndex}-${String(nom).replace(/[^a-z0-9]+/gi, '-').toLowerCase()}`;
+
+      const horairesHTML = groups.length
+        ? `<div class="popup-next-showtime">🎬 Prochaine séance : <strong>${escapeHTML(nextLabel)}</strong></div>
+           <div class="popup-showtime-day-tabs" role="tablist">${groups.map((group, index) => `
+             <button type="button" class="popup-day-tab${index === 0 ? ' active' : ''}" data-day-target="${escapeHTML(uid)}-${index}">${escapeHTML(group.label)}</button>
+           `).join('')}</div>
+           ${groups.map((group, index) => `
+             <div class="popup-day-panel${index === 0 ? ' active' : ''}" data-day-panel="${escapeHTML(uid)}-${index}">
+               <div class="popup-showtimes">${group.showtimes.map(item => `
+                 <span class="popup-showtime-pill"><strong>${escapeHTML(item.time)}</strong>${item.version ? `<em>${escapeHTML(item.version)}</em>` : ''}</span>
+               `).join('')}</div>
+             </div>
+           `).join('')}`
+        : '<div class="popup-showtimes-muted">Aucune séance dans les 7 prochains jours.</div>';
+      return `<div class="popup-cinema-row">
+        <div class="popup-cinema-name"><i class="ti ti-map-pin"></i>${escapeHTML(nom)}${distanceLabel}</div>
+        ${horairesHTML}
+      </div>`;
+    }).join('')}</div>`;
 }
 
+document.addEventListener('click', function(event) {
+  const tab = event.target.closest?.('.popup-day-tab');
+  if (!tab) return;
+  const target = tab.dataset.dayTarget;
+  const row = tab.closest('.popup-cinema-row');
+  if (!target || !row) return;
+  row.querySelectorAll('.popup-day-tab').forEach(button => button.classList.toggle('active', button === tab));
+  row.querySelectorAll('.popup-day-panel').forEach(panel => panel.classList.toggle('active', panel.dataset.dayPanel === target));
+});
 
 async function loadCachedSynopsisForCatalogue(film) {
   const imdbId = String(film?.imdbID || film?.imdbId || '').trim();

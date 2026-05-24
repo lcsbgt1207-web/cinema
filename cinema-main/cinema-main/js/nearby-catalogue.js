@@ -1,5 +1,5 @@
-/* CinéProche — Catalogue proche — ZIP 3.8.1
-   Objectif : normalisation des horaires UGC pour la popup catalogue.
+/* CinéProche — Catalogue proche — ZIP 3.4
+   Objectif : conserver la fusion proche + enrichir les fiches film utilisées par le Catalogue.
    - Les films reconnus dans js/data.js gardent leur note locale.
    - Les films absents trouvés sur TMDB deviennent utilisables directement dans la liste finale.
    - Ajout d'un catalogue temporaire exportable window.NEARBY_CATALOGUE_RUNTIME_DATA.
@@ -9,16 +9,6 @@
   'use strict';
 
   const NEARBY_CATALOGUE_API = 'https://cinepro-api-yal8.onrender.com';
-  // ZIP 3.8.1 : logs debug désactivés par défaut.
-  // Pour les réactiver ponctuellement : localStorage.setItem('cinepro_debug', '1') puis recharger.
-  const NEARBY_CATALOGUE_DEBUG = (() => {
-    try { return localStorage.getItem('cinepro_debug') === '1'; } catch (_) { return false; }
-  })();
-  const debugLog = (...args) => { if (NEARBY_CATALOGUE_DEBUG) console.log(...args); };
-  const debugWarn = (...args) => { if (NEARBY_CATALOGUE_DEBUG) console.warn(...args); };
-  const debugGroup = (...args) => { if (NEARBY_CATALOGUE_DEBUG) console.group(...args); };
-  const debugGroupEnd = () => { if (NEARBY_CATALOGUE_DEBUG) debugGroupEnd(); };
-  const debugTable = (...args) => { if (NEARBY_CATALOGUE_DEBUG) console.table(...args); };
   const tmdbRatingCache = new Map();
   const tmdbEnrichmentCache = new Map();
 
@@ -538,227 +528,38 @@
     );
   }
 
-  function startOfLocalDay(date = new Date()) {
-    return new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  }
-
-  function formatLocalDateYYYYMMDD(date = new Date()) {
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, '0');
-    const d = String(date.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
-  }
-
-  function getNearbyWindowBounds() {
-    // ZIP 3.7.3 : on ne garde plus les séances déjà passées aujourd'hui.
-    // Les sites cinéma masquent généralement les horaires passés, donc le catalogue doit faire pareil.
-    const now = new Date();
-    const start = new Date(now.getTime() - 5 * 60 * 1000);
-    const endExclusive = startOfLocalDay(now);
-    // J+7 inclus = on garde tout jusqu'au début de J+8.
-    endExclusive.setDate(endExclusive.getDate() + 8);
-    return { start, endExclusive };
-  }
-
-  function getDateFromRelativeFrenchLabel(text) {
-    const normalized = stripAccents(String(text || '').toLowerCase());
-    if (!normalized) return null;
-
-    const today = startOfLocalDay(new Date());
-    if (/\b(aujourd hui|ce jour)\b/.test(normalized)) return today;
-    if (/\b(demain)\b/.test(normalized)) {
-      const date = new Date(today);
-      date.setDate(date.getDate() + 1);
-      return date;
-    }
-    if (/\b(apres demain)\b/.test(normalized)) {
-      const date = new Date(today);
-      date.setDate(date.getDate() + 2);
-      return date;
-    }
-    return null;
-  }
-
-  function combineDayAndTime(dayDate, hour, minute) {
-    if (!(dayDate instanceof Date) || Number.isNaN(dayDate.getTime())) return null;
-    const combined = startOfLocalDay(dayDate);
-    combined.setHours(Number(hour), Number(minute), 0, 0);
-    return combined;
-  }
-
-  function parseShowtimeDate(value, fallbackDate = null) {
-    if (value === null || value === undefined) return null;
-    if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
-    const text = String(value).trim();
-    if (!text) return null;
-
-    const relativeDate = getDateFromRelativeFrenchLabel(text);
-    const relativeTimeMatch = text.match(/\b(\d{1,2})[:h](\d{2})\b/);
-    if (relativeDate && relativeTimeMatch) {
-      return combineDayAndTime(relativeDate, relativeTimeMatch[1], relativeTimeMatch[2]);
-    }
-    if (relativeDate) return relativeDate;
-
-    // Format ISO : 2026-05-23T17:00:00 ou 2026-05-23 17:00.
-    const isoMatch = text.match(/(20\d{2}-\d{2}-\d{2})(?:[T\s]+(\d{1,2})[:h](\d{2}))?/);
-    if (isoMatch) {
-      const [, day, hour = '0', minute = '0'] = isoMatch;
-      const parsed = new Date(`${day}T${String(hour).padStart(2, '0')}:${minute}:00`);
-
-      // Correction 3.5.3 : certains cinémas renvoient une ancienne date ISO mais le bloc parent
-      // porte la vraie date relative (ex : Demain). Dans ce cas on garde l'heure et on utilise le jour parent.
-      if (fallbackDate && hour && minute && (!parsed || !isShowtimeInNearbyWindow(parsed))) {
-        const rebased = combineDayAndTime(fallbackDate, hour, minute);
-        if (rebased) return rebased;
-      }
-
-      return Number.isNaN(parsed.getTime()) ? null : parsed;
-    }
-
-    // Format heure seule : 17:00 ou 17h00. On rattache à la date de la séance si elle existe, sinon aujourd'hui.
-    const timeMatch = text.match(/\b(\d{1,2})[:h](\d{2})\b/);
-    if (timeMatch) {
-      const base = fallbackDate ? startOfLocalDay(fallbackDate) : startOfLocalDay(new Date());
-      base.setHours(Number(timeMatch[1]), Number(timeMatch[2]), 0, 0);
-      return base;
-    }
-
-    const parsed = new Date(text);
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
-  }
-
-  function isShowtimeInNearbyWindow(date) {
-    if (!(date instanceof Date) || Number.isNaN(date.getTime())) return false;
-    const { start, endExclusive } = getNearbyWindowBounds();
-    return date >= start && date < endExclusive;
-  }
-
-  function formatNearbyShowtime(date) {
-    if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
-    const today = startOfLocalDay(new Date());
-    const day = startOfLocalDay(date);
-    const diffDays = Math.round((day - today) / 86400000);
-    const time = date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }).replace(':', 'h');
-    if (diffDays === 0) return `Aujourd’hui à ${time}`;
-    if (diffDays === 1) return `Demain à ${time}`;
-    const dayLabel = date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
-    return `${dayLabel.charAt(0).toUpperCase()}${dayLabel.slice(1)} à ${time}`;
-  }
-
-  function keyLooksLikeShowtimeDate(key = '') {
-    return /(startsAt|startAt|datetime|dateTime|showtime|showTime|horaire|time|date|jour|day|seance|séance|session)/i.test(String(key));
-  }
-
-  function extractShowtimeEntries(item) {
-    const entries = [];
-    const seenObjects = new WeakSet();
-
-    function pushDate(rawValue, fallbackDate = null) {
-      const parsed = parseShowtimeDate(rawValue, fallbackDate);
-      if (!parsed || !isShowtimeInNearbyWindow(parsed)) return;
-      entries.push({ date: parsed, label: formatNearbyShowtime(parsed), raw: rawValue });
-    }
-
-    function visit(node, path = '$', fallbackDate = null, depth = 0) {
-      if (node === null || node === undefined || depth > 8) return;
-
-      if (typeof node === 'string' || typeof node === 'number' || node instanceof Date) {
-        if (keyLooksLikeShowtimeDate(path)) pushDate(node, fallbackDate);
-        return;
-      }
-
-      if (typeof node !== 'object') return;
-      if (seenObjects.has(node)) return;
-      seenObjects.add(node);
-
-      const objectDate = parseShowtimeDate(firstString(
-        node.__nearbyFallbackDate, node.__nearbyRequestedDate, node.__nearbyApiDate,
-        node.date, node.day, node.jour, node.showDate, node.sessionDate,
-        node.dateLabel, node.dayLabel, node.label, node.tabLabel, node.displayDate, node.displayDay
-      ), fallbackDate) || fallbackDate;
-
-      const directValues = [
-        node.startsAt, node.startAt, node.start, node.datetime, node.dateTime,
-        node.showtime, node.showTime, node.time, node.horaire, node.hour, node.heure
-      ];
-      for (const value of directValues) pushDate(value, objectDate);
-
-      if (Array.isArray(node)) {
-        node.forEach((child, index) => visit(child, `${path}[${index}]`, objectDate, depth + 1));
-        return;
-      }
-
-      for (const [key, value] of Object.entries(node)) {
-        visit(value, `${path}.${key}`, objectDate, depth + 1);
-      }
-    }
-
-    visit(item);
-
-    const unique = [];
-    const seen = new Set();
-    for (const entry of entries.sort((a, b) => a.date - b.date)) {
-      const key = entry.date.toISOString().slice(0, 16);
-      if (seen.has(key)) continue;
-      seen.add(key);
-      unique.push(entry.label);
-    }
-    return unique;
-  }
-
   function extractShowtimes(item) {
     if (!item || typeof item !== 'object') return [];
-    const filtered = extractShowtimeEntries(item);
-    if (filtered.length) return filtered;
-
-    // Sécurité : si l'API ne donne que des heures sans date dans un tableau classique,
-    // on les rattache à la date du bloc si elle existe, sinon aujourd'hui.
     const possibleArrays = [item.horaires, item.times, item.showtimes, item.seances, item.sessions, item.scr, item.version?.times];
-    const fallback = [];
-    const itemDate = parseShowtimeDate(firstString(
-      item.__nearbyFallbackDate, item.__nearbyRequestedDate, item.__nearbyApiDate,
-      item.date, item.day, item.jour, item.showDate, item.sessionDate,
-      item.dateLabel, item.dayLabel, item.label, item.tabLabel, item.displayDate, item.displayDay
-    ));
-    for (const arr of possibleArrays) {
-      if (!Array.isArray(arr)) continue;
-      for (const value of arr) {
-        const parsed = parseShowtimeDate(
-          typeof value === 'string' ? value : firstString(value?.startsAt, value?.startAt, value?.time, value?.horaire, value?.hour, value?.heure),
-          itemDate
-        );
-        if (parsed && isShowtimeInNearbyWindow(parsed)) fallback.push(formatNearbyShowtime(parsed));
-      }
-    }
-    return [...new Set(fallback)];
+    for (const arr of possibleArrays) if (Array.isArray(arr)) return arr;
+    if (typeof item.time === 'string') return [item.time];
+    if (typeof item.horaire === 'string') return [item.horaire];
+    return [];
   }
 
   function normalizeShowtimeItem(rawItem) {
     const movieObject = extractMovieObject(rawItem);
     const title = extractMovieTitle(movieObject) || extractMovieTitle(rawItem);
     if (!title || !looksLikeRealMovieTitle(title)) return null;
-    const horaires = extractShowtimes(rawItem);
-    // ZIP 3.5 : le Catalogue ne garde que les films avec au moins une séance entre aujourd'hui et J+7.
-    if (!horaires.length) return null;
     return {
       title,
       normalizedKey: normalizeNearbyTitle(title),
       rawMovie: movieObject || rawItem,
       rawItem,
       poster: extractPoster(movieObject, rawItem),
-      horaires
+      horaires: extractShowtimes(rawItem)
     };
   }
 
   async function fetchJsonWithDebug(url, label) {
-    debugLog(`[Catalogue proche][DEBUG] Appel ${label} :`, url);
+    console.log(`[Catalogue proche][DEBUG] Appel ${label} :`, url);
     const response = await fetch(url);
     const contentType = response.headers.get('content-type') || '';
     let json = null;
     let text = '';
     if (contentType.includes('application/json')) json = await response.json();
     else text = await response.text();
-    debugLog(`[Catalogue proche][DEBUG] Réponse ${label} :`, {
+    console.log(`[Catalogue proche][DEBUG] Réponse ${label} :`, {
       status: response.status,
       ok: response.ok,
       contentType,
@@ -874,24 +675,24 @@
 
     const candidates = collectCinemaIdCandidates(data, cinema?.nom || '');
     if (candidates.length) {
-      debugGroup(`[Catalogue proche][DEBUG] IDs candidats pour ${cinema?.nom}`);
-      debugTable(candidates.slice(0, 20).map(candidate => ({
+      console.group(`[Catalogue proche][DEBUG] IDs candidats pour ${cinema?.nom}`);
+      console.table(candidates.slice(0, 20).map(candidate => ({
         id: candidate.id,
         score: candidate.score,
         chemin: candidate.path,
         raison: candidate.reason,
         aperçu: String(candidate.raw || '').slice(0, 90)
       })));
-      debugGroupEnd();
+      console.groupEnd();
     }
 
     const best = candidates.find(candidate => candidate.score >= 0) || candidates[0] || null;
     const id = best?.id || null;
 
     if (id) {
-      debugLog(`[Catalogue proche][DEBUG] ID extrait pour ${cinema?.nom} :`, id, best);
+      console.log(`[Catalogue proche][DEBUG] ID extrait pour ${cinema?.nom} :`, id, best);
     } else {
-      debugWarn(`[Catalogue proche][DEBUG] Aucun ID cinéma trouvé pour ${cinema?.nom}. JSON complet ci-dessous :`, data);
+      console.warn(`[Catalogue proche][DEBUG] Aucun ID cinéma trouvé pour ${cinema?.nom}. JSON complet ci-dessous :`, data);
     }
     return id;
   }
@@ -989,46 +790,29 @@
 
     visit(data);
 
-    const uniqueByTitle = new Map();
+    const unique = [];
+    const seenKeys = new Set();
     for (const candidate of found) {
       const normalized = normalizeNearbyTitle(candidate.title);
-      if (!normalized) continue;
+      if (!normalized || seenKeys.has(normalized)) continue;
+      seenKeys.add(normalized);
       const raw = candidate.rawItem || { title: candidate.title };
       if (raw && typeof raw === 'object' && !extractMovieTitle(raw)) {
         raw.title = candidate.title;
       }
-
-      const existing = uniqueByTitle.get(normalized);
-      if (!existing) {
-        uniqueByTitle.set(normalized, raw);
-        continue;
-      }
-
-      // ZIP 3.5.5 : l'API UGC peut faire apparaître le même film plusieurs fois
-      // dans le JSON analysé. Avant, on gardait seulement le premier objet trouvé.
-      // Si ce premier objet ne portait pas les horaires, les séances UGC étaient perdues.
-      // On fusionne donc les tableaux d'horaires au lieu d'écraser/ignorer les doublons.
-      if (existing && typeof existing === 'object' && raw && typeof raw === 'object') {
-        for (const key of ['showtimes', 'horaires', 'times', 'seances', 'sessions']) {
-          const a = Array.isArray(existing[key]) ? existing[key] : [];
-          const b = Array.isArray(raw[key]) ? raw[key] : [];
-          if (b.length) existing[key] = [...a, ...b];
-        }
-      }
+      unique.push(raw);
     }
 
-    const unique = Array.from(uniqueByTitle.values());
-
     if (!unique.length) {
-      debugWarn('[Catalogue proche][DEBUG] Aucun film extrait de /seances. JSON complet analysé :', data);
+      console.warn('[Catalogue proche][DEBUG] Aucun film extrait de /seances. JSON complet analysé :', data);
     } else {
-      debugGroup('[Catalogue proche][DEBUG] Candidats films extraits de /seances');
-      debugTable(unique.slice(0, 60).map((item, index) => ({
+      console.group('[Catalogue proche][DEBUG] Candidats films extraits de /seances');
+      console.table(unique.slice(0, 60).map((item, index) => ({
         index,
         titre: extractMovieTitle(extractMovieObject(item)) || extractMovieTitle(item),
         cles: item && typeof item === 'object' ? Object.keys(item).slice(0, 8).join(', ') : typeof item
       })));
-      debugGroupEnd();
+      console.groupEnd();
     }
 
     return unique;
@@ -1038,35 +822,22 @@
     const allocineId = await getCinemaAllocineId(cinema);
     if (!allocineId) return [];
 
-    // ZIP 3.5.4 : surtout ne pas utiliser toISOString() ici.
-    // toISOString() passe en UTC et peut demander la veille après minuit en France.
-    const requestedDate = formatLocalDateYYYYMMDD(new Date());
+    const requestedDate = new Date().toISOString().split('T')[0];
     const url = `${NEARBY_CATALOGUE_API}/seances-auto?id=${encodeURIComponent(allocineId)}&date=${requestedDate}&days=7`;
     const data = await fetchJsonWithDebug(url, `seances-auto pour ${cinema?.nom}`);
 
-    debugLog(`[Catalogue proche][DEBUG] JSON complet /seances-auto pour ${cinema?.nom} :`, data);
-    debugLog(`[Catalogue proche][DEBUG] Date demandée / date utilisée pour ${cinema?.nom} :`, {
+    console.log(`[Catalogue proche][DEBUG] JSON complet /seances-auto pour ${cinema?.nom} :`, data);
+    console.log(`[Catalogue proche][DEBUG] Date demandée / date utilisée pour ${cinema?.nom} :`, {
       requestedDate: data?.requested_date || requestedDate,
       usedDate: data?.date || requestedDate,
       attempts: data?.attempts || []
     });
 
-    const apiFallbackDate = data?.date || data?.requested_date || requestedDate;
-    const rawShowtimes = extractSeancesArray(data).map(item => {
-      if (item && typeof item === 'object') {
-        return {
-          ...item,
-          __nearbyFallbackDate: item.__nearbyFallbackDate || apiFallbackDate,
-          __nearbyRequestedDate: item.__nearbyRequestedDate || requestedDate,
-          __nearbyApiDate: item.__nearbyApiDate || data?.date || ''
-        };
-      }
-      return item;
-    });
-    debugLog(`[Catalogue proche][DEBUG] Tableau extrait pour ${cinema?.nom} :`, rawShowtimes);
+    const rawShowtimes = extractSeancesArray(data);
+    console.log(`[Catalogue proche][DEBUG] Tableau extrait pour ${cinema?.nom} :`, rawShowtimes);
     if (rawShowtimes[0]) {
-      debugLog(`[Catalogue proche][DEBUG] Premier objet brut pour ${cinema?.nom} :`, rawShowtimes[0]);
-      debugLog(`[Catalogue proche][DEBUG] Clés premier objet pour ${cinema?.nom} :`, Object.keys(rawShowtimes[0] || {}));
+      console.log(`[Catalogue proche][DEBUG] Premier objet brut pour ${cinema?.nom} :`, rawShowtimes[0]);
+      console.log(`[Catalogue proche][DEBUG] Clés premier objet pour ${cinema?.nom} :`, Object.keys(rawShowtimes[0] || {}));
     }
     return rawShowtimes.map(normalizeShowtimeItem).filter(Boolean);
   }
@@ -1160,7 +931,7 @@
         <div class="nearby-catalogue-head">
           <div>
             <h2>Films proches trouvés</h2>
-            <p>ZIP 3.5.4 : uniquement les films avec une séance entre aujourd’hui et J+7, avec horaires lisibles.</p>
+            <p>ZIP 3.4 : séances réelles + fiche film enrichie avec note, métadonnées et cinémas proches.</p>
           </div>
           <div class="nearby-catalogue-stats">
             <div class="nearby-catalogue-stat"><strong>${stats.total}</strong> films</div>
@@ -1297,75 +1068,6 @@
 
 
 
-
-  function normalizeExportedNearbyVersion(value) {
-    const raw = String(value || '').trim().toUpperCase();
-    if (!raw) return '';
-    if (raw.includes('VOST')) return 'VOST';
-    if (raw.includes('ORIGINAL') || raw.includes('SUB') || raw === 'VO') return 'VO';
-    if (raw.includes('DUB') || raw.includes('VF') || raw.includes('FRENCH') || raw.includes('FRANCAIS') || raw.includes('FRANÇAIS')) return 'VF';
-    return raw.length <= 8 ? raw : '';
-  }
-
-  function getExportedShowtimeVersion(value) {
-    if (!value || typeof value !== 'object') return '';
-    return normalizeExportedNearbyVersion(
-      value.version || value.diffusionVersion || value.format || value.language || value.lang ||
-      value.versionLabel || value.localizedVersion || value.projectionVersion || value?.version?.label || value?.version?.name
-    );
-  }
-
-  function normalizeExportedNearbyShowtimes(values) {
-    if (!Array.isArray(values)) return [];
-    const byTime = new Map();
-    const extras = [];
-
-    for (const value of values) {
-      const rawDate = value?.startsAt || value?.startAt || value?.datetime || value?.dateTime || value?.showtime || value?.showTime || value?.time || value?.horaire || value?.date || value;
-      const parsed = parseShowtimeDate(rawDate);
-      if (!parsed || !isShowtimeInNearbyWindow(parsed)) continue;
-      const version = getExportedShowtimeVersion(value);
-      const item = {
-        startsAt: `${formatLocalDateYYYYMMDD(parsed)}T${String(parsed.getHours()).padStart(2, '0')}:${String(parsed.getMinutes()).padStart(2, '0')}:00`,
-        label: formatNearbyShowtime(parsed),
-        time: parsed.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }).replace(':', 'h'),
-        version,
-        rawVersion: value?.diffusionVersion || value?.version || value?.format || ''
-      };
-
-      const baseKey = item.startsAt.slice(0, 16);
-      const existing = byTime.get(baseKey);
-      if (!existing) {
-        byTime.set(baseKey, item);
-        continue;
-      }
-      if (!existing.version && item.version) {
-        byTime.set(baseKey, item);
-        continue;
-      }
-      if (existing.version && item.version && existing.version !== item.version) {
-        extras.push(item);
-      }
-    }
-
-    return [...byTime.values(), ...extras].sort((a, b) => String(a.startsAt).localeCompare(String(b.startsAt)));
-  }
-
-  function normalizeExportedNearbyHoraires(horaires) {
-    return normalizeExportedNearbyShowtimes(horaires).map(item => item.label);
-  }
-
-  function collectExportedCinemaShowtimes(cinema) {
-    const raw = [];
-    // ZIP 3.6.7 : priorité absolue aux objets bruts de l'API.
-    // Ils contiennent startsAt + diffusionVersion, donc ils permettent d'afficher VF/VO.
-    for (const key of ['rawShowtimes', 'showtimes', 'structuredHoraires', 'horaires', 'seances', 'sessions', 'times']) {
-      const value = cinema?.[key];
-      if (Array.isArray(value)) raw.push(...value);
-    }
-    return normalizeExportedNearbyShowtimes(raw);
-  }
-
   function buildNearbyCatalogueRankedExport(ranked) {
     return ranked.map((movie, index) => {
       const local = movie.localFilm || null;
@@ -1417,22 +1119,13 @@
         nearbyMatchedTitle: movie.matchedTitle || tmdb?.titre || '',
         nearbyRatingValue: bestRating,
         nearbyRatingSource: ratingSource,
-        nearbyCinemas: movie.cinemas.map(c => {
-          const structuredHoraires = collectExportedCinemaShowtimes(c);
-          return {
-            nom: c.nom,
-            adresse: c.adresse || '',
-            distanceKm: c.distanceKm ?? null,
-            horaires: structuredHoraires.map(item => item.label),
-            structuredHoraires,
-            showtimes: structuredHoraires,
-            rawShowtimes: c.rawShowtimes || c.showtimes || []
-          };
-        }),
-        cinemas: movie.cinemas.map(c => {
-          const structuredHoraires = collectExportedCinemaShowtimes(c);
-          return { nom: c.nom, horaires: structuredHoraires.map(item => item.label), structuredHoraires, showtimes: structuredHoraires, rawShowtimes: c.rawShowtimes || c.showtimes || [] };
-        })
+        nearbyCinemas: movie.cinemas.map(c => ({
+          nom: c.nom,
+          adresse: c.adresse || '',
+          distanceKm: c.distanceKm ?? null,
+          horaires: c.horaires || []
+        })),
+        cinemas: movie.cinemas.map(c => ({ nom: c.nom, horaires: c.horaires || [] }))
       };
     }).sort((a, b) => {
       const ar = Number(a.bestNote ?? a.nearbyRatingValue ?? 0);
@@ -1454,16 +1147,8 @@
     }
     if (!location) location = await window.PLACES.geolocate();
 
-    console.log('[Catalogue proche] ZIP 3.8.1 actif — rafraîchissement forcé des séances futures + versions VF/VO.');
+    console.log('[Catalogue proche] ZIP 3.4 actif — mode unique Films proches classés exporté vers le Catalogue.');
     console.log('[Catalogue proche] Position utilisée :', location);
-
-    // ZIP 3.6.7 : une nouvelle recherche remplace toujours l'ancien cache.
-    // Cela évite de garder des horaires d'hier dans la popup.
-    try {
-      localStorage.removeItem('cinepro_runtime_catalogue');
-      localStorage.removeItem('cinepro_nearby_ranked_catalogue');
-      localStorage.removeItem('cinepro_active_catalogue');
-    } catch (_) {}
 
     const cinemas = await window.PLACES.findNearbycinemas(location, radius);
     const maxCinemas = Number.isFinite(Number(options.maxCinemas)) ? Number(options.maxCinemas) : 8;
@@ -1537,28 +1222,18 @@
           }
 
           const movie = moviesByKey.get(key);
-          const newHoraires = Array.isArray(item.horaires) ? item.horaires : [];
-          const newRawShowtimes = Array.isArray(item.rawItem?.showtimes) ? item.rawItem.showtimes : [];
-          const existingCinema = movie.cinemas.find(c => c.nom === cinema.nom);
-          if (!existingCinema) {
+          if (!movie.cinemas.some(c => c.nom === cinema.nom)) {
             movie.cinemas.push({
               nom: cinema.nom,
               adresse: cinema.adresse,
               distanceKm: cinema.dist,
-              horaires: newHoraires,
-              showtimes: newRawShowtimes,
-              rawShowtimes: newRawShowtimes
+              horaires: item.horaires || []
             });
-          } else if (newHoraires.length || newRawShowtimes.length) {
-            // ZIP 3.7.3 : on complète les horaires lisibles ET les objets bruts.
-            existingCinema.horaires = [...new Set([...(existingCinema.horaires || []), ...newHoraires])];
-            existingCinema.showtimes = [...(existingCinema.showtimes || []), ...newRawShowtimes];
-            existingCinema.rawShowtimes = [...(existingCinema.rawShowtimes || []), ...newRawShowtimes];
           }
           movie.rawShowtimes.push(item.rawItem || item);
         }
       } catch (error) {
-        debugWarn(`[Catalogue proche][DEBUG] Impossible de charger les films pour ${cinema.nom} :`, error?.message || error);
+        console.warn(`[Catalogue proche][DEBUG] Impossible de charger les films pour ${cinema.nom} :`, error?.message || error);
       }
     }
 
@@ -1592,10 +1267,10 @@
     const runtimeFusion = buildRuntimeCatalogueFusion(ranked);
     const nearbyRankedCatalogue = buildNearbyCatalogueRankedExport(ranked);
 
-    console.log(`[Catalogue proche] Résultat ZIP 3.8.1 : ${stats.total} film(s), ${stats.rated} avec note, ${stats.tmdbEnriched} film(s) fusionné(s) TMDB, ${stats.missing} à vérifier.`);
+    console.log(`[Catalogue proche] Résultat ZIP 3.4 : ${stats.total} film(s), ${stats.rated} avec note, ${stats.tmdbEnriched} film(s) fusionné(s) TMDB, ${stats.missing} à vérifier.`);
     console.group('[Catalogue proche] Debug correspondances titres');
     console.table(matchDebug);
-    debugGroupEnd();
+    console.groupEnd();
 
     if (missingDraft.length) {
       console.warn('[Catalogue proche] Films absents de js/data.js — brouillon prêt pour futur enrichissement :', missingDraft);
@@ -1607,7 +1282,7 @@
         choix2: item.bestLocalCandidates?.[1] ? `${item.bestLocalCandidates[1].titre} (${item.bestLocalCandidates[1].score})` : '—',
         choix3: item.bestLocalCandidates?.[2] ? `${item.bestLocalCandidates[2].titre} (${item.bestLocalCandidates[2].score})` : '—'
       })));
-      debugGroupEnd();
+      console.groupEnd();
     }
 
     if (tmdbEnrichment && !tmdbEnrichment.disabled) {
@@ -1622,7 +1297,7 @@
         synopsis: movie.tmdbDraft?.synopsis ? 'oui' : 'non',
         affiche: movie.tmdbDraft?.poster ? 'oui' : 'non'
       })));
-      debugGroupEnd();
+      console.groupEnd();
     }
 
     if (enrichedDraft.length) {
@@ -1641,7 +1316,7 @@
       synopsis: film.synopsis ? 'oui' : 'non',
       affiche: film.poster ? 'oui' : 'non'
     })));
-    debugGroupEnd();
+    console.groupEnd();
 
     console.table(ranked.map((movie, index) => ({
       rang: index + 1,
@@ -1667,31 +1342,25 @@
 
     try {
       const storedPayload = {
-        version: '3.8.1',
+        version: '3.4',
         updatedAt: new Date().toISOString(),
         films: runtimeFusion.films,
         tmdbRuntimeFilms: runtimeFusion.tmdbRuntimeFilms,
         stats: window.NEARBY_CATALOGUE_STATS
       };
-      const activePayload = {
-        version: '3.8.1',
-        source: 'active-nearby-catalogue',
-        searchDate: formatLocalDateYYYYMMDD(new Date()),
+      const nearbyPayload = {
+        version: '3.4',
         updatedAt: new Date().toISOString(),
         address: options.address || '',
         radius,
         films: nearbyRankedCatalogue,
         stats: { total: nearbyRankedCatalogue.length, rated: nearbyRankedCatalogue.filter(f => Number.isFinite(Number(f.bestNote))).length }
       };
-      const nearbyPayload = { ...activePayload, source: 'legacy-nearby-ranked' };
       localStorage.setItem('cinepro_runtime_catalogue', JSON.stringify(storedPayload));
       localStorage.setItem('cinepro_nearby_ranked_catalogue', JSON.stringify(nearbyPayload));
-      localStorage.setItem('cinepro_active_catalogue', JSON.stringify(activePayload));
-      window.CINEPRO_ACTIVE_CATALOGUE = nearbyRankedCatalogue;
-      console.log(`[Catalogue proche] ZIP 3.8.1 : catalogue actif rafraîchi et sauvegardé (${nearbyRankedCatalogue.length} films).`);
+      console.log(`[Catalogue proche] ZIP 3.4 : catalogue runtime sauvegardé pour catalogue.html (${runtimeFusion.total} films).`);
       window.dispatchEvent(new CustomEvent('nearby-catalogue-runtime-ready', { detail: storedPayload }));
       window.dispatchEvent(new CustomEvent('nearby-catalogue-ranked-ready', { detail: nearbyPayload }));
-      window.dispatchEvent(new CustomEvent('cinepro-active-catalogue-ready', { detail: activePayload }));
     } catch (storageError) {
       console.warn('[Catalogue proche] Impossible de sauvegarder le catalogue runtime :', storageError?.message || storageError);
     }

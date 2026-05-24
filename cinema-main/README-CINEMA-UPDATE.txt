@@ -1,25 +1,18 @@
-CinéProche — Zip 3.4
+ZIP 3.8.2 — Nettoyage catalogue
 
-Objectif : enrichir la fiche film sans casser le mode unique “Films proches classés”.
+Modification faite :
+- Le gros JavaScript inline de catalogue.html a été déplacé dans js/catalogue-page.js.
+- catalogue.html garde uniquement la structure HTML et les balises script externes.
+- Le nouveau fichier est appelé avec : js/catalogue-page.js?v=3.8.2
 
-Modifications principales :
-- La popup film affiche maintenant la meilleure note disponible avec sa source.
-- La popup conserve réalisateur, genres, durée, année, titre original, affiche et synopsis.
-- Le mode Catalogue applique aussi le cache IMDb FR au clic sur un film proche.
-- La zone “Séances proches” affiche les cinémas proches et les horaires quand ils sont présents dans les données runtime.
-- Le mode “Films proches classés” reste prioritaire et ne perd pas les données enrichies après changement de recherche, filtre ou pagination.
+Ce qui n'a pas été modifié :
+- Les séances
+- VF / VO
+- Google Maps
+- TMDB / OMDb / Letterboxd
+- La logique de films proches classés
+- Le comportement visible du catalogue
 
-Fichiers modifiés :
-- js/data.js
-- js/data.backup.js
-- js/nearby-catalogue.js
-- catalogue.html
-- html/catalogue.html
-- css/style.css
-- css/style.backup.css
-
-Installation :
-1. Dézipper cinema-updates.zip.
-2. Remplacer les fichiers du projet par ceux du ZIP.
-3. Lancer le backend si besoin : cd backend && npm start
-4. Ouvrir le site et tester Catalogue > Films proches classés.
+Contrôle effectué :
+- Syntaxe JavaScript vérifiée avec node --check sur js/catalogue-page.js.
+- L'ordre de chargement des scripts est conservé : config, data, omdb, tmdb, places, nearby-catalogue, catalogue-page, puis Google Maps.

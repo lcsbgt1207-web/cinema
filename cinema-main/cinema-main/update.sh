@@ -55,19 +55,6 @@ ensure_git_identity() {
   git config user.name >/dev/null 2>&1 || git config user.name "CineProche Auto Update" || true
 }
 
-COMMIT_MESSAGE=""
-
-ask_commit_message() {
-  echo ""
-  echo "Nom du commit GitHub pour cette mise à jour :"
-  echo "Exemple : [CinéProche] ZIP 2.9.8 - Enrichissement TMDB"
-  read -p "> " COMMIT_MESSAGE
-
-  if [ -z "${COMMIT_MESSAGE// }" ]; then
-    COMMIT_MESSAGE="Mise à jour CinéProche automatique"
-  fi
-}
-
 commit_if_needed() {
   local message="$1"
   [ -d ".git" ] || return 0
@@ -100,7 +87,14 @@ sync_git_before_update() {
 push_git_after_everything() {
   [ -d ".git" ] || return 0
 
-  commit_if_needed "$COMMIT_MESSAGE"
+  local commit_message=""
+  echo ""
+  read -p "Nom du commit GitHub pour cette mise à jour : " commit_message
+  if [ -z "${commit_message// }" ]; then
+    commit_message="Mise à jour CinéProche automatique"
+  fi
+
+  commit_if_needed "$commit_message"
 
   echo "Synchronisation finale avec GitHub..."
   git pull --rebase origin main >/dev/null 2>&1 || {
@@ -126,20 +120,6 @@ copy_dir() {
     mkdir -p "$dest"
     cp -R "$src"/. "$dest"/
   fi
-}
-
-
-cleanup_obsolete_project_files() {
-  echo "Nettoyage des anciens fichiers de travail..."
-  rm -rf "$PROJECT_DIR/cinema-main" 2>/dev/null || true
-  rm -f "$PROJECT_DIR/cinema-update.zip" 2>/dev/null || true
-  rm -f "$PROJECT_DIR/css/style.backup.css" 2>/dev/null || true
-  rm -f "$PROJECT_DIR/js/config.backup.js" 2>/dev/null || true
-  rm -f "$PROJECT_DIR/js/data.backup.js" 2>/dev/null || true
-  rm -f "$PROJECT_DIR/[Cin#U00e9Proche]" 2>/dev/null || true
-  rm -rf "$PROJECT_DIR/html" 2>/dev/null || true
-  rm -rf "$PROJECT_DIR/scripts" 2>/dev/null || true
-  rm -f "$PROJECT_DIR/js/overlays.html" 2>/dev/null || true
 }
 
 copy_file() {
@@ -172,8 +152,6 @@ fi
 
 cd "$PROJECT_DIR" || pause_exit 1
 
-cleanup_obsolete_project_files
-
 sync_git_before_update
 
 FOUND_ZIP=$(find_latest_zip)
@@ -185,8 +163,6 @@ if [ -z "$FOUND_ZIP" ]; then
 fi
 
 echo "ZIP trouvé : $FOUND_ZIP"
-
-ask_commit_message
 
 stop_node_processes
 

@@ -1,260 +1,3 @@
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Catalogue — CinéProche</title>
-  <link rel="stylesheet" href="css/style.css" />
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css" />
-  <style>
-    .page-content { max-width: 1320px; padding: 0 32px 56px; }
-
-    /* TABLE */
-    .table-wrap { overflow-x: auto; border: 0.5px solid var(--gray-200); border-radius: var(--radius-lg); margin-top: 10px; }
-    table { width: 100%; border-collapse: collapse; min-width: 1080px; table-layout: fixed; }
-    thead tr { background: var(--gray-50); border-bottom: 0.5px solid var(--gray-200); }
-    th {
-      font-size: 11px;
-      font-weight: 500;
-      color: var(--gray-400);
-      text-transform: uppercase;
-      letter-spacing: 0.4px;
-      padding: 12px 16px;
-      text-align: left;
-      white-space: nowrap;
-      cursor: pointer;
-      user-select: none;
-      transition: color var(--transition);
-    }
-    th:hover, th.sorted { color: var(--black); }
-    th i { font-size: 11px; vertical-align: middle; margin-left: 3px; }
-    th.note-col { text-align: center; }
-
-    tbody tr {
-      border-bottom: 0.5px solid var(--gray-200);
-      cursor: pointer;
-      transition: background var(--transition);
-    }
-    tbody tr:last-child { border-bottom: none; }
-    tbody tr:hover { background: var(--gray-50); }
-
-    td { padding: 14px 16px; font-size: 14px; color: var(--black); vertical-align: middle; }
-    .td-title { width: 360px; max-width: 360px; }
-    .td-title .film-cell > div { min-width: 0; }
-    .film-name { font-weight: 600; font-size: 15px; line-height: 1.25; white-space: normal; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-    .film-original { font-size: 12px; color: var(--gray-400); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .td-real { color: var(--gray-500); white-space: nowrap; font-size: 13px; }
-    .td-note { text-align: center; }
-    .td-source { text-align:center; color:var(--gray-500); font-size:12px; white-space:nowrap; }
-    .td-cinema { text-align:center; color:var(--gray-500); font-size:12px; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .nearby-note-main { display:inline-flex; align-items:center; justify-content:center; min-width:46px; padding:4px 8px; border-radius:8px; background:var(--red-bg); color:var(--red); font-weight:700; }
-    .nearby-source-pill { display:inline-flex; align-items:center; justify-content:center; padding:4px 8px; border:0.5px solid var(--gray-200); border-radius:999px; background:#fff; color:var(--gray-600); font-weight:600; }
-    .nearby-cinema-pill { display:inline-flex; align-items:center; justify-content:center; gap:4px; max-width:170px; padding:4px 8px; border-radius:999px; background:var(--gray-50); color:var(--gray-500); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .td-year { color: var(--gray-500); font-size: 12px; white-space: nowrap; }
-    .sep-left { border-left: 0.5px solid var(--gray-200); }
-
-    .genre-pill {
-      font-size: 11px;
-      color: var(--gray-500);
-      border: 0.5px solid var(--gray-200);
-      border-radius: var(--radius-full);
-      padding: 2px 9px;
-      white-space: nowrap;
-    }
-
-    .source-header { display: flex; align-items: center; justify-content: center; gap: 4px; }
-    .source-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-    .dot-lb   { background: #00c030; }
-    .dot-imdb { background: #f5c518; }
-    .dot-sc   { background: #ff5f5f; }
-
-    .fav-btn {
-      background: none;
-      border: none;
-      cursor: pointer;
-      color: var(--gray-300);
-      font-size: 16px;
-      padding: 2px 4px;
-      transition: color var(--transition);
-    }
-    .fav-btn:hover, .fav-btn.active { color: var(--black); }
-
-    .table-footer { display:none; }
-
-    .film-cell { display: flex; align-items: center; gap: 14px; min-width: 0; }
-    .film-thumb { width: 64px; height: 92px; border-radius: 6px; background: var(--gray-100); overflow: hidden; flex: 0 0 auto; display:flex; align-items:center; justify-content:center; color:var(--gray-300); }
-    .film-thumb img { width: 100%; height: 100%; object-fit: cover; display:block; }
-    .catalogue-bottom { margin-top: 18px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
-    .page-state { font-size: 13px; color: var(--gray-500); width: 100%; }
-    .pagination-controls { display: flex; align-items: center; gap: 8px; }
-    .page-btn { width: 38px; height: 38px; border: 0.5px solid var(--gray-200); border-radius: 8px; background: var(--white); color: var(--black); cursor:pointer; font-size: 13px; transition: all var(--transition); }
-    .page-btn:hover { border-color: var(--black); }
-    .page-btn.active { background: var(--black); color: var(--white); border-color: var(--black); }
-    .page-btn:disabled { opacity: .35; cursor: not-allowed; border-color: var(--gray-200); }
-    .page-ellipsis { height: 38px; min-width: 22px; display: inline-flex; align-items: center; justify-content: center; color: var(--gray-400); font-size: 14px; user-select: none; }
-    .page-size-select { height: 38px; border: 0.5px solid var(--gray-200); border-radius: 8px; padding: 0 34px 0 12px; background: var(--white); color: var(--gray-600); font-size: 13px; }
-    table th:nth-child(1), table td:nth-child(1) { width: 42px; }
-    table th:nth-child(2), table td:nth-child(2) { width: 380px; }
-    table th:nth-child(3), table td:nth-child(3) { width: 230px; }
-    table th:nth-child(4), table td:nth-child(4) { width: 160px; }
-    table th:nth-child(5), table td:nth-child(5),
-    table th:nth-child(6), table td:nth-child(6),
-    table th:nth-child(7), table td:nth-child(7) { width: 145px; }
-    table th:nth-child(8), table td:nth-child(8) { width: 100px; }
-
-  </style>
-</head>
-<body>
-<div id="map-hidden" style="display:none;width:1px;height:1px;"></div>
-
-<!-- ── HEADER ── -->
-<header class="site-header">
-  <div class="container">
-    <div class="header-inner">
-      <a href="index.html" class="logo">
-        <div class="logo-icon"><i class="ti ti-movie"></i></div>
-        <span class="logo-text">Ciné<span>Proche</span></span>
-      </a>
-      <div class="header-right">
-        <nav class="nav">
-          <a href="nouveautes.html"><i class="ti ti-sparkles"></i><span>Nouveautés</span></a>
-          <a href="catalogue.html" class="active"><i class="ti ti-layout-grid"></i><span>Catalogue</span></a>
-          <a href="agenda.html"><i class="ti ti-calendar"></i><span>Mon agenda</span></a>
-          <a href="#contact"><i class="ti ti-mail"></i><span>Contact</span></a>
-        </nav>
-        <button class="btn-user" title="Mon profil" onclick="window.location.href='profil.html'">
-          <i class="ti ti-user"></i>
-        </button>
-      </div>
-    </div>
-  </div>
-</header>
-
-<!-- ── CONTENU ── -->
-<main class="container page-content">
-  <div class="page-header">
-    <div class="page-title">Catalogue</div>
-    <div class="page-count" id="film-count"></div>
-  </div>
-
-  <!-- Toolbar filtres -->
-  <div class="toolbar">
-    <div class="toolbar-search">
-      <i class="ti ti-search"></i>
-      <input type="text" id="search-input" placeholder="Titre, réalisateur…" oninput="filterTable()" />
-    </div>
-    <select class="filter-select" id="genre-filter" onchange="filterTable()">
-      <option value="">Tous les genres</option>
-      <option>Drame</option>
-      <option>Action</option>
-      <option>Aventure</option>
-      <option>Thriller</option>
-      <option>Science-fiction</option>
-      <option>Crime</option>
-      <option>Policier</option>
-      <option>Fantastique</option>
-      <option>Animation</option>
-      <option>Guerre</option>
-      <option>Western</option>
-      <option>Romance</option>
-      <option>Comédie</option>
-      <option>Documentaire</option>
-    </select>
-    <select class="filter-select" id="decade-filter" onchange="filterTable()">
-      <option value="">Toutes les époques</option>
-      <option>Années 2020</option>
-      <option>Années 2010</option>
-      <option>Années 2000</option>
-      <option>Années 1990</option>
-      <option>Avant 1990</option>
-    </select>
-    <select class="filter-select" id="radius-filter">
-      <option>Rayon : 5 km</option>
-      <option selected>Rayon : 15 km</option>
-      <option>Rayon : 30 km</option>
-      <option>Rayon : 50 km</option>
-    </select>
-    <select class="filter-select" id="catalogue-mode-filter" onchange="setCatalogueMode(this.value)" title="Le Catalogue affiche maintenant les meilleurs films projetés près de vous.">
-      <option value="nearby" selected>Films proches classés</option>
-    </select>
-    <span class="toolbar-count" id="count-label"></span>
-  </div>
-
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th style="width:30px;"></th>
-          <th onclick="sortTable('titre')">Titre <i class="ti ti-selector" id="icon-titre"></i></th>
-          <th onclick="sortTable('real')">Réalisateur <i class="ti ti-selector" id="icon-real"></i></th>
-          <th onclick="sortTable('genre')">Genre</th>
-          <th class="note-col sep-left" onclick="sortTable('lb')">
-            <div class="source-header" id="header-lb"><span class="source-dot dot-lb"></span> Letterboxd <i class="ti ti-selector" id="icon-lb"></i></div>
-          </th>
-          <th class="note-col sorted" onclick="sortTable('imdb')">
-            <div class="source-header" id="header-imdb"><span class="source-dot dot-imdb"></span> IMDb <i class="ti ti-chevron-down" id="icon-imdb"></i></div>
-          </th>
-          <th class="note-col" onclick="sortTable('sc')">
-            <div class="source-header" id="header-sc"><span class="source-dot dot-sc"></span> SensCritique <i class="ti ti-selector" id="icon-sc"></i></div>
-          </th>
-          <th onclick="sortTable('annee')">Année <i class="ti ti-selector" id="icon-annee"></i></th>
-        </tr>
-      </thead>
-      <tbody id="table-body"></tbody>
-    </table>
-  </div>
-
-  <div class="catalogue-bottom" id="catalogue-bottom"></div>
-</main>
-
-<!-- OVERLAYS -->
-<div class="overlay" id="film-overlay"><div class="popup" id="film-popup"></div></div>
-<div class="overlay" id="resa-overlay">
-  <div class="popup" style="max-width:420px;">
-    <div style="padding:20px 22px 16px;border-bottom:0.5px solid var(--gray-200);">
-      <div style="font-size:16px;font-weight:500;color:var(--black);margin-bottom:4px;" id="resa-film"></div>
-      <div style="font-size:13px;color:var(--gray-500);display:flex;align-items:center;gap:5px;"><i class="ti ti-building"></i><span id="resa-cinema"></span></div>
-    </div>
-    <div style="padding:16px 22px;display:flex;flex-direction:column;gap:10px;border-bottom:0.5px solid var(--gray-200);">
-      <div style="display:flex;align-items:center;gap:12px;font-size:13px;"><i class="ti ti-clock" style="color:var(--gray-400);"></i><span style="color:var(--gray-500);min-width:70px;">Séance</span><span style="font-weight:500;" id="resa-heure"></span></div>
-      <div style="display:flex;align-items:center;gap:12px;font-size:13px;"><i class="ti ti-calendar" style="color:var(--gray-400);"></i><span style="color:var(--gray-500);min-width:70px;">Date</span><span style="font-weight:500;" id="resa-date"></span></div>
-    </div>
-    <div style="padding:14px 22px;display:flex;flex-direction:column;gap:8px;">
-      <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="confirmReservation()"><i class="ti ti-external-link"></i> Réserver sur AlloCiné</button>
-      <button class="btn btn-secondary" style="width:100%;justify-content:center;" onclick="closeResaOverlay()">Annuler</button>
-    </div>
-  </div>
-</div>
-<div class="overlay" id="retour-overlay">
-  <div class="popup" style="max-width:420px;">
-    <div style="padding:24px 22px 16px;text-align:center;border-bottom:0.5px solid var(--gray-200);">
-      <div style="width:48px;height:48px;background:var(--green-bg);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;"><i class="ti ti-check" style="font-size:22px;color:var(--green);"></i></div>
-      <div style="font-size:16px;font-weight:500;color:var(--black);margin-bottom:4px;">Réservation confirmée !</div>
-      <div style="font-size:13px;color:var(--gray-500);">Ajoutez cette séance à votre agenda.</div>
-    </div>
-    <div style="background:var(--black);padding:16px 22px;">
-      <div style="font-size:15px;font-weight:500;color:#fff;margin-bottom:2px;" id="retour-film"></div>
-      <div style="font-size:12px;color:rgba(255,255,255,0.5);" id="retour-cinema"></div>
-      <div style="border-top:1px dashed rgba(255,255,255,0.2);margin:10px 0;"></div>
-      <div style="display:flex;gap:20px;">
-        <div><div style="font-size:10px;color:rgba(255,255,255,0.45);text-transform:uppercase;letter-spacing:0.4px;">Séance</div><div style="font-size:13px;font-weight:500;color:#fff;" id="retour-heure"></div></div>
-        <div><div style="font-size:10px;color:rgba(255,255,255,0.45);text-transform:uppercase;letter-spacing:0.4px;">Date</div><div style="font-size:13px;font-weight:500;color:#fff;">Aujourd'hui</div></div>
-      </div>
-    </div>
-    <div style="padding:14px 22px;display:flex;flex-direction:column;gap:8px;">
-      <button class="btn btn-primary" id="btn-add-agenda" style="width:100%;justify-content:center;" onclick="addToAgenda()"><i class="ti ti-calendar-plus"></i> Ajouter à mon agenda</button>
-      <button class="btn btn-secondary" style="width:100%;justify-content:center;" onclick="closeRetourOverlay()">Fermer</button>
-    </div>
-  </div>
-</div>
-
-<script src="js/config.js?v=3.3"></script>
-<script src="js/data.js?v=3.3"></script>
-<script src="js/omdb.js?v=3.3"></script>
-<script src="js/tmdb.js?v=3.3"></script>
-<script src="js/places.js?v=3.3"></script>
-<script src="js/nearby-catalogue.js?v=3.5.6"></script>
-<script>
   // ZIP 3.4 — Catalogue centré sur les films proches : un seul mode, données enrichies conservées.
   // Sécurité : si aucun résultat proche n'existe, on garde le catalogue enrichi ZIP 3.0 puis js/data.js.
   const STATIC_CATALOGUE = FILMS.filter(f => f && !f.isMock);
@@ -263,6 +6,9 @@
   localStorage.setItem('cinepro_catalogue_mode', 'nearby');
   const LETTERBOXD_API_URL = 'http://localhost:3000/api/films-letterboxd';
   const LETTERBOXD_MIN_VALID_RATING = 0.5;
+  const ACTIVE_CATALOGUE_KEY = 'cinepro_active_catalogue';
+  const NEARBY_RANKED_KEY = 'cinepro_nearby_ranked_catalogue';
+  const RUNTIME_CATALOGUE_KEY = 'cinepro_runtime_catalogue';
   const favs = new Set(JSON.parse(localStorage.getItem('cinepro_favs') || '[]'));
   let sortKey = 'imdb', sortDir = -1;
   let currentPage = 1;
@@ -312,32 +58,77 @@
     return copy;
   }
 
-  function readStoredRuntimeCatalogue() {
+  function getLocalDateKey(date = new Date()) {
+    const d = new Date(date);
+    if (Number.isNaN(d.getTime())) return '';
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
+  function isFreshNearbyPayload(payload) {
+    // ZIP 3.8.1 : un seul catalogue proche actif, valable toute la journée.
+    // On ne rejette plus un bon catalogue après 30 minutes : cela faisait retomber la page sur les 80 films.
+    if (!payload || typeof payload !== 'object') return false;
+    const acceptedVersions = new Set(['3.7.3', '3.7.4', '3.8.1']);
+    if (payload.version && !acceptedVersions.has(String(payload.version))) return false;
+    if (!Array.isArray(payload.films) || !payload.films.length) return false;
+    const stamp = payload.searchDate || payload.updatedAt || payload.createdAt;
+    if (getLocalDateKey(stamp) !== getLocalDateKey(new Date())) return false;
+    return true;
+  }
+
+  function readStoredPayload(key) {
     try {
-      const payload = JSON.parse(localStorage.getItem('cinepro_runtime_catalogue') || 'null');
-      return Array.isArray(payload?.films) ? payload.films : [];
+      const payload = JSON.parse(localStorage.getItem(key) || 'null');
+      return isFreshNearbyPayload(payload) && Array.isArray(payload?.films) ? payload.films : [];
     } catch (_) {
       return [];
     }
   }
 
-  function readStoredNearbyCatalogue() {
+  function readStoredActiveCatalogue() { return readStoredPayload(ACTIVE_CATALOGUE_KEY); }
+  function readStoredRuntimeCatalogue() { return readStoredPayload(RUNTIME_CATALOGUE_KEY); }
+  function readStoredNearbyCatalogue() { return readStoredPayload(NEARBY_RANKED_KEY); }
+
+  function writeActiveCatalogueFromFilms(films, meta = {}) {
+    if (!Array.isArray(films) || !films.length) return null;
+    const now = new Date();
+    const payload = {
+      version: '3.8.1',
+      source: 'active-nearby-catalogue',
+      searchDate: getLocalDateKey(now),
+      updatedAt: now.toISOString(),
+      address: meta.address || '',
+      radius: meta.radius || null,
+      films,
+      stats: { total: films.length }
+    };
     try {
-      const payload = JSON.parse(localStorage.getItem('cinepro_nearby_ranked_catalogue') || 'null');
-      return Array.isArray(payload?.films) ? payload.films : [];
-    } catch (_) {
-      return [];
+      localStorage.setItem(ACTIVE_CATALOGUE_KEY, JSON.stringify(payload));
+      window.CINEPRO_ACTIVE_CATALOGUE = films;
+    } catch (error) {
+      console.warn('[Catalogue] ZIP 3.8.1 : sauvegarde cinepro_active_catalogue impossible :', error?.message || error);
     }
+    return payload;
   }
 
   function hasNearbyCatalogue() {
-    return (Array.isArray(window.NEARBY_CATALOGUE_NEARBY_RANKED) && window.NEARBY_CATALOGUE_NEARBY_RANKED.length) || readStoredNearbyCatalogue().length;
+    return (Array.isArray(window.CINEPRO_ACTIVE_CATALOGUE) && window.CINEPRO_ACTIVE_CATALOGUE.length)
+      || (Array.isArray(window.NEARBY_CATALOGUE_NEARBY_RANKED) && window.NEARBY_CATALOGUE_NEARBY_RANKED.length)
+      || readStoredActiveCatalogue().length
+      || readStoredNearbyCatalogue().length;
   }
 
   function getActiveRawCatalogueSource() {
     // ZIP 3.4 : le Catalogue est centré sur les films proches.
     // On utilise toujours en priorité la liste complète enrichie des films proches,
     // afin de ne jamais perdre réalisateur, genre, affiche, année ou note après un changement de filtre.
+    const active = Array.isArray(window.CINEPRO_ACTIVE_CATALOGUE) && window.CINEPRO_ACTIVE_CATALOGUE.length
+      ? window.CINEPRO_ACTIVE_CATALOGUE
+      : readStoredActiveCatalogue();
+
     const nearby = Array.isArray(window.NEARBY_CATALOGUE_NEARBY_RANKED) && window.NEARBY_CATALOGUE_NEARBY_RANKED.length
       ? window.NEARBY_CATALOGUE_NEARBY_RANKED
       : readStoredNearbyCatalogue();
@@ -346,15 +137,21 @@
       ? window.NEARBY_CATALOGUE_RUNTIME_DATA
       : readStoredRuntimeCatalogue();
 
+    if (active.length) {
+      catalogueMode = 'nearby';
+      localStorage.setItem('cinepro_catalogue_mode', 'nearby');
+      return { source: active, label: 'catalogue proche actif' };
+    }
+
     if (nearby.length) {
+      writeActiveCatalogueFromFilms(nearby);
       catalogueMode = 'nearby';
       localStorage.setItem('cinepro_catalogue_mode', 'nearby');
       return { source: nearby, label: 'films proches classés' };
     }
-    if (runtime.length) {
-      return { source: runtime, label: 'catalogue enrichi en attente de films proches' };
-    }
-    return { source: STATIC_CATALOGUE, label: 'catalogue local en attente de films proches' };
+    // ZIP 3.8.1 : en mode films proches, on ne retombe plus sur les 80 films classiques.
+    // Tant que la recherche proche n'a pas produit cinepro_active_catalogue, on affiche un état d'attente.
+    return { source: [], label: 'catalogue proche en attente de recherche' };
   }
 
   function getBestNote(film) {
@@ -400,7 +197,7 @@
       merged.push(prepared);
     });
 
-    console.log(`[Catalogue] ZIP 3.4 : ${active.label} utilisé (${merged.length} films).`);
+    console.log(`[Catalogue] ZIP 3.8.1 : ${active.label} utilisé (${merged.length} films).`);
     return merged;
   }
 
@@ -411,7 +208,14 @@
     localStorage.setItem('cinepro_catalogue_mode', 'nearby');
     select.value = 'nearby';
     const nearbyOption = select.querySelector('option[value="nearby"]');
-    if (nearbyOption) nearbyOption.textContent = hasNearbyCatalogue() ? 'Films proches classés' : 'Films proches classés — lance une recherche';
+    if (nearbyOption) {
+      const count = (Array.isArray(window.CINEPRO_ACTIVE_CATALOGUE) && window.CINEPRO_ACTIVE_CATALOGUE.length)
+        ? window.CINEPRO_ACTIVE_CATALOGUE.length
+        : (readStoredActiveCatalogue().length || ((Array.isArray(window.NEARBY_CATALOGUE_NEARBY_RANKED) && window.NEARBY_CATALOGUE_NEARBY_RANKED.length)
+          ? window.NEARBY_CATALOGUE_NEARBY_RANKED.length
+          : readStoredNearbyCatalogue().length));
+      nearbyOption.textContent = count ? `Films proches classés — ${count} films` : 'Films proches classés — lance une recherche';
+    }
   }
 
   function setCatalogueMode(_mode) {
@@ -517,6 +321,22 @@
 
     const start = (currentPage - 1) * pageSize;
     const pageData = data.slice(start, start + pageSize);
+
+    if (!data.length && catalogueMode === 'nearby') {
+      document.getElementById('table-body').innerHTML = `
+        <tr>
+          <td colspan="8">
+            <div class="catalogue-empty-row">
+              <strong>Catalogue proche en attente</strong>
+              Lance une recherche depuis l’accueil, ou attends la fin de la récupération des séances proches.
+            </div>
+          </td>
+        </tr>`;
+      document.getElementById('count-label').textContent = '0 film proche';
+      document.getElementById('film-count').textContent = '0 film proche';
+      renderPagination(1);
+      return;
+    }
 
     document.getElementById('table-body').innerHTML = pageData.map(f => {
       const poster = f.poster
@@ -772,7 +592,93 @@
   }
 
 
+
+  function readLastNearbySearch() {
+    try {
+      const payload = JSON.parse(localStorage.getItem('cinepro_last_nearby_search') || 'null');
+      if (!payload || typeof payload !== 'object') return null;
+      return payload;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  let nearbyAutoBuildRunning = false;
+  async function autoBuildNearbyCatalogueFromLastSearch() {
+    if (hasNearbyCatalogue() || nearbyAutoBuildRunning) return true;
+    // ZIP 3.8.1 : avant de reconstruire, on nettoie les caches périmés.
+    try {
+      localStorage.removeItem(RUNTIME_CATALOGUE_KEY);
+      localStorage.removeItem(NEARBY_RANKED_KEY);
+      localStorage.removeItem(ACTIVE_CATALOGUE_KEY);
+    } catch (_) {}
+    const lastSearch = readLastNearbySearch();
+    if (!lastSearch) return false;
+    if (typeof getNearbyRankedMovies !== 'function' || !window.PLACES) return false;
+
+    nearbyAutoBuildRunning = true;
+    try {
+      console.log('[Catalogue] ZIP 3.8.1 : génération automatique du catalogue proche depuis la dernière recherche.', lastSearch);
+      await getNearbyRankedMovies({
+        address: lastSearch.address || lastSearch.query || '',
+        location: lastSearch.location || null,
+        radius: Number(lastSearch.radius) || 15000
+      });
+      catalogue = getCatalogueSource();
+      sortKey = 'bestNote';
+      sortDir = -1;
+      currentPage = 1;
+      filterTable();
+      return true;
+    } catch (error) {
+      console.warn('[Catalogue] ZIP 3.8.1 : génération automatique impossible pour le moment :', error?.message || error);
+      return false;
+    } finally {
+      nearbyAutoBuildRunning = false;
+    }
+  }
+
+  function scheduleNearbyCatalogueAutoBuild() {
+    let tries = 0;
+    const timer = setInterval(async () => {
+      tries += 1;
+      if (hasNearbyCatalogue()) {
+        clearInterval(timer);
+        return;
+      }
+      const done = await autoBuildNearbyCatalogueFromLastSearch();
+      if (done || tries >= 10) clearInterval(timer);
+    }, 900);
+  }
+
+  window.addEventListener('nearby-catalogue-ranked-ready', () => {
+    console.log('[Catalogue] ZIP 3.8.1 : catalogue actif reçu depuis Catalogue proche. Rafraîchissement de la liste.');
+    catalogue = getCatalogueSource();
+    sortKey = 'bestNote';
+    sortDir = -1;
+    currentPage = 1;
+    filterTable();
+  });
+
+  window.addEventListener('cinepro-active-catalogue-ready', (event) => {
+    console.log('[Catalogue] ZIP 3.8.1 : cinepro_active_catalogue reçu. Rafraîchissement.');
+    if (Array.isArray(event?.detail?.films) && event.detail.films.length) {
+      window.CINEPRO_ACTIVE_CATALOGUE = event.detail.films;
+    }
+    catalogueMode = 'nearby';
+    localStorage.setItem('cinepro_catalogue_mode', 'nearby');
+    catalogue = getCatalogueSource();
+    sortKey = 'bestNote';
+    sortDir = -1;
+    currentPage = 1;
+    filterTable();
+  });
+
   async function initCatalogue() {
+    // ZIP 3.8.1 : on lance la reconstruction proche dès le début.
+    // Si aucune donnée proche n'est prête, le tableau affiche un état d'attente au lieu des 80 films classiques.
+    scheduleNearbyCatalogueAutoBuild();
+
     // 1) Afficher immédiatement la meilleure source disponible. Le mode utilisateur reste Films proches.
     updateCatalogueModeControl();
     catalogue = getCatalogueSource();
@@ -802,7 +708,3 @@
   }
 
   initCatalogue();
-</script>
-<script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAx4ILK4VPFvYxaZX-HwpUPMEOpkQLJEmE&libraries=places&language=fr&callback=initNearbyCatalogueGoogleMaps"></script>
-</body>
-</html>

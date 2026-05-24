@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" role="img">
+  <title>CinéProche</title>
+  <style>
+    .ink { fill: #1a1a1a; }
+    @media (prefers-color-scheme: dark) { .ink { fill: #ffffff; } }
+    .cursor-fill { fill: #ffffff; }
+    @media (prefers-color-scheme: dark) { .cursor-fill { fill: #1a1a1a; } }
+  </style>
+  <!-- Grains éparpillés -->
+  <circle class="ink" cx="12" cy="30" r="3"/>
+  <circle class="ink" cx="9"  cy="24" r="2"/>
+  <circle class="ink" cx="18" cy="22" r="2.5"/>
+  <circle class="ink" cx="14" cy="17" r="1.5"/>
+  <circle class="ink" cx="28" cy="17" r="3"/>
+  <circle class="ink" cx="24" cy="12" r="2"/>
+  <circle class="ink" cx="40" cy="14" r="3.5"/>
+  <circle class="ink" cx="40" cy="8"  r="2.5"/>
+  <circle class="ink" cx="53" cy="17" r="3"/>
+  <circle class="ink" cx="57" cy="11" r="2"/>
+  <circle class="ink" cx="63" cy="22" r="2.5"/>
+  <circle class="ink" cx="67" cy="17" r="1.5"/>
+  <circle class="ink" cx="68" cy="30" r="3"/>
+  <circle class="ink" cx="72" cy="24" r="2"/>
+  <!-- Grains sur le seau -->
+  <circle class="ink" cx="23" cy="35" r="7"/>
+  <circle class="ink" cx="23" cy="29" r="5"/>
+  <circle class="ink" cx="18" cy="33" r="4"/>
+  <circle class="ink" cx="33" cy="32" r="7.5"/>
+  <circle class="ink" cx="33" cy="26" r="5.5"/>
+  <circle class="ink" cx="40" cy="30" r="8"/>
+  <circle class="ink" cx="40" cy="23" r="6"/>
+  <circle class="ink" cx="47" cy="32" r="7.5"/>
+  <circle class="ink" cx="47" cy="26" r="5.5"/>
+  <circle class="ink" cx="57" cy="35" r="7"/>
+  <circle class="ink" cx="57" cy="29" r="5"/>
+  <circle class="ink" cx="62" cy="33" r="4"/>
+  <!-- Rebord -->
+  <rect class="ink" x="16" y="40" width="48" height="6" rx="2"/>
+  <!-- Corps seau -->
+  <path class="ink" d="M18 46 L24 72 L56 72 L62 46 Z"/>
+  <!-- Curseur -->
+  <path class="cursor-fill" stroke="#1a1a1a" stroke-width="2" stroke-linejoin="round"
+        d="M46 52 L46 66 L51 61 L54 68 L57 67 L54 60 L60 60 Z"/>
+</svg>
