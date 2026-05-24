@@ -367,135 +367,32 @@ function compareValues(a, b) {
   return a > b ? 1 : a < b ? -1 : 0;
 }
 
-function escapeCatalogueHtml(value) {
-  return String(value ?? '').replace(/[&<>"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[char] || char));
-}
-
-function updateCatalogueTableHeaders() {
-  const nearby = isNearbyModeActive();
-  const headers = {
-    lb: document.getElementById('header-lb'),
-    imdb: document.getElementById('header-imdb'),
-    sc: document.getElementById('header-sc')
-  };
-
-  if (nearby) {
-    if (headers.lb) headers.lb.innerHTML = '<span class="source-dot dot-sc"></span> Note <i class="ti ti-selector" id="icon-lb"></i>';
-    if (headers.imdb) headers.imdb.innerHTML = '<span class="source-dot dot-imdb"></span> Source <i class="ti ti-selector" id="icon-imdb"></i>';
-    if (headers.sc) headers.sc.innerHTML = '<span class="source-dot dot-lb"></span> Cinéma <i class="ti ti-selector" id="icon-sc"></i>';
-  } else {
-    if (headers.lb) headers.lb.innerHTML = '<span class="source-dot dot-lb"></span> Letterboxd <i class="ti ti-selector" id="icon-lb"></i>';
-    if (headers.imdb) headers.imdb.innerHTML = '<span class="source-dot dot-imdb"></span> IMDb <i class="ti ti-selector" id="icon-imdb"></i>';
-    if (headers.sc) headers.sc.innerHTML = '<span class="source-dot dot-sc"></span> SensCritique <i class="ti ti-selector" id="icon-sc"></i>';
-  }
-}
-
 function renderTable(data) {
-  updateCatalogueTableHeaders();
   lastFilteredData = data;
-  const totalPages = Math.max(1, Math.ceil(data.length / pageSize));
-  if (currentPage > totalPages) currentPage = totalPages;
-
-  const start = (currentPage - 1) * pageSize;
-  const pageData = data.slice(start, start + pageSize);
-
-  if (!data.length && catalogueMode === 'nearby') {
-    document.getElementById('table-body').innerHTML = `
-      <tr>
-        <td colspan="8">
-          <div class="catalogue-empty-row">
-            <strong>Catalogue proche en attente</strong>
-            Lance une recherche depuis l’accueil, ou attends la fin de la récupération des séances proches.
-          </div>
-        </td>
-      </tr>`;
-    document.getElementById('count-label').textContent = '0 film proche';
-    document.getElementById('film-count').textContent = '0 film proche';
-    renderPagination(1);
+  const renderer = window.CINEPRO_CATALOGUE_RENDER;
+  if (!renderer || typeof renderer.renderTable !== 'function') {
+    console.error('[Catalogue] Renderer catalogue manquant : js/catalogue-render.js');
     return;
   }
 
-  document.getElementById('table-body').innerHTML = pageData.map(f => {
-    const poster = f.poster
-      ? `<img src="${f.poster}" alt="Affiche ${f.titre}" loading="lazy">`
-      : `<i class="ti ti-photo"></i>`;
+  const totalPages = Math.max(1, Math.ceil(data.length / pageSize));
+  if (currentPage > totalPages) currentPage = totalPages;
 
-    return `
-    <tr onclick='openCatalogueFilmPopup(${JSON.stringify(String(f.id))})'>
-      <td><button class="fav-btn ${favs.has(String(f.id)) ? 'active' : ''}" onclick='event.stopPropagation(); toggleFav(${JSON.stringify(String(f.id))}, this)'>
-        <i class="ti ti-bookmark"></i></button></td>
-      <td class="td-title">
-        <div class="film-cell">
-          <div class="film-thumb">${poster}</div>
-          <div>
-            <div class="film-name">${f.lbRank ? '#' + f.lbRank + ' · ' : ''}${f.titre}</div>
-            ${f.original ? `<div class="film-original">${f.original}</div>` : ''}
-            ${f.isNearbyShowing ? `<div class="film-original">À l’affiche près de toi · ${escapeCatalogueHtml((f.nearbyCinemas || f.cinemas || []).slice(0, 2).map(c => c.nom).join(', ') || 'cinéma proche')}</div>` : ''}
-          </div>
-        </div>
-      </td>
-      <td class="td-real">${f.real}</td>
-      <td><span class="genre-pill">${f.genre}</span></td>
-      ${isNearbyModeActive() ? `
-        <td class="td-note sep-left"><span class="nearby-note-main">${formatNearbyBestNote(f)}</span></td>
-        <td class="td-source"><span class="nearby-source-pill">${escapeCatalogueHtml(getNearbyRatingSource(f))}</span></td>
-        <td class="td-cinema"><span class="nearby-cinema-pill"><i class="ti ti-map-pin"></i>${escapeCatalogueHtml(getNearbyCinemaLabel(f))}</span></td>
-      ` : `
-        <td class="td-note sep-left"><span class="note note-lb">${formatClassicRating(f.lb, ' ★')}</span></td>
-        <td class="td-note"><span class="note note-imdb">${formatImdbNote(f)}</span></td>
-        <td class="td-note"><span class="note note-sc">${formatClassicRating(f.sc)}</span></td>
-      `}
-      <td class="td-year">${f.annee || '—'}</td>
-    </tr>`;
-  }).join('');
+  renderer.renderTable({
+    data,
+    currentPage,
+    pageSize,
+    catalogueMode,
+    nearbyMode: isNearbyModeActive(),
+    favs,
+    formatNearbyBestNote,
+    getNearbyRatingSource,
+    getNearbyCinemaLabel,
+    formatClassicRating,
+    formatImdbNote
+  });
 
-  const label = data.length + ' film' + (data.length > 1 ? 's' : '') + (isNearbyModeActive() ? ' proches' : '');
-  document.getElementById('count-label').textContent = label;
-  document.getElementById('film-count').textContent = label;
-  renderPagination(totalPages);
   scheduleVisibleCatalogueEnrichment();
-}
-
-function getVisiblePaginationPages(totalPages) {
-  if (totalPages <= 4) {
-    return Array.from({ length: totalPages }, (_, index) => index + 1);
-  }
-
-  const start = currentPage <= 2 ? 1 : currentPage;
-  const pages = [];
-  for (let page = start; page <= Math.min(start + 2, totalPages); page++) {
-    pages.push(page);
-  }
-
-  if (!pages.includes(totalPages)) {
-    if (pages[pages.length - 1] < totalPages - 1) pages.push('ellipsis');
-    pages.push(totalPages);
-  }
-
-  return pages;
-}
-
-function renderPagination(totalPages) {
-  const bottom = document.getElementById('catalogue-bottom');
-  if (!bottom) return;
-
-  const pages = getVisiblePaginationPages(totalPages);
-  bottom.innerHTML = `
-    <div class="page-state">Page ${currentPage} sur ${totalPages}</div>
-    <div class="pagination-controls">
-      <button class="page-btn" ${currentPage === 1 ? 'disabled' : ''} onclick="changePage(${currentPage - 1})"><i class="ti ti-chevron-left"></i></button>
-      ${pages.map(page => page === 'ellipsis'
-        ? `<span class="page-ellipsis">…</span>`
-        : `<button class="page-btn ${page === currentPage ? 'active' : ''}" onclick="changePage(${page})">${page}</button>`
-      ).join('')}
-      <button class="page-btn" ${currentPage === totalPages ? 'disabled' : ''} onclick="changePage(${currentPage + 1})"><i class="ti ti-chevron-right"></i></button>
-    </div>
-    <select class="page-size-select" onchange="changePageSize(this.value)">
-      <option value="8" ${pageSize === 8 ? 'selected' : ''}>8 par page</option>
-      <option value="12" ${pageSize === 12 ? 'selected' : ''}>12 par page</option>
-      <option value="25" ${pageSize === 25 ? 'selected' : ''}>25 par page</option>
-    </select>
-  `;
 }
 
 function changePage(page) {
