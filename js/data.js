@@ -630,7 +630,7 @@ function buildPopupHTML(film) {
   const duree = film.duree || (film.runtime ? `${film.runtime} min` : '') || 'Durée inconnue';
   const annee = film.annee || film.year || '';
   const cinemas = getPopupCinemas(film);
-  console.log('[Popup] ZIP 3.6.7 : cinémas utilisés pour la fiche film', title, cinemas);
+  console.log('[Popup] ZIP 3.7.3 : cinémas utilisés pour la fiche film', title, cinemas);
   const seancesHTML = buildPopupSeancesHTML(cinemas);
 
   return `
@@ -758,12 +758,15 @@ function isPopupShowtimeInNextSevenDays(value) {
   const date = parsePopupShowtimeDate(value);
   if (!date) return true;
 
-  const today = getStartOfLocalDay(new Date());
-  const showtimeDay = getStartOfLocalDay(date);
+  // ZIP 3.7.3 : la popup n'affiche plus les séances déjà passées aujourd'hui.
+  // Cela aligne CinéProche avec UGC/Pathé qui retirent les horaires passés de la journée.
+  const now = new Date();
+  const min = new Date(now.getTime() - 5 * 60 * 1000);
+  const today = getStartOfLocalDay(now);
   const maxDay = new Date(today);
-  maxDay.setDate(today.getDate() + 7);
+  maxDay.setDate(today.getDate() + 8);
 
-  return showtimeDay >= today && showtimeDay <= maxDay;
+  return date >= min && date < maxDay;
 }
 
 function getPopupShowtimeVersion(value) {
@@ -894,7 +897,7 @@ function collectPopupCinemaShowtimes(cinema) {
   visit(cinema?.sessions || []);
   visit(cinema?.times || []);
 
-  // ZIP 3.6.7 : les horaires peuvent exister deux fois :
+  // ZIP 3.7.3 : les horaires peuvent exister deux fois :
   // - en texte simple : "Aujourd’hui à 13h10"
   // - en objet structuré : { startsAt: ..., version: "VF" }
   // On privilégie toujours l'objet structuré avec version pour afficher VF/VO,

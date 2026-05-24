@@ -1,4 +1,4 @@
-/* CinéProche — Catalogue proche — ZIP 3.6.3
+/* CinéProche — Catalogue proche — ZIP 3.7.3
    Objectif : normalisation des horaires UGC pour la popup catalogue.
    - Les films reconnus dans js/data.js gardent leur note locale.
    - Les films absents trouvés sur TMDB deviennent utilisables directement dans la liste finale.
@@ -540,8 +540,11 @@
   }
 
   function getNearbyWindowBounds() {
-    const start = startOfLocalDay(new Date());
-    const endExclusive = new Date(start);
+    // ZIP 3.7.3 : on ne garde plus les séances déjà passées aujourd'hui.
+    // Les sites cinéma masquent généralement les horaires passés, donc le catalogue doit faire pareil.
+    const now = new Date();
+    const start = new Date(now.getTime() - 5 * 60 * 1000);
+    const endExclusive = startOfLocalDay(now);
     // J+7 inclus = on garde tout jusqu'au début de J+8.
     endExclusive.setDate(endExclusive.getDate() + 8);
     return { start, endExclusive };
@@ -1441,7 +1444,7 @@
     }
     if (!location) location = await window.PLACES.geolocate();
 
-    console.log('[Catalogue proche] ZIP 3.6.7 actif — rafraîchissement séances + versions VF/VO.');
+    console.log('[Catalogue proche] ZIP 3.7.3 actif — rafraîchissement forcé des séances futures + versions VF/VO.');
     console.log('[Catalogue proche] Position utilisée :', location);
 
     // ZIP 3.6.7 : une nouvelle recherche remplace toujours l'ancien cache.
@@ -1449,6 +1452,7 @@
     try {
       localStorage.removeItem('cinepro_runtime_catalogue');
       localStorage.removeItem('cinepro_nearby_ranked_catalogue');
+      localStorage.removeItem('cinepro_active_catalogue');
     } catch (_) {}
 
     const cinemas = await window.PLACES.findNearbycinemas(location, radius);
@@ -1536,7 +1540,7 @@
               rawShowtimes: newRawShowtimes
             });
           } else if (newHoraires.length || newRawShowtimes.length) {
-            // ZIP 3.6.3 : on complète les horaires lisibles ET les objets bruts.
+            // ZIP 3.7.3 : on complète les horaires lisibles ET les objets bruts.
             existingCinema.horaires = [...new Set([...(existingCinema.horaires || []), ...newHoraires])];
             existingCinema.showtimes = [...(existingCinema.showtimes || []), ...newRawShowtimes];
             existingCinema.rawShowtimes = [...(existingCinema.rawShowtimes || []), ...newRawShowtimes];
@@ -1578,7 +1582,7 @@
     const runtimeFusion = buildRuntimeCatalogueFusion(ranked);
     const nearbyRankedCatalogue = buildNearbyCatalogueRankedExport(ranked);
 
-    console.log(`[Catalogue proche] Résultat ZIP 3.6.3 : ${stats.total} film(s), ${stats.rated} avec note, ${stats.tmdbEnriched} film(s) fusionné(s) TMDB, ${stats.missing} à vérifier.`);
+    console.log(`[Catalogue proche] Résultat ZIP 3.7.3 : ${stats.total} film(s), ${stats.rated} avec note, ${stats.tmdbEnriched} film(s) fusionné(s) TMDB, ${stats.missing} à vérifier.`);
     console.group('[Catalogue proche] Debug correspondances titres');
     console.table(matchDebug);
     console.groupEnd();
@@ -1653,14 +1657,14 @@
 
     try {
       const storedPayload = {
-        version: '3.7.1',
+        version: '3.7.3',
         updatedAt: new Date().toISOString(),
         films: runtimeFusion.films,
         tmdbRuntimeFilms: runtimeFusion.tmdbRuntimeFilms,
         stats: window.NEARBY_CATALOGUE_STATS
       };
       const activePayload = {
-        version: '3.7.1',
+        version: '3.7.3',
         source: 'active-nearby-catalogue',
         searchDate: formatLocalDateYYYYMMDD(new Date()),
         updatedAt: new Date().toISOString(),
@@ -1674,7 +1678,7 @@
       localStorage.setItem('cinepro_nearby_ranked_catalogue', JSON.stringify(nearbyPayload));
       localStorage.setItem('cinepro_active_catalogue', JSON.stringify(activePayload));
       window.CINEPRO_ACTIVE_CATALOGUE = nearbyRankedCatalogue;
-      console.log(`[Catalogue proche] ZIP 3.7.1 : catalogue actif rafraîchi et sauvegardé (${nearbyRankedCatalogue.length} films).`);
+      console.log(`[Catalogue proche] ZIP 3.7.3 : catalogue actif rafraîchi et sauvegardé (${nearbyRankedCatalogue.length} films).`);
       window.dispatchEvent(new CustomEvent('nearby-catalogue-runtime-ready', { detail: storedPayload }));
       window.dispatchEvent(new CustomEvent('nearby-catalogue-ranked-ready', { detail: nearbyPayload }));
       window.dispatchEvent(new CustomEvent('cinepro-active-catalogue-ready', { detail: activePayload }));
