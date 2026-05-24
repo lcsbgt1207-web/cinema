@@ -469,7 +469,7 @@
         const cinemas = await PLACES.findNearbycinemas(PLACES.userLocation);
         if (cinemas.length) {
           // Chercher les 10 cinémas les plus proches et filtrer ceux qui ont des séances
-          const cinemasPool = cinemas.slice(0, 10);
+          const cinemasPool = cinemas.slice(0, 15);
           document.getElementById('film-cinemas-list').innerHTML =
             `<div style="padding:16px 0;font-size:12px;color:var(--gray-400);display:flex;align-items:center;gap:6px;">
               <i class="ti ti-loader" style="animation:spin 1s linear infinite;"></i>
@@ -762,6 +762,21 @@
           if (h2.length) result['Demain'] = h2;
         }
       } catch(e) {}
+      // Si rien trouvé sur aujourd'hui+demain, chercher après-demain
+      if (!Object.keys(result).length) {
+        try {
+          const afterTomorrowStr = new Date(Date.now()+172800000).toISOString().split('T')[0];
+          const s3 = await fetch(`${CINEPRO_API}/seances?id=${found.id}&date=${afterTomorrowStr}`);
+          if (s3.ok) {
+            const d3 = await s3.json();
+            const h3 = extraireHoraires(d3.seances, afterTomorrowStr, filmTitre);
+            if (h3.length) {
+              const opts = {weekday:'long',day:'numeric',month:'long'};
+              result[new Date(afterTomorrowStr).toLocaleDateString('fr-FR', opts)] = h3;
+            }
+          }
+        } catch(e) {}
+      }
       seancesCache[cacheKey] = Object.keys(result).length ? result : null;
       return seancesCache[cacheKey];
     } catch(e) {
