@@ -128,6 +128,20 @@ copy_dir() {
   fi
 }
 
+
+cleanup_obsolete_project_files() {
+  echo "Nettoyage des anciens fichiers de travail..."
+  rm -rf "$PROJECT_DIR/cinema-main" 2>/dev/null || true
+  rm -f "$PROJECT_DIR/cinema-update.zip" 2>/dev/null || true
+  rm -f "$PROJECT_DIR/css/style.backup.css" 2>/dev/null || true
+  rm -f "$PROJECT_DIR/js/config.backup.js" 2>/dev/null || true
+  rm -f "$PROJECT_DIR/js/data.backup.js" 2>/dev/null || true
+  rm -f "$PROJECT_DIR/[Cin#U00e9Proche]" 2>/dev/null || true
+  rm -rf "$PROJECT_DIR/html" 2>/dev/null || true
+  rm -rf "$PROJECT_DIR/scripts" 2>/dev/null || true
+  rm -f "$PROJECT_DIR/js/overlays.html" 2>/dev/null || true
+}
+
 copy_file() {
   local name="$1"
   local src="$PROJECT_DIR/$UPDATE_DIR/$name"
@@ -157,6 +171,8 @@ if [ ! -d "$PROJECT_DIR" ]; then
 fi
 
 cd "$PROJECT_DIR" || pause_exit 1
+
+cleanup_obsolete_project_files
 
 sync_git_before_update
 

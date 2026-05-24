@@ -1,4 +1,4 @@
-/* CinéProche — Catalogue proche — ZIP 3.7.4
+/* CinéProche — Catalogue proche — ZIP 3.8.1
    Objectif : normalisation des horaires UGC pour la popup catalogue.
    - Les films reconnus dans js/data.js gardent leur note locale.
    - Les films absents trouvés sur TMDB deviennent utilisables directement dans la liste finale.
@@ -9,7 +9,7 @@
   'use strict';
 
   const NEARBY_CATALOGUE_API = 'https://cinepro-api-yal8.onrender.com';
-  // ZIP 3.7.4 : logs debug désactivés par défaut.
+  // ZIP 3.8.1 : logs debug désactivés par défaut.
   // Pour les réactiver ponctuellement : localStorage.setItem('cinepro_debug', '1') puis recharger.
   const NEARBY_CATALOGUE_DEBUG = (() => {
     try { return localStorage.getItem('cinepro_debug') === '1'; } catch (_) { return false; }
@@ -1454,7 +1454,7 @@
     }
     if (!location) location = await window.PLACES.geolocate();
 
-    console.log('[Catalogue proche] ZIP 3.7.4 actif — rafraîchissement forcé des séances futures + versions VF/VO.');
+    console.log('[Catalogue proche] ZIP 3.8.1 actif — rafraîchissement forcé des séances futures + versions VF/VO.');
     console.log('[Catalogue proche] Position utilisée :', location);
 
     // ZIP 3.6.7 : une nouvelle recherche remplace toujours l'ancien cache.
@@ -1592,7 +1592,7 @@
     const runtimeFusion = buildRuntimeCatalogueFusion(ranked);
     const nearbyRankedCatalogue = buildNearbyCatalogueRankedExport(ranked);
 
-    console.log(`[Catalogue proche] Résultat ZIP 3.7.4 : ${stats.total} film(s), ${stats.rated} avec note, ${stats.tmdbEnriched} film(s) fusionné(s) TMDB, ${stats.missing} à vérifier.`);
+    console.log(`[Catalogue proche] Résultat ZIP 3.8.1 : ${stats.total} film(s), ${stats.rated} avec note, ${stats.tmdbEnriched} film(s) fusionné(s) TMDB, ${stats.missing} à vérifier.`);
     console.group('[Catalogue proche] Debug correspondances titres');
     console.table(matchDebug);
     debugGroupEnd();
@@ -1667,14 +1667,14 @@
 
     try {
       const storedPayload = {
-        version: '3.7.4',
+        version: '3.8.1',
         updatedAt: new Date().toISOString(),
         films: runtimeFusion.films,
         tmdbRuntimeFilms: runtimeFusion.tmdbRuntimeFilms,
         stats: window.NEARBY_CATALOGUE_STATS
       };
       const activePayload = {
-        version: '3.7.4',
+        version: '3.8.1',
         source: 'active-nearby-catalogue',
         searchDate: formatLocalDateYYYYMMDD(new Date()),
         updatedAt: new Date().toISOString(),
@@ -1688,7 +1688,7 @@
       localStorage.setItem('cinepro_nearby_ranked_catalogue', JSON.stringify(nearbyPayload));
       localStorage.setItem('cinepro_active_catalogue', JSON.stringify(activePayload));
       window.CINEPRO_ACTIVE_CATALOGUE = nearbyRankedCatalogue;
-      console.log(`[Catalogue proche] ZIP 3.7.4 : catalogue actif rafraîchi et sauvegardé (${nearbyRankedCatalogue.length} films).`);
+      console.log(`[Catalogue proche] ZIP 3.8.1 : catalogue actif rafraîchi et sauvegardé (${nearbyRankedCatalogue.length} films).`);
       window.dispatchEvent(new CustomEvent('nearby-catalogue-runtime-ready', { detail: storedPayload }));
       window.dispatchEvent(new CustomEvent('nearby-catalogue-ranked-ready', { detail: nearbyPayload }));
       window.dispatchEvent(new CustomEvent('cinepro-active-catalogue-ready', { detail: activePayload }));

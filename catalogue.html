@@ -251,11 +251,11 @@
 </div>
 
 <script src="js/config.js?v=3.3"></script>
-<script src="js/data.js?v=3.7.4"></script>
+<script src="js/data.js?v=3.8.1"></script>
 <script src="js/omdb.js?v=3.3"></script>
 <script src="js/tmdb.js?v=3.3"></script>
 <script src="js/places.js?v=3.3"></script>
-<script src="js/nearby-catalogue.js?v=3.7.4"></script>
+<script src="js/nearby-catalogue.js?v=3.8.1"></script>
 <script>
   // ZIP 3.4 — Catalogue centré sur les films proches : un seul mode, données enrichies conservées.
   // Sécurité : si aucun résultat proche n'existe, on garde le catalogue enrichi ZIP 3.0 puis js/data.js.
@@ -327,10 +327,10 @@
   }
 
   function isFreshNearbyPayload(payload) {
-    // ZIP 3.7.4 : un seul catalogue proche actif, valable toute la journée.
+    // ZIP 3.8.1 : un seul catalogue proche actif, valable toute la journée.
     // On ne rejette plus un bon catalogue après 30 minutes : cela faisait retomber la page sur les 80 films.
     if (!payload || typeof payload !== 'object') return false;
-    const acceptedVersions = new Set(['3.7.3', '3.7.4']);
+    const acceptedVersions = new Set(['3.7.3', '3.7.4', '3.8.1']);
     if (payload.version && !acceptedVersions.has(String(payload.version))) return false;
     if (!Array.isArray(payload.films) || !payload.films.length) return false;
     const stamp = payload.searchDate || payload.updatedAt || payload.createdAt;
@@ -355,7 +355,7 @@
     if (!Array.isArray(films) || !films.length) return null;
     const now = new Date();
     const payload = {
-      version: '3.7.4',
+      version: '3.8.1',
       source: 'active-nearby-catalogue',
       searchDate: getLocalDateKey(now),
       updatedAt: now.toISOString(),
@@ -368,7 +368,7 @@
       localStorage.setItem(ACTIVE_CATALOGUE_KEY, JSON.stringify(payload));
       window.CINEPRO_ACTIVE_CATALOGUE = films;
     } catch (error) {
-      console.warn('[Catalogue] ZIP 3.7.4 : sauvegarde cinepro_active_catalogue impossible :', error?.message || error);
+      console.warn('[Catalogue] ZIP 3.8.1 : sauvegarde cinepro_active_catalogue impossible :', error?.message || error);
     }
     return payload;
   }
@@ -408,7 +408,7 @@
       localStorage.setItem('cinepro_catalogue_mode', 'nearby');
       return { source: nearby, label: 'films proches classés' };
     }
-    // ZIP 3.7.4 : en mode films proches, on ne retombe plus sur les 80 films classiques.
+    // ZIP 3.8.1 : en mode films proches, on ne retombe plus sur les 80 films classiques.
     // Tant que la recherche proche n'a pas produit cinepro_active_catalogue, on affiche un état d'attente.
     return { source: [], label: 'catalogue proche en attente de recherche' };
   }
@@ -456,7 +456,7 @@
       merged.push(prepared);
     });
 
-    console.log(`[Catalogue] ZIP 3.7.4 : ${active.label} utilisé (${merged.length} films).`);
+    console.log(`[Catalogue] ZIP 3.8.1 : ${active.label} utilisé (${merged.length} films).`);
     return merged;
   }
 
@@ -865,7 +865,7 @@
   let nearbyAutoBuildRunning = false;
   async function autoBuildNearbyCatalogueFromLastSearch() {
     if (hasNearbyCatalogue() || nearbyAutoBuildRunning) return true;
-    // ZIP 3.7.4 : avant de reconstruire, on nettoie les caches périmés.
+    // ZIP 3.8.1 : avant de reconstruire, on nettoie les caches périmés.
     try {
       localStorage.removeItem(RUNTIME_CATALOGUE_KEY);
       localStorage.removeItem(NEARBY_RANKED_KEY);
@@ -877,7 +877,7 @@
 
     nearbyAutoBuildRunning = true;
     try {
-      console.log('[Catalogue] ZIP 3.7.4 : génération automatique du catalogue proche depuis la dernière recherche.', lastSearch);
+      console.log('[Catalogue] ZIP 3.8.1 : génération automatique du catalogue proche depuis la dernière recherche.', lastSearch);
       await getNearbyRankedMovies({
         address: lastSearch.address || lastSearch.query || '',
         location: lastSearch.location || null,
@@ -890,7 +890,7 @@
       filterTable();
       return true;
     } catch (error) {
-      console.warn('[Catalogue] ZIP 3.7.4 : génération automatique impossible pour le moment :', error?.message || error);
+      console.warn('[Catalogue] ZIP 3.8.1 : génération automatique impossible pour le moment :', error?.message || error);
       return false;
     } finally {
       nearbyAutoBuildRunning = false;
@@ -911,7 +911,7 @@
   }
 
   window.addEventListener('nearby-catalogue-ranked-ready', () => {
-    console.log('[Catalogue] ZIP 3.7.4 : catalogue actif reçu depuis Catalogue proche. Rafraîchissement de la liste.');
+    console.log('[Catalogue] ZIP 3.8.1 : catalogue actif reçu depuis Catalogue proche. Rafraîchissement de la liste.');
     catalogue = getCatalogueSource();
     sortKey = 'bestNote';
     sortDir = -1;
@@ -920,7 +920,7 @@
   });
 
   window.addEventListener('cinepro-active-catalogue-ready', (event) => {
-    console.log('[Catalogue] ZIP 3.7.4 : cinepro_active_catalogue reçu. Rafraîchissement.');
+    console.log('[Catalogue] ZIP 3.8.1 : cinepro_active_catalogue reçu. Rafraîchissement.');
     if (Array.isArray(event?.detail?.films) && event.detail.films.length) {
       window.CINEPRO_ACTIVE_CATALOGUE = event.detail.films;
     }
@@ -934,7 +934,7 @@
   });
 
   async function initCatalogue() {
-    // ZIP 3.7.4 : on lance la reconstruction proche dès le début.
+    // ZIP 3.8.1 : on lance la reconstruction proche dès le début.
     // Si aucune donnée proche n'est prête, le tableau affiche un état d'attente au lieu des 80 films classiques.
     scheduleNearbyCatalogueAutoBuild();
 
