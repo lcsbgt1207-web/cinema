@@ -128,6 +128,23 @@ copy_dir() {
   fi
 }
 
+cleanup_obsolete_project_files() {
+  echo "Nettoyage des fichiers parasites du projet..."
+
+  rm -rf "$PROJECT_DIR/cinema-main"
+  rm -rf "$PROJECT_DIR/html"
+  rm -f "$PROJECT_DIR/cinema-update.zip"
+  rm -f "$PROJECT_DIR/cinema-updates.zip"
+  rm -f "$PROJECT_DIR/[Cin#U00e9Proche]"
+
+  find "$PROJECT_DIR" \
+    -path "$PROJECT_DIR/.git" -prune -o \
+    -path "$PROJECT_DIR/backend/node_modules" -prune -o \
+    -path "$PROJECT_DIR/node_modules" -prune -o \
+    \( -name "*.backup.*" -o -name "*.bak" -o -name "cinema-update*.zip" -o -name "cinema-updates*.zip" \) \
+    -type f -print -delete 2>/dev/null || true
+}
+
 copy_file() {
   local name="$1"
   local src="$PROJECT_DIR/$UPDATE_DIR/$name"
@@ -201,6 +218,8 @@ if [ ! -d "$PROJECT_DIR/$UPDATE_DIR" ]; then
   echo "Erreur : le dossier $UPDATE_DIR est introuvable après extraction."
   pause_exit 1
 fi
+
+cleanup_obsolete_project_files
 
 copy_dir "html"
 copy_dir "css"
