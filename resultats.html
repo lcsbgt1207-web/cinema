@@ -256,6 +256,28 @@
   </div>
 </div>
 
+
+<!-- POPUP GÉOLOCALISATION -->
+<div class="overlay" id="geo-overlay">
+  <div class="popup" style="max-width:400px;">
+    <div style="padding:32px 28px 20px;text-align:center;">
+      <div style="width:56px;height:56px;background:var(--gray-100);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
+        <i class="ti ti-current-location" style="font-size:24px;color:var(--black);"></i>
+      </div>
+      <div style="font-size:17px;font-weight:600;color:var(--black);margin-bottom:8px;">Où êtes-vous ?</div>
+      <div style="font-size:13px;color:var(--gray-500);line-height:1.6;">Pour trouver les cinémas qui passent ce film près de chez vous, nous avons besoin de votre position.</div>
+    </div>
+    <div style="padding:0 28px 24px;display:flex;flex-direction:column;gap:8px;">
+      <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="acceptGeolocate()">
+        <i class="ti ti-current-location"></i> Utiliser ma position
+      </button>
+      <button class="btn btn-secondary" style="width:100%;justify-content:center;" onclick="refuseGeolocate()">
+        Continuer sans localisation
+      </button>
+    </div>
+  </div>
+</div>
+
 <script src="js/config.js?v=2"></script>
 <script src="js/tmdb.js?v=2"></script>
 <script src="js/places.js?v=2"></script>
@@ -436,7 +458,13 @@
       document.getElementById('results-info').innerHTML =
         `<i class="ti ti-building"></i> Cinémas proches passant ce film`;
 
-      // Chercher cinémas proches si position dispo
+      // Chercher cinémas proches — popup custom si pas de position
+      if (!PLACES.userLocation && navigator.geolocation) {
+        try {
+          await showGeoPopup();
+        } catch(e) {}
+      }
+
       if (PLACES.userLocation) {
         const cinemas = await PLACES.findNearbycinemas(PLACES.userLocation);
         if (cinemas.length) {
@@ -1036,6 +1064,40 @@
     runSearch();
   }
   function searchEnter(e) { if(e.key==='Enter') newSearch(); }
+
+
+  // ── Popup Géolocalisation ──
+  let _geoResolve = null;
+  let _geoReject = null;
+
+  function showGeoPopup() {
+    return new Promise((resolve, reject) => {
+      _geoResolve = resolve;
+      _geoReject = reject;
+      document.getElementById('geo-overlay').classList.add('open');
+      document.body.style.overflow = 'hidden';
+    });
+  }
+
+  function acceptGeolocate() {
+    document.getElementById('geo-overlay').classList.remove('open');
+    document.body.style.overflow = '';
+    const btn = document.getElementById('geo-overlay');
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        PLACES.userLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        if (_geoResolve) _geoResolve();
+      },
+      () => { if (_geoReject) _geoReject(new Error('geo_refused')); },
+      { timeout: 8000 }
+    );
+  }
+
+  function refuseGeolocate() {
+    document.getElementById('geo-overlay').classList.remove('open');
+    document.body.style.overflow = '';
+    if (_geoReject) _geoReject(new Error('geo_refused'));
+  }
 
   function geolocate() {
     if(!navigator.geolocation) return;
