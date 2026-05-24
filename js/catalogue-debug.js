@@ -1,5 +1,5 @@
-/* CinéProche — Audit cache/rayon catalogue — ZIP 3.9.7
-   Aucun changement fonctionnel : ce fichier expose seulement un outil de diagnostic console.
+/* CinéProche — Audit catalogue — ZIP 4.0
+   Outil console volontairement discret.
    Utilisation : F12 → Console → CINEPRO_DEBUG_CATALOGUE.audit()
 */
 (function () {
@@ -64,7 +64,7 @@
       .filter(row => row.exists && expectedRadius && Number(row.radius || 0) && Number(row.radius) !== expectedRadius)
       .map(row => ({ cache: row.cache, cacheRadius: row.radius, lastSearchRadius: expectedRadius }));
 
-    console.group('[CinéProche] Audit catalogue ZIP 3.9.7');
+    console.group('[CinéProche] Audit catalogue ZIP 4.0');
     console.log('Dernière recherche proche :', lastSearch || 'Aucune');
     console.table(rows);
     if (mismatches.length) {
@@ -72,14 +72,15 @@
     } else {
       console.log('Aucune incohérence rayon évidente détectée dans les caches présents.');
     }
-    console.log('Variables runtime :', {
+    const runtime = {
       CINEPRO_ACTIVE_CATALOGUE: Array.isArray(window.CINEPRO_ACTIVE_CATALOGUE) ? window.CINEPRO_ACTIVE_CATALOGUE.length : 0,
       NEARBY_CATALOGUE_NEARBY_RANKED: Array.isArray(window.NEARBY_CATALOGUE_NEARBY_RANKED) ? window.NEARBY_CATALOGUE_NEARBY_RANKED.length : 0,
       NEARBY_CATALOGUE_RUNTIME_DATA: Array.isArray(window.NEARBY_CATALOGUE_RUNTIME_DATA) ? window.NEARBY_CATALOGUE_RUNTIME_DATA.length : 0
-    });
+    };
+    console.log('Variables runtime :', runtime);
     console.groupEnd();
 
-    return { lastSearch, caches: rows, mismatches };
+    return { lastSearch, caches: rows, mismatches, runtime }; 
   }
 
   function clearCatalogueCaches() {

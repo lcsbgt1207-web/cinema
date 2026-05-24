@@ -1,10 +1,7 @@
-// ZIP 3.9.4 — Audit et simplification du catalogue.
-// Rôle : orchestrer l’affichage du catalogue proche uniquement.
-// Les accès localStorage passent maintenant par js/storage.js quand il est disponible.
-// Important : ce fichier ne doit pas relancer toute la logique cinéma ; il consomme les données produites par nearby-catalogue.js.
-
-// ZIP 3.4 — Catalogue centré sur les films proches : un seul mode, données enrichies conservées.
-// Sécurité : si aucun résultat proche n'existe, on garde le catalogue enrichi ZIP 3.0 puis js/data.js.
+// CinéProche — Catalogue proche — ZIP 4.0
+// Rôle : orchestrer le catalogue des films projetés près de la dernière recherche.
+// Flux stable : cache avec rayon -> réhydratation runtime -> affichage via catalogue-render.js.
+// Ce fichier ne gère pas le HTML du tableau et ne modifie pas les séances directement.
 const STATIC_CATALOGUE = FILMS.filter(f => f && !f.isMock);
 let catalogue = [];
 let catalogueMode = 'nearby';
@@ -148,14 +145,14 @@ function isFreshNearbyPayload(payload) {
   const stamp = payload.searchDate || payload.updatedAt || payload.createdAt;
   if (getLocalDateKey(stamp) !== getLocalDateKey(new Date())) return false;
 
-  // ZIP 3.9.4 : si l'utilisateur refait la recherche avec un autre rayon,
-  // on ne doit pas réutiliser un ancien catalogue 15 km pour une recherche 50 km.
+  // ZIP 4.0 : le cache catalogue est lié à la dernière recherche proche.
+  // Si le rayon ou l'adresse ne correspondent pas, le cache est ignoré.
   const lastSearch = readLastNearbySearch();
   if (lastSearch) {
     const wantedRadius = Number(lastSearch.radius || 0);
     const payloadRadius = Number(payload.radius || 0);
 
-    // ZIP 3.9.8 : si une recherche avec rayon existe, un cache sans rayon n'est plus fiable.
+    // Un cache sans rayon n'est plus fiable quand une recherche avec rayon existe.
     if (wantedRadius && !payloadRadius) return false;
     if (wantedRadius && payloadRadius && Math.abs(wantedRadius - payloadRadius) > 50) return false;
 
@@ -202,7 +199,7 @@ function writeActiveCatalogueFromFilms(films, meta = {}) {
     writeStorageJson(ACTIVE_CATALOGUE_KEY, payload);
     window.CINEPRO_ACTIVE_CATALOGUE = films;
   } catch (error) {
-    console.warn('[Catalogue] ZIP 3.9.4 : sauvegarde cinepro_active_catalogue impossible :', error?.message || error);
+    console.warn('[Catalogue] ZIP 4.0 : sauvegarde cinepro_active_catalogue impossible :', error?.message || error);
   }
   return payload;
 }
@@ -213,34 +210,6 @@ function hasNearbyCatalogue() {
     || readStoredActiveCatalogue().length
     || readStoredNearbyCatalogue().length;
 }
-
-
-function hydrateCatalogueRuntimeFromStorage() {
-  const activeFilms = readStoredActiveCatalogue();
-  if (activeFilms.length) {
-    window.CINEPRO_ACTIVE_CATALOGUE = activeFilms;
-  }
-
-  const nearbyFilms = readStoredNearbyCatalogue();
-  if (nearbyFilms.length) {
-    window.NEARBY_CATALOGUE_NEARBY_RANKED = nearbyFilms;
-  }
-
-  const runtimeFilms = readStoredRuntimeCatalogue();
-  if (runtimeFilms.length) {
-    window.NEARBY_CATALOGUE_RUNTIME_DATA = runtimeFilms;
-  }
-
-  if (activeFilms.length || nearbyFilms.length || runtimeFilms.length) {
-    window.dispatchEvent(new CustomEvent('cinepro-catalogue-hydrated', {
-      detail: { active: activeFilms.length, nearby: nearbyFilms.length, runtime: runtimeFilms.length }
-    }));
-  }
-
-  return { active: activeFilms.length, nearby: nearbyFilms.length, runtime: runtimeFilms.length };
-}
-
-window.hydrateCatalogueRuntimeFromStorage = hydrateCatalogueRuntimeFromStorage;
 
 function getActiveRawCatalogueSource() {
   // ZIP 3.4 : le Catalogue est centré sur les films proches.
@@ -270,8 +239,7 @@ function getActiveRawCatalogueSource() {
     setStoredCatalogueMode('nearby');
     return { source: nearby, label: 'films proches classés' };
   }
-  // ZIP 3.8.1 : en mode films proches, on ne retombe plus sur les 80 films classiques.
-  // Tant que la recherche proche n'a pas produit cinepro_active_catalogue, on affiche un état d'attente.
+  // Tant que la recherche proche n'a pas produit de cache valide, on affiche un état d'attente.
   return { source: [], label: 'catalogue proche en attente de recherche' };
 }
 
@@ -319,7 +287,7 @@ function getCatalogueSource() {
   });
 
   if (isCatalogueDebugEnabled()) {
-    console.log(`[Catalogue] ZIP 3.9.9 : ${active.label} utilisé (${merged.length} films).`);
+    console.log(`[Catalogue] ZIP 4.0 : ${active.label} utilisé (${merged.length} films).`);
   }
   return merged;
 }
@@ -342,8 +310,7 @@ function updateCatalogueModeControl() {
 }
 
 function setCatalogueMode(_mode) {
-  // ZIP 3.4 : on supprime le mode “Tous les films” du parcours utilisateur.
-  // Le menu Catalogue doit répondre à : “Quels bons films passent près de moi ?”.
+  // Le menu Catalogue reste centré sur : “Quels bons films passent près de moi ?”.
   catalogueMode = 'nearby';
   setStoredCatalogueMode('nearby');
   sortKey = 'bestNote';
@@ -595,7 +562,7 @@ async function enrichCatalogueInBackground() {
     writeActiveCatalogueFromFilms(catalogue, { source: 'tmdb-visible-background-refresh' });
     filterTable();
   } catch (error) {
-    console.warn('[Catalogue] ZIP 3.9.4 : enrichissement visible TMDB ignoré :', error?.message || error);
+    console.warn('[Catalogue] ZIP 4.0 : enrichissement visible TMDB ignoré :', error?.message || error);
   } finally {
     catalogueBackgroundEnrichmentRunning = false;
     updateCatalogueModeControl();
@@ -627,7 +594,7 @@ async function loadLetterboxdCatalogue() {
     const payload = await response.json();
     const apiFilms = Array.isArray(payload.films) ? payload.films : [];
     const updated = applyLetterboxdRatings(apiFilms);
-    if (isCatalogueDebugEnabled()) console.log(`[Catalogue] ZIP 3.9.4 : notes Letterboxd mises à jour (${updated}).`);
+    if (isCatalogueDebugEnabled()) console.log(`[Catalogue] ZIP 4.0 : notes Letterboxd mises à jour (${updated}).`);
     return true;
   } catch (error) {
     console.warn('API Letterboxd non disponible, catalogue statique utilisé :', error.message);
@@ -689,7 +656,7 @@ async function autoBuildNearbyCatalogueFromLastSearch() {
 
   nearbyAutoBuildRunning = true;
   try {
-    if (isCatalogueDebugEnabled()) console.log('[Catalogue] ZIP 3.9.4 : génération automatique du catalogue proche depuis la dernière recherche.', lastSearch);
+    if (isCatalogueDebugEnabled()) console.log('[Catalogue] ZIP 4.0 : génération automatique du catalogue proche depuis la dernière recherche.', lastSearch);
     await getNearbyRankedMovies({
       address: lastSearch.address || lastSearch.query || '',
       location: lastSearch.location || null,
@@ -702,7 +669,7 @@ async function autoBuildNearbyCatalogueFromLastSearch() {
     filterTable();
     return true;
   } catch (error) {
-    console.warn('[Catalogue] ZIP 3.9.4 : génération automatique impossible pour le moment :', error?.message || error);
+    console.warn('[Catalogue] ZIP 4.0 : génération automatique impossible pour le moment :', error?.message || error);
     return false;
   } finally {
     nearbyAutoBuildRunning = false;
@@ -744,9 +711,6 @@ window.addEventListener('cinepro-active-catalogue-ready', (event) => {
 });
 
 async function initCatalogue() {
-  // ZIP 3.9.9 : réhydrater les variables runtime depuis localStorage avant toute reconstruction.
-  hydrateCatalogueRuntimeFromStorage();
-
   // ZIP 3.8.1 : on lance la reconstruction proche dès le début.
   // Si aucune donnée proche n'est prête, le tableau affiche un état d'attente au lieu des 80 films classiques.
   scheduleNearbyCatalogueAutoBuild();
