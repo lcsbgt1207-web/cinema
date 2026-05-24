@@ -1500,9 +1500,13 @@
     // ZIP 3.6.7 : une nouvelle recherche remplace toujours l'ancien cache.
     // Cela évite de garder des horaires d'hier dans la popup.
     try {
-      localStorage.removeItem('cinepro_runtime_catalogue');
-      localStorage.removeItem('cinepro_nearby_ranked_catalogue');
-      localStorage.removeItem('cinepro_active_catalogue');
+      if (window.CineProStorage?.clearNearbyCatalogue) {
+        window.CineProStorage.clearNearbyCatalogue();
+      } else {
+        localStorage.removeItem('cinepro_runtime_catalogue');
+        localStorage.removeItem('cinepro_nearby_ranked_catalogue');
+        localStorage.removeItem('cinepro_active_catalogue');
+      }
     } catch (_) {}
 
     const cinemas = await window.PLACES.findNearbycinemas(location, radius);
@@ -1725,9 +1729,13 @@
         stats: { total: nearbyRankedCatalogue.length, rated: nearbyRankedCatalogue.filter(f => Number.isFinite(Number(f.bestNote))).length }
       };
       const nearbyPayload = { ...activePayload, source: 'legacy-nearby-ranked' };
-      localStorage.setItem('cinepro_runtime_catalogue', JSON.stringify(storedPayload));
-      localStorage.setItem('cinepro_nearby_ranked_catalogue', JSON.stringify(nearbyPayload));
-      localStorage.setItem('cinepro_active_catalogue', JSON.stringify(activePayload));
+      if (window.CineProStorage?.saveNearbyCatalogue) {
+        window.CineProStorage.saveNearbyCatalogue({ runtimePayload: storedPayload, nearbyPayload, activePayload });
+      } else {
+        localStorage.setItem('cinepro_runtime_catalogue', JSON.stringify(storedPayload));
+        localStorage.setItem('cinepro_nearby_ranked_catalogue', JSON.stringify(nearbyPayload));
+        localStorage.setItem('cinepro_active_catalogue', JSON.stringify(activePayload));
+      }
       window.CINEPRO_ACTIVE_CATALOGUE = nearbyRankedCatalogue;
       console.log(`[Catalogue proche] ZIP 3.9.2 : catalogue actif sauvegardé (${nearbyRankedCatalogue.length} films).`);
       window.dispatchEvent(new CustomEvent('nearby-catalogue-runtime-ready', { detail: storedPayload }));
