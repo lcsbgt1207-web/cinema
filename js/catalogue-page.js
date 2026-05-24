@@ -1,4 +1,4 @@
-// ZIP 3.8.3 — Catalogue JS externalisé + conservation réalisateur/genre TMDB.
+// ZIP 3.8.5 — Catalogue JS externalisé + cache TMDB détaillé conservé.
 // Objectif : garder catalogue.html centré sur la structure HTML, sans changement fonctionnel visible.
 
 // ZIP 3.4 — Catalogue centré sur les films proches : un seul mode, données enrichies conservées.
@@ -94,7 +94,7 @@ function isFreshNearbyPayload(payload) {
   // ZIP 3.8.1 : un seul catalogue proche actif, valable toute la journée.
   // On ne rejette plus un bon catalogue après 30 minutes : cela faisait retomber la page sur les 80 films.
   if (!payload || typeof payload !== 'object') return false;
-  const acceptedVersions = new Set(['3.7.3', '3.7.4', '3.8.1', '3.8.3']);
+  const acceptedVersions = new Set(['3.7.3', '3.7.4', '3.8.1', '3.8.3', '3.8.5']);
   if (payload.version && !acceptedVersions.has(String(payload.version))) return false;
   if (!Array.isArray(payload.films) || !payload.films.length) return false;
   const stamp = payload.searchDate || payload.updatedAt || payload.createdAt;
@@ -119,7 +119,7 @@ function writeActiveCatalogueFromFilms(films, meta = {}) {
   if (!Array.isArray(films) || !films.length) return null;
   const now = new Date();
   const payload = {
-    version: '3.8.1',
+    version: '3.8.5',
     source: 'active-nearby-catalogue',
     searchDate: getLocalDateKey(now),
     updatedAt: now.toISOString(),

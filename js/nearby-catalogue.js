@@ -1,4 +1,4 @@
-/* CinéProche — Catalogue proche — ZIP 3.8.1
+/* CinéProche — Catalogue proche — ZIP 3.8.5
    Objectif : normalisation des horaires UGC pour la popup catalogue.
    - Les films reconnus dans js/data.js gardent leur note locale.
    - Les films absents trouvés sur TMDB deviennent utilisables directement dans la liste finale.
@@ -287,7 +287,23 @@
   async function searchTmdbEnrichment(title, options = {}) {
     const cacheKey = normalizeNearbyTitle(title);
     if (!cacheKey) return null;
-    if (tmdbEnrichmentCache.has(cacheKey)) return tmdbEnrichmentCache.get(cacheKey);
+    if (tmdbEnrichmentCache.has(cacheKey)) {
+      const cached = tmdbEnrichmentCache.get(cacheKey);
+      // ZIP 3.8.5 : une recherche de note TMDB utilise ratingOnly et ne charge pas
+      // les détails (genre, réalisateur, acteurs). Avant, ce résultat minimal était
+      // réutilisé par l'enrichissement complet, ce qui laissait le catalogue proche
+      // avec "Non renseigné" / "À compléter" après une nouvelle recherche.
+      // On accepte le cache minimal pour les notes, mais on refait un appel complet
+      // quand la page Catalogue a besoin des métadonnées détaillées.
+      if (options.ratingOnly) return cached;
+      const hasDetailedMetadata = cached?.found && (
+        (Array.isArray(cached.genres) && cached.genres.length) ||
+        Boolean(cached.real) ||
+        Boolean(cached.acteurs) ||
+        Boolean(cached.synopsis)
+      );
+      if (!cached?.found || hasDetailedMetadata) return cached;
+    }
 
     const cfg = getNearbyConfig();
     const status = getTmdbConfigStatus();
@@ -1477,7 +1493,7 @@
     }
     if (!location) location = await window.PLACES.geolocate();
 
-    console.log('[Catalogue proche] ZIP 3.8.1 actif — rafraîchissement forcé des séances futures + versions VF/VO.');
+    console.log('[Catalogue proche] ZIP 3.8.5 actif — cache TMDB ratingOnly corrigé + métadonnées complètes.');
     console.log('[Catalogue proche] Position utilisée :', location);
 
     // ZIP 3.6.7 : une nouvelle recherche remplace toujours l'ancien cache.
@@ -1690,14 +1706,14 @@
 
     try {
       const storedPayload = {
-        version: '3.8.3',
+        version: '3.8.5',
         updatedAt: new Date().toISOString(),
         films: runtimeFusion.films,
         tmdbRuntimeFilms: runtimeFusion.tmdbRuntimeFilms,
         stats: window.NEARBY_CATALOGUE_STATS
       };
       const activePayload = {
-        version: '3.8.3',
+        version: '3.8.5',
         source: 'active-nearby-catalogue',
         searchDate: formatLocalDateYYYYMMDD(new Date()),
         updatedAt: new Date().toISOString(),
@@ -1711,7 +1727,7 @@
       localStorage.setItem('cinepro_nearby_ranked_catalogue', JSON.stringify(nearbyPayload));
       localStorage.setItem('cinepro_active_catalogue', JSON.stringify(activePayload));
       window.CINEPRO_ACTIVE_CATALOGUE = nearbyRankedCatalogue;
-      console.log(`[Catalogue proche] ZIP 3.8.3 : catalogue actif rafraîchi et sauvegardé (${nearbyRankedCatalogue.length} films).`);
+      console.log(`[Catalogue proche] ZIP 3.8.5 : catalogue actif enrichi et sauvegardé (${nearbyRankedCatalogue.length} films).`);
       window.dispatchEvent(new CustomEvent('nearby-catalogue-runtime-ready', { detail: storedPayload }));
       window.dispatchEvent(new CustomEvent('nearby-catalogue-ranked-ready', { detail: nearbyPayload }));
       window.dispatchEvent(new CustomEvent('cinepro-active-catalogue-ready', { detail: activePayload }));
