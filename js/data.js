@@ -816,37 +816,114 @@ function getNextPopupShowtimeLabel(horaires) {
   return next?.label || '';
 }
 
+function getPopupShowtimeDayKey(date) {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return 'unknown';
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function getPopupDayLabel(date) {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return 'Séances';
+  const today = getStartOfLocalDay(new Date());
+  const tomorrow = new Date(today);
+  tomorrow.setDate(today.getDate() + 1);
+  const showtimeDay = getStartOfLocalDay(date);
+
+  if (showtimeDay.getTime() === today.getTime()) return 'Aujourd’hui';
+  if (showtimeDay.getTime() === tomorrow.getTime()) return 'Demain';
+
+  const label = new Intl.DateTimeFormat('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' }).format(date);
+  return label.charAt(0).toUpperCase() + label.slice(1).replace('.', '');
+}
+
+function formatPopupShowtimeHourOnly(item) {
+  const date = item?.date || parsePopupShowtimeDate(item?.raw || item);
+  if (date instanceof Date && !Number.isNaN(date.getTime())) {
+    return new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' }).format(date).replace(':', 'h');
+  }
+  return String(item?.label || item || '').replace(/^Aujourd’hui\s*[·à-]*\s*/i, '').replace(/^Demain\s*[·à-]*\s*/i, '').trim();
+}
+
+function groupPopupHorairesByDay(horaires) {
+  const normalized = normalizePopupHoraires(horaires);
+  const upcoming = normalized.filter(item => isPopupShowtimeUpcoming(item.raw));
+  const useful = upcoming.length ? upcoming : normalized;
+  const groupsMap = new Map();
+
+  for (const item of useful) {
+    const date = item.date || parsePopupShowtimeDate(item.raw);
+    const key = getPopupShowtimeDayKey(date);
+    const label = getPopupDayLabel(date);
+    if (!groupsMap.has(key)) groupsMap.set(key, { key, label, date, items: [] });
+    groupsMap.get(key).items.push(item);
+  }
+
+  return Array.from(groupsMap.values()).sort((a, b) => {
+    if (a.date && b.date) return a.date - b.date;
+    if (a.date) return -1;
+    if (b.date) return 1;
+    return a.label.localeCompare(b.label, 'fr');
+  });
+}
+
 function buildPopupSeancesHTML(cinemas) {
   if (!cinemas.length) {
     return `<div class="empty-seances">Aucune séance proche n’est encore associée à ce film. Lance une recherche de cinémas proches pour remplir cette zone.</div>`;
   }
 
-  return `<div class="popup-seances-list">${cinemas.slice(0, 8).map((cinema, cinemaIndex) => {
+  const sortedCinemas = [...cinemas]
+    .filter(cinema => cinema && (cinema.nom || cinema.name))
+    .sort((a, b) => {
+      const da = Number(a.distanceKm ?? a.dist);
+      const db = Number(b.distanceKm ?? b.dist);
+      if (Number.isFinite(da) && Number.isFinite(db)) return da - db;
+      if (Number.isFinite(da)) return -1;
+      if (Number.isFinite(db)) return 1;
+      return String(a.nom || a.name || '').localeCompare(String(b.nom || b.name || ''), 'fr');
+    })
+    .slice(0, 8);
+
+  return `<div class="popup-seances-list">${sortedCinemas.map((cinema, cinemaIndex) => {
     const nom = cinema.nom || cinema.name || 'Cinéma';
     const distance = Number(cinema.distanceKm ?? cinema.dist);
     const distanceLabel = Number.isFinite(distance) ? ` · ${distance.toFixed(1)} km` : '';
-    const horaires = normalizePopupHoraires(cinema.horaires || []);
-    const upcoming = horaires.filter(item => isPopupShowtimeUpcoming(item.raw));
-    const usefulHoraires = upcoming.length ? upcoming : horaires;
-    const visibleHoraires = usefulHoraires.slice(0, 4);
-    const hiddenHoraires = usefulHoraires.slice(4, 12);
+    const groups = groupPopupHorairesByDay(cinema.horaires || []);
     const nextLabel = getNextPopupShowtimeLabel(cinema.horaires || []);
-    const hiddenId = `popup-hidden-showtimes-${cinemaIndex}`;
-    const moreLabel = hiddenHoraires.length === 1 ? '+ 1 autre séance' : `+ ${hiddenHoraires.length} autres séances`;
-    const horairesHTML = usefulHoraires.length
+
+    const horairesHTML = groups.length
       ? `<div class="popup-next-showtime">${nextLabel ? `Prochaine séance : <strong>${escapeHTML(nextLabel)}</strong>` : 'Séances à venir'}</div>
-         <div class="popup-showtimes">
-           ${visibleHoraires.map(item => `<span>${escapeHTML(item.label)}</span>`).join('')}
-           ${hiddenHoraires.length ? `<span class="popup-showtimes-extra" id="${hiddenId}">${hiddenHoraires.map(item => `<span>${escapeHTML(item.label)}</span>`).join('')}</span>
-           <button class="popup-showtimes-more" type="button" onclick="togglePopupShowtimes('${hiddenId}', this)">${escapeHTML(moreLabel)}</button>` : ''}
+         <div class="popup-day-tabs" role="tablist" aria-label="Jours de séances">
+           ${groups.map((group, groupIndex) => `<button class="popup-day-tab${groupIndex === 0 ? ' active' : ''}" type="button" role="tab" aria-selected="${groupIndex === 0 ? 'true' : 'false'}" onclick="togglePopupSeanceDay(${cinemaIndex}, '${escapeHTML(group.key)}')">${escapeHTML(group.label)}</button>`).join('')}
+         </div>
+         <div class="popup-day-panels">
+           ${groups.map((group, groupIndex) => `<div class="popup-day-panel${groupIndex === 0 ? ' active' : ''}" data-popup-cinema="${cinemaIndex}" data-popup-day="${escapeHTML(group.key)}">
+             <div class="popup-showtimes">${group.items.map(item => `<span>${escapeHTML(formatPopupShowtimeHourOnly(item))}</span>`).join('')}</div>
+           </div>`).join('')}
          </div>`
       : '<div class="popup-showtimes-muted">Aucune séance dans les 7 prochains jours.</div>';
+
     return `<div class="popup-cinema-row">
       <div class="popup-cinema-name"><i class="ti ti-map-pin"></i>${escapeHTML(nom)}${distanceLabel}</div>
       ${horairesHTML}
     </div>`;
   }).join('')}</div>`;
 }
+
+function togglePopupSeanceDay(cinemaIndex, dayKey) {
+  const tabSelector = `.popup-day-tab[onclick*="togglePopupSeanceDay(${cinemaIndex},"]`;
+  document.querySelectorAll(tabSelector).forEach(tab => {
+    const isActive = tab.getAttribute('onclick')?.includes(`'${dayKey}'`);
+    tab.classList.toggle('active', Boolean(isActive));
+    tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
+  });
+
+  document.querySelectorAll(`.popup-day-panel[data-popup-cinema="${cinemaIndex}"]`).forEach(panel => {
+    panel.classList.toggle('active', panel.dataset.popupDay === dayKey);
+  });
+}
+window.togglePopupSeanceDay = togglePopupSeanceDay;
 
 function togglePopupShowtimes(hiddenId, button) {
   const node = document.getElementById(hiddenId);

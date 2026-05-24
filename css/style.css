@@ -664,3 +664,14 @@ img { max-width: 100%; display: block; }
 .popup-showtimes-more:hover { background:#333; }
 .popup-showtimes-muted { color:var(--gray-500); font-size:12.5px; line-height:1.45; }
 @media (max-width:640px){ .popup-rating-pill{font-size:12px;} .popup-cinema-row{padding:10px;} .popup-showtimes-more{width:100%;} }
+
+/* cinema-update: zip-3-6-1-popup-seance-day-tabs */
+.popup-day-tabs { display:flex; gap:6px; flex-wrap:wrap; margin:8px 0 10px; }
+.popup-day-tab { border:1px solid var(--gray-200); border-radius:999px; background:#fff; color:var(--gray-600); padding:6px 10px; font-size:12px; cursor:pointer; transition:all var(--transition); }
+.popup-day-tab:hover { border-color:var(--black); color:var(--black); }
+.popup-day-tab.active { background:var(--black); border-color:var(--black); color:#fff; }
+.popup-day-panels { margin-top:2px; }
+.popup-day-panel { display:none; }
+.popup-day-panel.active { display:block; }
+.popup-day-panel .popup-showtimes span { font-weight:600; }
+@media (max-width:640px){ .popup-day-tab{flex:1 1 auto;} }
