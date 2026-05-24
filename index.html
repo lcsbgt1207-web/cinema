@@ -131,7 +131,7 @@
   async function loadStats() {
     try {
       const films = await TMDB.getNowPlaying();
-      document.getElementById('stat-films').textContent = films.length + '+';
+      document.getElementById('stat-films').textContent = (films.length || 20) + '+';
     } catch(e) {}
   }
   loadStats();
