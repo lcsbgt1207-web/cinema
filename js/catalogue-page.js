@@ -1,5 +1,6 @@
-// ZIP 3.8.6 — Catalogue JS externalisé + chargement TMDB optimisé en arrière-plan.
-// Objectif : garder catalogue.html centré sur la structure HTML, sans changement fonctionnel visible.
+// ZIP 3.9.2 — Stabilisation du catalogue proche.
+// Rôle : lire le catalogue proche sauvegardé, afficher vite la liste, puis enrichir uniquement les films visibles incomplets.
+// Important : ce fichier ne doit pas recalculer toute la recherche cinéma ; il consomme les données produites par nearby-catalogue.js.
 
 // ZIP 3.4 — Catalogue centré sur les films proches : un seul mode, données enrichies conservées.
 // Sécurité : si aucun résultat proche n'existe, on garde le catalogue enrichi ZIP 3.0 puis js/data.js.
@@ -94,11 +95,25 @@ function isFreshNearbyPayload(payload) {
   // ZIP 3.8.1 : un seul catalogue proche actif, valable toute la journée.
   // On ne rejette plus un bon catalogue après 30 minutes : cela faisait retomber la page sur les 80 films.
   if (!payload || typeof payload !== 'object') return false;
-  const acceptedVersions = new Set(['3.7.3', '3.7.4', '3.8.1', '3.8.3', '3.8.4', '3.8.5', '3.8.6']);
+  const acceptedVersions = new Set(['3.7.3', '3.7.4', '3.8.1', '3.8.3', '3.8.4', '3.8.5', '3.8.6', '3.9.2']);
   if (payload.version && !acceptedVersions.has(String(payload.version))) return false;
   if (!Array.isArray(payload.films) || !payload.films.length) return false;
   const stamp = payload.searchDate || payload.updatedAt || payload.createdAt;
   if (getLocalDateKey(stamp) !== getLocalDateKey(new Date())) return false;
+
+  // ZIP 3.9.2 : si l'utilisateur refait la recherche avec un autre rayon,
+  // on ne doit pas réutiliser un ancien catalogue 15 km pour une recherche 50 km.
+  const lastSearch = readLastNearbySearch();
+  if (lastSearch) {
+    const wantedRadius = Number(lastSearch.radius || 0);
+    const payloadRadius = Number(payload.radius || 0);
+    if (wantedRadius && payloadRadius && Math.abs(wantedRadius - payloadRadius) > 50) return false;
+
+    const wantedAddress = normalizeRuntimeCatalogueKey(lastSearch.address || lastSearch.query || '');
+    const payloadAddress = normalizeRuntimeCatalogueKey(payload.address || payload.query || '');
+    if (wantedAddress && payloadAddress && wantedAddress !== payloadAddress) return false;
+  }
+
   return true;
 }
 
@@ -119,7 +134,7 @@ function writeActiveCatalogueFromFilms(films, meta = {}) {
   if (!Array.isArray(films) || !films.length) return null;
   const now = new Date();
   const payload = {
-    version: '3.8.6',
+    version: '3.9.2',
     source: 'active-nearby-catalogue',
     searchDate: getLocalDateKey(now),
     updatedAt: now.toISOString(),
@@ -261,16 +276,6 @@ function refreshCatalogueFromRuntime() {
 }
 
 window.addEventListener('nearby-catalogue-runtime-ready', () => {
-  console.log('[Catalogue] Fusion runtime reçue depuis Catalogue proche. Rafraîchissement de la liste.');
-  refreshCatalogueFromRuntime();
-});
-
-window.addEventListener('nearby-catalogue-ranked-ready', () => {
-  console.log('[Catalogue] Films proches classés reçus. Mode unique films proches conservé.');
-  catalogueMode = 'nearby';
-  localStorage.setItem('cinepro_catalogue_mode', 'nearby');
-  sortKey = 'bestNote';
-  sortDir = -1;
   refreshCatalogueFromRuntime();
 });
 
@@ -399,6 +404,7 @@ function renderTable(data) {
   document.getElementById('count-label').textContent = label;
   document.getElementById('film-count').textContent = label;
   renderPagination(totalPages);
+  scheduleVisibleCatalogueEnrichment();
 }
 
 function getVisiblePaginationPages(totalPages) {
@@ -577,33 +583,48 @@ function needsCatalogueTmdbRefresh(film) {
   return !hasReal || !hasGenre || !hasPoster;
 }
 
+function getVisibleCatalogueRows() {
+  const start = (currentPage - 1) * pageSize;
+  return lastFilteredData.slice(start, start + pageSize);
+}
+
 let catalogueBackgroundEnrichmentRunning = false;
 async function enrichCatalogueInBackground() {
   if (catalogueBackgroundEnrichmentRunning || typeof enrichFilmsWithOmdb !== 'function') return;
 
-  const candidates = catalogue.filter(needsCatalogueTmdbRefresh);
+  // ZIP 3.9.2 : on enrichit uniquement les films visibles sur la page.
+  // Avant, le catalogue pouvait relancer TMDB/OMDb sur 20+ films d'un coup,
+  // ce qui donnait une attente ressentie de 1 à 2 minutes.
+  const visibleRows = getVisibleCatalogueRows();
+  const candidates = visibleRows.filter(needsCatalogueTmdbRefresh).slice(0, pageSize);
   if (!candidates.length) return;
 
   catalogueBackgroundEnrichmentRunning = true;
   const countLabel = document.getElementById('film-count');
 
   try {
-    if (countLabel) countLabel.textContent = `${catalogue.length} films proches · infos en cours…`;
+    if (countLabel) countLabel.textContent = `${catalogue.length} films proches · infos visibles…`;
 
     await enrichFilmsWithOmdb(candidates, (done, total) => {
-      // On rafraîchit par petits paliers pour éviter une page qui semble bloquée.
-      if (done === 1 || done === total || done % 3 === 0) filterTable();
-      if (countLabel) countLabel.textContent = `${catalogue.length} films proches · infos ${done}/${total}`;
+      if (done === total) filterTable();
+      if (countLabel) countLabel.textContent = `${catalogue.length} films proches · infos visibles ${done}/${total}`;
     });
 
-    writeActiveCatalogueFromFilms(catalogue, { source: 'tmdb-background-refresh' });
+    writeActiveCatalogueFromFilms(catalogue, { source: 'tmdb-visible-background-refresh' });
     filterTable();
   } catch (error) {
-    console.warn('[Catalogue] ZIP 3.8.6 : enrichissement TMDB en arrière-plan ignoré :', error?.message || error);
+    console.warn('[Catalogue] ZIP 3.9.2 : enrichissement visible TMDB ignoré :', error?.message || error);
   } finally {
     catalogueBackgroundEnrichmentRunning = false;
     updateCatalogueModeControl();
   }
+}
+
+function scheduleVisibleCatalogueEnrichment() {
+  window.clearTimeout(window.__cineproVisibleCatalogueEnrichmentTimer);
+  window.__cineproVisibleCatalogueEnrichmentTimer = window.setTimeout(() => {
+    enrichCatalogueInBackground();
+  }, 150);
 }
 
 async function loadLetterboxdCatalogue() {
@@ -615,13 +636,16 @@ async function loadLetterboxdCatalogue() {
   catalogue = getCatalogueSource();
 
   try {
-    const response = await fetch(LETTERBOXD_API_URL, { cache: 'no-store' });
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 1200);
+    const response = await fetch(LETTERBOXD_API_URL, { cache: 'no-store', signal: controller.signal });
+    window.clearTimeout(timeout);
     if (!response.ok) throw new Error('API indisponible');
 
     const payload = await response.json();
     const apiFilms = Array.isArray(payload.films) ? payload.films : [];
     const updated = applyLetterboxdRatings(apiFilms);
-    console.log(`Notes Letterboxd mises à jour : ${updated}. Données TMDB/locales conservées.`);
+    console.log(`[Catalogue] ZIP 3.9.2 : notes Letterboxd mises à jour (${updated}).`);
     return true;
   } catch (error) {
     console.warn('API Letterboxd non disponible, catalogue statique utilisé :', error.message);
@@ -682,7 +706,7 @@ async function autoBuildNearbyCatalogueFromLastSearch() {
 
   nearbyAutoBuildRunning = true;
   try {
-    console.log('[Catalogue] ZIP 3.8.1 : génération automatique du catalogue proche depuis la dernière recherche.', lastSearch);
+    console.log('[Catalogue] ZIP 3.9.2 : génération automatique du catalogue proche depuis la dernière recherche.', lastSearch);
     await getNearbyRankedMovies({
       address: lastSearch.address || lastSearch.query || '',
       location: lastSearch.location || null,
@@ -716,7 +740,6 @@ function scheduleNearbyCatalogueAutoBuild() {
 }
 
 window.addEventListener('nearby-catalogue-ranked-ready', () => {
-  console.log('[Catalogue] ZIP 3.8.1 : catalogue actif reçu depuis Catalogue proche. Rafraîchissement de la liste.');
   catalogue = getCatalogueSource();
   sortKey = 'bestNote';
   sortDir = -1;
@@ -725,7 +748,6 @@ window.addEventListener('nearby-catalogue-ranked-ready', () => {
 });
 
 window.addEventListener('cinepro-active-catalogue-ready', (event) => {
-  console.log('[Catalogue] ZIP 3.8.1 : cinepro_active_catalogue reçu. Rafraîchissement.');
   if (Array.isArray(event?.detail?.films) && event.detail.films.length) {
     window.CINEPRO_ACTIVE_CATALOGUE = event.detail.films;
   }
@@ -749,20 +771,14 @@ async function initCatalogue() {
   sortKey = 'bestNote'; sortDir = -1;
   filterTable();
 
-  // 2) Letterboxd ne met à jour QUE les notes Letterboxd.
-  try {
-    await loadLetterboxdCatalogue();
-    filterTable();
-  } catch (error) {
-    console.warn('Letterboxd ignoré, catalogue local conservé :', error.message);
-    catalogue = getCatalogueSource();
-    filterTable();
-  }
+  // 2) Letterboxd ne bloque plus l'ouverture du catalogue.
+  // Si l'API locale n'est pas lancée, on garde le catalogue proche tel quel.
+  loadLetterboxdCatalogue()
+    .then(() => filterTable())
+    .catch((error) => console.warn('Letterboxd ignoré, catalogue local conservé :', error?.message || error));
 
-  // 3) ZIP 3.8.6 : TMDB/OMDb ne bloque plus l'ouverture du catalogue.
-  // La liste s'affiche tout de suite, puis seuls les films incomplets sont enrichis en arrière-plan.
-  filterTable();
-  enrichCatalogueInBackground();
+  // 3) ZIP 3.9.2 : l'enrichissement TMDB/OMDb est déclenché par renderTable()
+  // uniquement sur les films visibles de la page courante.
 }
 
 initCatalogue();
