@@ -282,6 +282,7 @@
 <script src="js/tmdb.js?v=2"></script>
 <script src="js/places.js?v=2"></script>
 <script src="js/pagination.js?v=2"></script>
+<script src="js/storage.js?v=3.9.6"></script>
 <script>
   const params      = new URLSearchParams(window.location.search);
   let searchQuery   = params.get('q') || '';
@@ -289,7 +290,7 @@
   const lat         = parseFloat(params.get('lat'));
   const lng         = parseFloat(params.get('lng'));
   let mapsReady     = false;
-  let currentRadius = 15000; // 15km par défaut
+  let currentRadius = Number(params.get('radius') || params.get('rayon') || 15) * 1000; // 15km par défaut
 
   function updateRadius(val) {
     currentRadius = val * 1000;
@@ -302,6 +303,8 @@
   let currentCinemaForFilm = null;
 
   document.getElementById('main-search').value = searchQuery;
+  document.getElementById('radius-slider').value = Math.round(currentRadius / 1000);
+  document.getElementById('radius-label').textContent = Math.round(currentRadius / 1000) + ' km';
 
   // ── Callback Google Maps ──
   async function initGoogleMaps() {
@@ -331,6 +334,18 @@
     else await searchFilm();
   }
 
+  function saveLastNearbySearch(location) {
+    const payload = {
+      query: searchQuery || 'Ma position',
+      address: searchQuery || 'Ma position',
+      location: location || null,
+      radius: currentRadius,
+      searchDate: new Date().toISOString().slice(0, 10)
+    };
+    if (window.CINEPRO_STORAGE?.writeLastNearbySearch) window.CINEPRO_STORAGE.writeLastNearbySearch(payload);
+    else localStorage.setItem('cinepro_last_nearby_search', JSON.stringify({ ...payload, updatedAt: new Date().toISOString() }));
+  }
+
   // ── RECHERCHE LIEU ──
   async function searchLieu() {
     const list = document.getElementById('cinemas-list');
@@ -352,6 +367,7 @@
         return;
       }
 
+      saveLastNearbySearch(location);
       const cinemas = await PLACES.findNearbycinemas(location, currentRadius);
       if (!cinemas.length) {
         list.innerHTML = `<div class="state-box"><i class="ti ti-building-off"></i><p>Aucun cinéma trouvé dans ce secteur.</p></div>`;

@@ -170,12 +170,35 @@
       <option>Années 1990</option>
       <option>Avant 1990</option>
     </select>
-    <select class="filter-select" id="radius-filter">
-      <option>Rayon : 5 km</option>
-      <option selected>Rayon : 15 km</option>
-      <option>Rayon : 30 km</option>
-      <option>Rayon : 50 km</option>
+    <select class="filter-select" id="radius-filter" onchange="changeCatalogueRadius(this.value)" title="Reconstruit le catalogue proche avec le rayon choisi.">
+      <option value="5000">Rayon : 5 km</option>
+      <option value="15000" selected>Rayon : 15 km</option>
+      <option value="30000">Rayon : 30 km</option>
+      <option value="50000">Rayon : 50 km</option>
     </select>
+    <select class="filter-select" id="format-filter" onchange="filterTable()" title="Filtrer selon le format disponible dans les horaires.">
+      <option value="">VF / VO</option>
+      <option value="vf">VF</option>
+      <option value="vo">VO</option>
+    </select>
+    <select class="filter-select" id="time-filter" onchange="filterTable()" title="Filtrer selon les horaires trouvés.">
+      <option value="">Toutes heures</option>
+      <option value="morning">Matin</option>
+      <option value="afternoon">Après-midi</option>
+      <option value="evening">Soir</option>
+    </select>
+    <select class="filter-select" id="cinema-filter" onchange="filterTable()" title="Filtrer par cinéma proche.">
+      <option value="">Tous les cinémas</option>
+    </select>
+    <select class="filter-select" id="sort-filter" onchange="changeCatalogueSort(this.value)" title="Choisir le tri du catalogue.">
+      <option value="bestNote" selected>Tri : note</option>
+      <option value="distance">Tri : distance</option>
+      <option value="annee">Tri : nouveauté</option>
+      <option value="showtimesCount">Tri : nombre de séances</option>
+    </select>
+    <button class="filter-select" type="button" onclick="refreshNearbyCatalogue()" title="Reconstruire les séances proches" style="cursor:pointer;">
+      Rafraîchir les séances
+    </button>
     <select class="filter-select" id="catalogue-mode-filter" onchange="setCatalogueMode(this.value)" title="Le Catalogue affiche maintenant les meilleurs films projetés près de vous.">
       <option value="nearby" selected>Films proches classés</option>
     </select>
@@ -256,9 +279,9 @@
 <script src="js/tmdb.js?v=3.3"></script>
 <script src="js/places.js?v=3.3"></script>
 <script src="js/nearby-catalogue.js?v=3.8.5"></script>
-<script src="js/storage.js?v=3.9.4"></script>
-<script src="js/catalogue-render.js?v=3.9.5"></script>
-<script src="js/catalogue-page.js?v=3.9.5"></script>
+<script src="js/storage.js?v=3.9.6"></script>
+<script src="js/catalogue-render.js?v=3.9.6"></script>
+<script src="js/catalogue-page.js?v=3.9.6"></script>
 <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAx4ILK4VPFvYxaZX-HwpUPMEOpkQLJEmE&libraries=places&language=fr&callback=initNearbyCatalogueGoogleMaps"></script>
 </body>
 </html>
