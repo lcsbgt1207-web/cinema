@@ -1,7 +1,5 @@
 /* ═══════════════════════════════════════
-   ZIP 3.6.2 : onglets jours complets + versions VF/VO dans les séances.
-
-   CinéProche — Données & utilitaires partagés — ZIP 3.6
+   CinéProche — Données & utilitaires partagés
    ═══════════════════════════════════════ */
 
 // ── Couleurs affiches ──
@@ -692,19 +690,8 @@ function getPopupBestRating(film) {
 
 function getPopupCinemas(film) {
   const nearby = Array.isArray(film?.nearbyCinemas) ? film.nearbyCinemas : [];
-  const fallback = Array.isArray(film?.cinemas) ? film.cinemas : [];
-  const source = nearby.length ? nearby : fallback;
-  return source
-    .filter(cinema => cinema && (cinema.nom || cinema.name))
-    .map(cinema => ({
-      ...cinema,
-      horaires: normalizePopupHoraires(cinema.horaires || cinema.showtimes || cinema.seances || cinema.sessions || [])
-    }))
-    .sort((a, b) => {
-      const da = Number(a.distanceKm ?? a.dist ?? 9999);
-      const db = Number(b.distanceKm ?? b.dist ?? 9999);
-      return da - db;
-    });
+  const cinemas = nearby.length ? nearby : (Array.isArray(film?.cinemas) ? film.cinemas : []);
+  return cinemas.filter(cinema => cinema && (cinema.nom || cinema.name));
 }
 
 
@@ -714,15 +701,29 @@ function getStartOfLocalDay(date) {
   return d;
 }
 
+function normalizePopupVersion(value) {
+  const raw = String(value || '').trim().toUpperCase();
+  if (!raw) return '';
+  if (raw.includes('VOST')) return 'VOST';
+  if (raw.includes('SUB') || raw.includes('ORIGINAL') || raw === 'VO') return 'VO';
+  if (raw.includes('DUB') || raw.includes('VF') || raw.includes('FRENCH') || raw.includes('FRANCAIS') || raw.includes('FRANÇAIS')) return 'VF';
+  return raw.length <= 8 ? raw : '';
+}
+
+function getPopupShowtimeRaw(value) {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'string' || typeof value === 'number' || value instanceof Date) return value;
+  return value.startsAt || value.startAt || value.datetime || value.dateTime || value.showtime || value.showTime || value.time || value.horaire || value.hour || value.heure || value.date || '';
+}
+
 function parsePopupShowtimeDate(value) {
-  if (!value) return null;
-  const raw = typeof value === 'string' ? value : (value?.startsAt || value?.startAt || value?.datetime || value?.dateTime || value?.time || value?.horaire || value?.date || '');
+  const raw = getPopupShowtimeRaw(value);
   if (!raw) return null;
 
-  const normalized = String(raw).trim();
-  if (!normalized) return null;
-  const normalizedLower = normalized.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  const timeMatch = normalized.match(/(\d{1,2})[h:](\d{2})/);
+  const text = String(raw).trim();
+  if (!text) return null;
+  const normalizedLower = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const timeMatch = text.match(/(\d{1,2})[h:](\d{2})/);
 
   if (timeMatch && /aujourd/.test(normalizedLower)) {
     const d = getStartOfLocalDay(new Date());
@@ -736,15 +737,17 @@ function parsePopupShowtimeDate(value) {
     return d;
   }
 
-  // Cas simple : horaire seul comme "13:10" ou "13h10".
-  // On le rattache à aujourd'hui, puis le filtre masquera l'horaire s'il est déjà passé.
-  if (/^\d{1,2}[h:]\d{2}$/i.test(normalized) && timeMatch) {
-    const d = getStartOfLocalDay(new Date());
-    d.setHours(Number(timeMatch[1]), Number(timeMatch[2]), 0, 0);
-    return d;
+  // Cas simple : heure seule comme 13h10. On ne peut pas deviner le jour.
+  if (/^\d{1,2}[h:]\d{2}$/i.test(text)) return null;
+
+  const isoMatch = text.match(/(20\d{2}-\d{2}-\d{2})(?:[T\s]+(\d{1,2})[:h](\d{2}))?/);
+  if (isoMatch) {
+    const [, day, hour = '0', minute = '0'] = isoMatch;
+    const d = new Date(`${day}T${String(hour).padStart(2, '0')}:${minute}:00`);
+    return Number.isNaN(d.getTime()) ? null : d;
   }
 
-  const date = new Date(normalized);
+  const date = new Date(text);
   if (Number.isNaN(date.getTime())) return null;
   return date;
 }
@@ -754,21 +757,23 @@ function isPopupShowtimeInNextSevenDays(value) {
   if (!date) return true;
 
   const today = getStartOfLocalDay(new Date());
-  const maxDayExclusive = new Date(today);
-  maxDayExclusive.setDate(today.getDate() + 8);
+  const showtimeDay = getStartOfLocalDay(date);
+  const maxDay = new Date(today);
+  maxDay.setDate(today.getDate() + 7);
 
-  return date >= today && date < maxDayExclusive;
+  return showtimeDay >= today && showtimeDay <= maxDay;
 }
 
-function isPopupShowtimeUpcoming(value) {
-  const date = parsePopupShowtimeDate(value);
-  if (!date) return true;
-  const now = new Date();
-  return date >= now && isPopupShowtimeInNextSevenDays(value);
+function getPopupShowtimeVersion(value) {
+  if (!value || typeof value !== 'object') return '';
+  return normalizePopupVersion(
+    value.version || value.diffusionVersion || value.format || value.language || value.lang ||
+    value.versionLabel || value.localizedVersion || value.projectionVersion || value?.version?.label || value?.version?.name
+  );
 }
 
 function formatPopupShowtime(value) {
-  const raw = typeof value === 'string' ? value : (value?.startsAt || value?.startAt || value?.datetime || value?.dateTime || value?.time || value?.horaire || value?.date || 'Horaire');
+  const raw = getPopupShowtimeRaw(value);
   const text = String(raw || '').trim();
   const date = parsePopupShowtimeDate(value);
 
@@ -789,23 +794,79 @@ function formatPopupShowtime(value) {
   return `${day} · ${time}`;
 }
 
-function normalizePopupHoraires(horaires) {
-  if (!Array.isArray(horaires)) return [];
-  const normalized = horaires
-    .map(raw => ({ raw, date: parsePopupShowtimeDate(raw), label: formatPopupShowtime(raw) }))
-    .filter(item => item.label && isPopupShowtimeInNextSevenDays(item.raw));
+function getPopupDayLabel(date) {
+  const today = getStartOfLocalDay(new Date());
+  const day = getStartOfLocalDay(date);
+  const diff = Math.round((day - today) / 86400000);
+  if (diff === 0) return 'Aujourd’hui';
+  if (diff === 1) return 'Demain';
+  const label = new Intl.DateTimeFormat('fr-FR', { weekday: 'short', day: 'numeric' }).format(date);
+  return label.charAt(0).toUpperCase() + label.slice(1).replace('.', '');
+}
 
-  normalized.sort((a, b) => {
-    if (a.date && b.date) return a.date - b.date;
-    if (a.date) return -1;
-    if (b.date) return 1;
-    return String(a.label).localeCompare(String(b.label), 'fr');
-  });
+function getPopupShowtimeTime(date, fallback = '') {
+  if (date instanceof Date && !Number.isNaN(date.getTime())) {
+    return new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' }).format(date).replace(':', 'h');
+  }
+  const match = String(fallback || '').match(/(\d{1,2})[h:](\d{2})/);
+  return match ? `${match[1].padStart(2, '0')}h${match[2]}` : String(fallback || '').trim();
+}
+
+function collectPopupCinemaShowtimes(cinema) {
+  const collected = [];
+  const seenObjects = new WeakSet();
+
+  function add(value, inheritedVersion = '') {
+    if (value === null || value === undefined || value === '') return;
+    const raw = getPopupShowtimeRaw(value);
+    const date = parsePopupShowtimeDate(value);
+    if (date && !isPopupShowtimeInNextSevenDays(value)) return;
+    const version = getPopupShowtimeVersion(value) || inheritedVersion || '';
+    const time = getPopupShowtimeTime(date, raw);
+    if (!time) return;
+    collected.push({
+      raw: value,
+      date,
+      dayKey: date ? getStartOfLocalDay(date).toISOString().slice(0, 10) : 'unknown',
+      dayLabel: date ? getPopupDayLabel(date) : 'Séances',
+      time,
+      version,
+      sortTime: date ? date.getTime() : 0
+    });
+  }
+
+  function visit(node, inheritedVersion = '', depth = 0) {
+    if (node === null || node === undefined || depth > 7) return;
+    if (typeof node === 'string' || typeof node === 'number' || node instanceof Date) {
+      add(node, inheritedVersion);
+      return;
+    }
+    if (typeof node !== 'object') return;
+    if (seenObjects.has(node)) return;
+    seenObjects.add(node);
+
+    const version = getPopupShowtimeVersion(node) || inheritedVersion;
+    const direct = getPopupShowtimeRaw(node);
+    if (direct) add(node, version);
+
+    for (const key of ['horaires', 'showtimes', 'seances', 'séances', 'sessions', 'times', 'rawShowtimes']) {
+      const value = node[key];
+      if (Array.isArray(value)) value.forEach(child => visit(child, version, depth + 1));
+    }
+  }
+
+  visit(cinema?.structuredHoraires || []);
+  visit(cinema?.showtimes || []);
+  visit(cinema?.rawShowtimes || []);
+  visit(cinema?.horaires || []);
+  visit(cinema?.seances || []);
+  visit(cinema?.sessions || []);
+  visit(cinema?.times || []);
 
   const unique = [];
   const seen = new Set();
-  for (const item of normalized) {
-    const key = item.date ? item.date.toISOString().slice(0, 16) : item.label;
+  for (const item of collected.sort((a, b) => a.sortTime - b.sortTime || a.time.localeCompare(b.time, 'fr'))) {
+    const key = `${item.dayKey}|${item.time}|${item.version}`;
     if (seen.has(key)) continue;
     seen.add(key);
     unique.push(item);
@@ -813,69 +874,18 @@ function normalizePopupHoraires(horaires) {
   return unique;
 }
 
-function getNextPopupShowtimeLabel(horaires) {
-  const next = normalizePopupHoraires(horaires).find(item => isPopupShowtimeUpcoming(item.raw));
-  return next?.label || '';
-}
-
-function getPopupShowtimeDayKey(date) {
-  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return 'unknown';
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-}
-
-function getPopupDayLabel(date) {
-  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return 'Séances';
-  const today = getStartOfLocalDay(new Date());
-  const tomorrow = new Date(today);
-  tomorrow.setDate(today.getDate() + 1);
-  const showtimeDay = getStartOfLocalDay(date);
-
-  if (showtimeDay.getTime() === today.getTime()) return 'Aujourd’hui';
-  if (showtimeDay.getTime() === tomorrow.getTime()) return 'Demain';
-
-  const label = new Intl.DateTimeFormat('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' }).format(date);
-  return label.charAt(0).toUpperCase() + label.slice(1).replace('.', '');
-}
-
-function formatPopupShowtimeHourOnly(item) {
-  const label = String(item?.label || item || '').trim();
-  const versionMatch = label.match(/(?:·|-)\s*(VF|VO|VOSTFR|VOST)\s*$/i);
-  const versionLabel = versionMatch ? ` ${versionMatch[1].toUpperCase()}` : '';
-  const date = item?.date || parsePopupShowtimeDate(item?.raw || item);
-  if (date instanceof Date && !Number.isNaN(date.getTime())) {
-    const time = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' }).format(date).replace(':', 'h');
-    return `${time}${versionLabel}`;
+function groupPopupShowtimesByDay(showtimes) {
+  const groups = [];
+  const byKey = new Map();
+  for (const showtime of showtimes) {
+    if (!byKey.has(showtime.dayKey)) {
+      const group = { key: showtime.dayKey, label: showtime.dayLabel, showtimes: [] };
+      byKey.set(showtime.dayKey, group);
+      groups.push(group);
+    }
+    byKey.get(showtime.dayKey).showtimes.push(showtime);
   }
-  return label
-    .replace(/^Aujourd’hui\s*[·à-]*\s*/i, '')
-    .replace(/^Demain\s*[·à-]*\s*/i, '')
-    .replace(/^[A-ZÀ-ÿ][A-Za-zÀ-ÿ.]*\s+\d{1,2}\s+[A-Za-zÀ-ÿ.]+\s*[·à-]*\s*/i, '')
-    .trim();
-}
-
-function groupPopupHorairesByDay(horaires) {
-  const normalized = normalizePopupHoraires(horaires);
-  const upcoming = normalized.filter(item => isPopupShowtimeUpcoming(item.raw));
-  const useful = upcoming.length ? upcoming : normalized;
-  const groupsMap = new Map();
-
-  for (const item of useful) {
-    const date = item.date || parsePopupShowtimeDate(item.raw);
-    const key = getPopupShowtimeDayKey(date);
-    const label = getPopupDayLabel(date);
-    if (!groupsMap.has(key)) groupsMap.set(key, { key, label, date, items: [] });
-    groupsMap.get(key).items.push(item);
-  }
-
-  return Array.from(groupsMap.values()).sort((a, b) => {
-    if (a.date && b.date) return a.date - b.date;
-    if (a.date) return -1;
-    if (b.date) return 1;
-    return a.label.localeCompare(b.label, 'fr');
-  });
+  return groups;
 }
 
 function buildPopupSeancesHTML(cinemas) {
@@ -883,69 +893,49 @@ function buildPopupSeancesHTML(cinemas) {
     return `<div class="empty-seances">Aucune séance proche n’est encore associée à ce film. Lance une recherche de cinémas proches pour remplir cette zone.</div>`;
   }
 
-  const sortedCinemas = [...cinemas]
-    .filter(cinema => cinema && (cinema.nom || cinema.name))
-    .sort((a, b) => {
-      const da = Number(a.distanceKm ?? a.dist);
-      const db = Number(b.distanceKm ?? b.dist);
-      if (Number.isFinite(da) && Number.isFinite(db)) return da - db;
-      if (Number.isFinite(da)) return -1;
-      if (Number.isFinite(db)) return 1;
-      return String(a.nom || a.name || '').localeCompare(String(b.nom || b.name || ''), 'fr');
-    })
-    .slice(0, 8);
+  return `<div class="popup-seances-list">${cinemas
+    .slice()
+    .sort((a, b) => Number(a.distanceKm ?? a.dist ?? 9999) - Number(b.distanceKm ?? b.dist ?? 9999))
+    .slice(0, 8)
+    .map((cinema, cinemaIndex) => {
+      const nom = cinema.nom || cinema.name || 'Cinéma';
+      const distance = Number(cinema.distanceKm ?? cinema.dist);
+      const distanceLabel = Number.isFinite(distance) ? ` · ${distance.toFixed(1)} km` : '';
+      const showtimes = collectPopupCinemaShowtimes(cinema);
+      const groups = groupPopupShowtimesByDay(showtimes);
+      const next = showtimes[0] || null;
+      const nextLabel = next ? `${next.dayLabel} · ${next.time}${next.version ? ` ${next.version}` : ''}` : '';
+      const uid = `popup-${cinemaIndex}-${String(nom).replace(/[^a-z0-9]+/gi, '-').toLowerCase()}`;
 
-  return `<div class="popup-seances-list">${sortedCinemas.map((cinema, cinemaIndex) => {
-    const nom = cinema.nom || cinema.name || 'Cinéma';
-    const distance = Number(cinema.distanceKm ?? cinema.dist);
-    const distanceLabel = Number.isFinite(distance) ? ` · ${distance.toFixed(1)} km` : '';
-    const groups = groupPopupHorairesByDay(cinema.horaires || []);
-    const nextLabel = getNextPopupShowtimeLabel(cinema.horaires || []);
-
-    const horairesHTML = groups.length
-      ? `<div class="popup-next-showtime">${nextLabel ? `Prochaine séance : <strong>${escapeHTML(nextLabel)}</strong>` : 'Séances à venir'}</div>
-         <div class="popup-day-tabs" role="tablist" aria-label="Jours de séances">
-           ${groups.map((group, groupIndex) => `<button class="popup-day-tab${groupIndex === 0 ? ' active' : ''}" type="button" role="tab" aria-selected="${groupIndex === 0 ? 'true' : 'false'}" onclick="togglePopupSeanceDay(${cinemaIndex}, '${escapeHTML(group.key)}')">${escapeHTML(group.label)}</button>`).join('')}
-         </div>
-         <div class="popup-day-panels">
-           ${groups.map((group, groupIndex) => `<div class="popup-day-panel${groupIndex === 0 ? ' active' : ''}" data-popup-cinema="${cinemaIndex}" data-popup-day="${escapeHTML(group.key)}">
-             <div class="popup-showtimes">${group.items.map(item => `<span>${escapeHTML(formatPopupShowtimeHourOnly(item))}</span>`).join('')}</div>
-           </div>`).join('')}
-         </div>`
-      : '<div class="popup-showtimes-muted">Aucune séance dans les 7 prochains jours.</div>';
-
-    return `<div class="popup-cinema-row">
-      <div class="popup-cinema-name"><i class="ti ti-map-pin"></i>${escapeHTML(nom)}${distanceLabel}</div>
-      ${horairesHTML}
-    </div>`;
-  }).join('')}</div>`;
+      const horairesHTML = groups.length
+        ? `<div class="popup-next-showtime">🎬 Prochaine séance : <strong>${escapeHTML(nextLabel)}</strong></div>
+           <div class="popup-showtime-day-tabs" role="tablist">${groups.map((group, index) => `
+             <button type="button" class="popup-day-tab${index === 0 ? ' active' : ''}" data-day-target="${escapeHTML(uid)}-${index}">${escapeHTML(group.label)}</button>
+           `).join('')}</div>
+           ${groups.map((group, index) => `
+             <div class="popup-day-panel${index === 0 ? ' active' : ''}" data-day-panel="${escapeHTML(uid)}-${index}">
+               <div class="popup-showtimes">${group.showtimes.map(item => `
+                 <span class="popup-showtime-pill"><strong>${escapeHTML(item.time)}</strong>${item.version ? `<em>${escapeHTML(item.version)}</em>` : ''}</span>
+               `).join('')}</div>
+             </div>
+           `).join('')}`
+        : '<div class="popup-showtimes-muted">Aucune séance dans les 7 prochains jours.</div>';
+      return `<div class="popup-cinema-row">
+        <div class="popup-cinema-name"><i class="ti ti-map-pin"></i>${escapeHTML(nom)}${distanceLabel}</div>
+        ${horairesHTML}
+      </div>`;
+    }).join('')}</div>`;
 }
 
-function togglePopupSeanceDay(cinemaIndex, dayKey) {
-  const tabSelector = `.popup-day-tab[onclick*="togglePopupSeanceDay(${cinemaIndex},"]`;
-  document.querySelectorAll(tabSelector).forEach(tab => {
-    const isActive = tab.getAttribute('onclick')?.includes(`'${dayKey}'`);
-    tab.classList.toggle('active', Boolean(isActive));
-    tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
-  });
-
-  document.querySelectorAll(`.popup-day-panel[data-popup-cinema="${cinemaIndex}"]`).forEach(panel => {
-    panel.classList.toggle('active', panel.dataset.popupDay === dayKey);
-  });
-}
-window.togglePopupSeanceDay = togglePopupSeanceDay;
-
-function togglePopupShowtimes(hiddenId, button) {
-  const node = document.getElementById(hiddenId);
-  if (!node) return;
-  node.classList.toggle('open');
-  if (button) button.textContent = node.classList.contains('open') ? 'Réduire' : button.dataset.originalLabel || button.textContent;
-}
-window.togglePopupShowtimes = function(hiddenId, button) {
-  if (button && !button.dataset.originalLabel) button.dataset.originalLabel = button.textContent;
-  togglePopupShowtimes(hiddenId, button);
-};
-
+document.addEventListener('click', function(event) {
+  const tab = event.target.closest?.('.popup-day-tab');
+  if (!tab) return;
+  const target = tab.dataset.dayTarget;
+  const row = tab.closest('.popup-cinema-row');
+  if (!target || !row) return;
+  row.querySelectorAll('.popup-day-tab').forEach(button => button.classList.toggle('active', button === tab));
+  row.querySelectorAll('.popup-day-panel').forEach(panel => panel.classList.toggle('active', panel.dataset.dayPanel === target));
+});
 
 async function loadCachedSynopsisForCatalogue(film) {
   const imdbId = String(film?.imdbID || film?.imdbId || '').trim();
