@@ -1,34 +1,49 @@
-// ZIP 3.9.3 — Stockage local centralisé CinéProche.
-// Rôle : éviter que chaque page manipule localStorage avec ses propres clés et ses propres try/catch.
-// Ce fichier est volontairement léger : il ne change pas le comportement visible, il rend seulement les accès plus sûrs et plus lisibles.
-
+/* CinéProche — Stockage local partagé — ZIP 3.9.4
+   Objectif : éviter que chaque page manipule localStorage avec ses propres clés.
+   Ce fichier est volontairement simple : il expose des fonctions sûres et non bloquantes.
+*/
 (function () {
   'use strict';
 
-  const KEYS = Object.freeze({
-    catalogueMode: 'cinepro_catalogue_mode',
-    activeCatalogue: 'cinepro_active_catalogue',
-    nearbyRankedCatalogue: 'cinepro_nearby_ranked_catalogue',
-    runtimeCatalogue: 'cinepro_runtime_catalogue',
-    lastNearbySearch: 'cinepro_last_nearby_search',
-    favourites: 'cinepro_favs',
-    billets: 'cinepro_billets',
-    agenda: 'cinepro_agenda',
-    userLat: 'cinepro_user_lat',
-    userLng: 'cinepro_user_lng',
-    debug: 'cinepro_debug'
-  });
+  const KEYS = {
+    ACTIVE_CATALOGUE: 'cinepro_active_catalogue',
+    NEARBY_RANKED_CATALOGUE: 'cinepro_nearby_ranked_catalogue',
+    RUNTIME_CATALOGUE: 'cinepro_runtime_catalogue',
+    LAST_NEARBY_SEARCH: 'cinepro_last_nearby_search',
+    CATALOGUE_MODE: 'cinepro_catalogue_mode',
+    FAVS: 'cinepro_favs',
+    DEBUG: 'cinepro_debug'
+  };
 
-  function readRaw(key, fallback = null) {
+  function readJSON(key, fallback = null) {
     try {
-      const value = localStorage.getItem(key);
-      return value === null ? fallback : value;
+      const raw = localStorage.getItem(key);
+      if (raw === null || raw === undefined || raw === '') return fallback;
+      return JSON.parse(raw);
     } catch (_) {
       return fallback;
     }
   }
 
-  function writeRaw(key, value) {
+  function writeJSON(key, value) {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function readText(key, fallback = '') {
+    try {
+      const raw = localStorage.getItem(key);
+      return raw === null || raw === undefined ? fallback : raw;
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  function writeText(key, value) {
     try {
       localStorage.setItem(key, String(value));
       return true;
@@ -46,92 +61,41 @@
     }
   }
 
-  function readJSON(key, fallback = null) {
-    try {
-      const value = localStorage.getItem(key);
-      if (value === null || value === undefined || value === '') return fallback;
-      return JSON.parse(value);
-    } catch (_) {
-      return fallback;
-    }
-  }
-
-  function writeJSON(key, value) {
-    try {
-      localStorage.setItem(key, JSON.stringify(value));
-      return true;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  function readArray(key) {
-    const value = readJSON(key, []);
-    return Array.isArray(value) ? value : [];
-  }
-
-  function readObject(key) {
-    const value = readJSON(key, null);
-    return value && typeof value === 'object' && !Array.isArray(value) ? value : null;
-  }
-
-  function clearNearbyCatalogue() {
-    remove(KEYS.runtimeCatalogue);
-    remove(KEYS.nearbyRankedCatalogue);
-    remove(KEYS.activeCatalogue);
-  }
-
-  function saveNearbyCatalogue({ runtimePayload, nearbyPayload, activePayload } = {}) {
-    if (runtimePayload) writeJSON(KEYS.runtimeCatalogue, runtimePayload);
-    if (nearbyPayload) writeJSON(KEYS.nearbyRankedCatalogue, nearbyPayload);
-    if (activePayload) writeJSON(KEYS.activeCatalogue, activePayload);
-  }
-
-  function readActiveCataloguePayload() {
-    return readObject(KEYS.activeCatalogue);
-  }
-
-  function readNearbyRankedPayload() {
-    return readObject(KEYS.nearbyRankedCatalogue);
-  }
-
-  function readRuntimeCataloguePayload() {
-    return readObject(KEYS.runtimeCatalogue);
-  }
-
   function readLastNearbySearch() {
-    return readObject(KEYS.lastNearbySearch);
+    const payload = readJSON(KEYS.LAST_NEARBY_SEARCH, null);
+    return payload && typeof payload === 'object' ? payload : null;
   }
 
-  function readFavourites() {
-    return readArray(KEYS.favourites);
+  function readFavorites() {
+    const favorites = readJSON(KEYS.FAVS, []);
+    return Array.isArray(favorites) ? favorites : [];
   }
 
-  function writeFavourites(favourites) {
-    return writeJSON(KEYS.favourites, Array.isArray(favourites) ? favourites : []);
+  function writeFavorites(values) {
+    return writeJSON(KEYS.FAVS, Array.isArray(values) ? values : []);
   }
 
-  function isDebugEnabled() {
-    return readRaw(KEYS.debug, '') === '1';
+  function setCatalogueMode(mode = 'nearby') {
+    return writeText(KEYS.CATALOGUE_MODE, mode);
   }
 
-  window.CineProStorage = Object.freeze({
+  function clearCatalogueCaches() {
+    remove(KEYS.ACTIVE_CATALOGUE);
+    remove(KEYS.NEARBY_RANKED_CATALOGUE);
+    remove(KEYS.RUNTIME_CATALOGUE);
+  }
+
+  window.CINEPRO_STORAGE = {
     KEYS,
-    readRaw,
-    writeRaw,
-    remove,
     readJSON,
     writeJSON,
-    readArray,
-    readObject,
-    clearNearbyCatalogue,
-    saveNearbyCatalogue,
-    readActiveCataloguePayload,
-    readNearbyRankedPayload,
-    readRuntimeCataloguePayload,
+    readText,
+    writeText,
+    remove,
     readLastNearbySearch,
-    readFavourites,
-    writeFavourites,
-    isDebugEnabled
-  });
+    readFavorites,
+    writeFavorites,
+    setCatalogueMode,
+    clearCatalogueCaches
+  };
 })();
