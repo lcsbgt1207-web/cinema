@@ -597,7 +597,7 @@ async function loadLetterboxdCatalogue() {
     if (isCatalogueDebugEnabled()) console.log(`[Catalogue] ZIP 4.0 : notes Letterboxd mises à jour (${updated}).`);
     return true;
   } catch (error) {
-    console.warn('API Letterboxd non disponible, catalogue statique utilisé :', error.message);
+    if (isCatalogueDebugEnabled()) console.info('[Catalogue] API Letterboxd locale indisponible, catalogue statique utilisé.');
     return false;
   }
 }
