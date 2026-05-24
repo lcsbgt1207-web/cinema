@@ -322,10 +322,16 @@
   }
 
   function isFreshNearbyPayload(payload) {
-    // ZIP 3.6.6 : on refuse les anciens caches pour éviter les séances d'hier.
-    if (!payload || payload.version !== '3.6.6') return false;
+    // ZIP 3.6.7 : on refuse les anciens caches pour éviter les séances d'hier.
+    // En plus de la date locale, on impose une durée de vie courte : si la recherche
+    // date de plus de 30 minutes, le Catalogue reconstruit automatiquement les films proches.
+    if (!payload || payload.version !== '3.6.7') return false;
     if (!Array.isArray(payload.films) || !payload.films.length) return false;
-    return getLocalDateKey(payload.updatedAt) === getLocalDateKey(new Date());
+    if (getLocalDateKey(payload.updatedAt) !== getLocalDateKey(new Date())) return false;
+    const updatedAt = new Date(payload.updatedAt).getTime();
+    if (!Number.isFinite(updatedAt)) return false;
+    const maxAgeMs = 30 * 60 * 1000;
+    return Date.now() - updatedAt <= maxAgeMs;
   }
 
   function readStoredRuntimeCatalogue() {
@@ -416,7 +422,7 @@
       merged.push(prepared);
     });
 
-    console.log(`[Catalogue] ZIP 3.6.6 : ${active.label} utilisé (${merged.length} films).`);
+    console.log(`[Catalogue] ZIP 3.6.7 : ${active.label} utilisé (${merged.length} films).`);
     return merged;
   }
 
@@ -427,7 +433,12 @@
     localStorage.setItem('cinepro_catalogue_mode', 'nearby');
     select.value = 'nearby';
     const nearbyOption = select.querySelector('option[value="nearby"]');
-    if (nearbyOption) nearbyOption.textContent = hasNearbyCatalogue() ? 'Films proches classés' : 'Films proches classés — lance une recherche';
+    if (nearbyOption) {
+      const count = (Array.isArray(window.NEARBY_CATALOGUE_NEARBY_RANKED) && window.NEARBY_CATALOGUE_NEARBY_RANKED.length)
+        ? window.NEARBY_CATALOGUE_NEARBY_RANKED.length
+        : readStoredNearbyCatalogue().length;
+      nearbyOption.textContent = count ? `Films proches classés — ${count} films` : 'Films proches classés — lance une recherche';
+    }
   }
 
   function setCatalogueMode(_mode) {
@@ -802,7 +813,7 @@
   let nearbyAutoBuildRunning = false;
   async function autoBuildNearbyCatalogueFromLastSearch() {
     if (hasNearbyCatalogue() || nearbyAutoBuildRunning) return true;
-    // ZIP 3.6.6 : avant de reconstruire, on nettoie les caches périmés.
+    // ZIP 3.6.7 : avant de reconstruire, on nettoie les caches périmés.
     try {
       localStorage.removeItem('cinepro_runtime_catalogue');
       localStorage.removeItem('cinepro_nearby_ranked_catalogue');
@@ -813,7 +824,7 @@
 
     nearbyAutoBuildRunning = true;
     try {
-      console.log('[Catalogue] ZIP 3.6.6 : génération automatique du catalogue proche depuis la dernière recherche.', lastSearch);
+      console.log('[Catalogue] ZIP 3.6.7 : génération automatique du catalogue proche depuis la dernière recherche.', lastSearch);
       await getNearbyRankedMovies({
         address: lastSearch.address || lastSearch.query || '',
         location: lastSearch.location || null,
@@ -826,7 +837,7 @@
       filterTable();
       return true;
     } catch (error) {
-      console.warn('[Catalogue] ZIP 3.6.6 : génération automatique impossible pour le moment :', error?.message || error);
+      console.warn('[Catalogue] ZIP 3.6.7 : génération automatique impossible pour le moment :', error?.message || error);
       return false;
     } finally {
       nearbyAutoBuildRunning = false;
@@ -847,7 +858,7 @@
   }
 
   window.addEventListener('nearby-catalogue-ranked-ready', () => {
-    console.log('[Catalogue] ZIP 3.6.6 : fusion runtime reçue depuis Catalogue proche. Rafraîchissement de la liste.');
+    console.log('[Catalogue] ZIP 3.6.7 : fusion runtime reçue depuis Catalogue proche. Rafraîchissement de la liste.');
     catalogue = getCatalogueSource();
     sortKey = 'bestNote';
     sortDir = -1;

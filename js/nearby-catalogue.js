@@ -1304,26 +1304,38 @@
 
   function normalizeExportedNearbyShowtimes(values) {
     if (!Array.isArray(values)) return [];
-    const normalized = [];
-    const seen = new Set();
+    const byTime = new Map();
+    const extras = [];
 
     for (const value of values) {
       const rawDate = value?.startsAt || value?.startAt || value?.datetime || value?.dateTime || value?.showtime || value?.showTime || value?.time || value?.horaire || value?.date || value;
       const parsed = parseShowtimeDate(rawDate);
       if (!parsed || !isShowtimeInNearbyWindow(parsed)) continue;
-      const key = `${parsed.toISOString().slice(0, 16)}|${getExportedShowtimeVersion(value)}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      normalized.push({
+      const version = getExportedShowtimeVersion(value);
+      const item = {
         startsAt: `${formatLocalDateYYYYMMDD(parsed)}T${String(parsed.getHours()).padStart(2, '0')}:${String(parsed.getMinutes()).padStart(2, '0')}:00`,
         label: formatNearbyShowtime(parsed),
         time: parsed.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }).replace(':', 'h'),
-        version: getExportedShowtimeVersion(value),
+        version,
         rawVersion: value?.diffusionVersion || value?.version || value?.format || ''
-      });
+      };
+
+      const baseKey = item.startsAt.slice(0, 16);
+      const existing = byTime.get(baseKey);
+      if (!existing) {
+        byTime.set(baseKey, item);
+        continue;
+      }
+      if (!existing.version && item.version) {
+        byTime.set(baseKey, item);
+        continue;
+      }
+      if (existing.version && item.version && existing.version !== item.version) {
+        extras.push(item);
+      }
     }
 
-    return normalized.sort((a, b) => String(a.startsAt).localeCompare(String(b.startsAt)));
+    return [...byTime.values(), ...extras].sort((a, b) => String(a.startsAt).localeCompare(String(b.startsAt)));
   }
 
   function normalizeExportedNearbyHoraires(horaires) {
@@ -1332,7 +1344,7 @@
 
   function collectExportedCinemaShowtimes(cinema) {
     const raw = [];
-    // ZIP 3.6.6 : priorité absolue aux objets bruts de l'API.
+    // ZIP 3.6.7 : priorité absolue aux objets bruts de l'API.
     // Ils contiennent startsAt + diffusionVersion, donc ils permettent d'afficher VF/VO.
     for (const key of ['rawShowtimes', 'showtimes', 'structuredHoraires', 'horaires', 'seances', 'sessions', 'times']) {
       const value = cinema?.[key];
@@ -1429,10 +1441,10 @@
     }
     if (!location) location = await window.PLACES.geolocate();
 
-    console.log('[Catalogue proche] ZIP 3.6.6 actif — rafraîchissement séances + versions VF/VO.');
+    console.log('[Catalogue proche] ZIP 3.6.7 actif — rafraîchissement séances + versions VF/VO.');
     console.log('[Catalogue proche] Position utilisée :', location);
 
-    // ZIP 3.6.6 : une nouvelle recherche remplace toujours l'ancien cache.
+    // ZIP 3.6.7 : une nouvelle recherche remplace toujours l'ancien cache.
     // Cela évite de garder des horaires d'hier dans la popup.
     try {
       localStorage.removeItem('cinepro_runtime_catalogue');
@@ -1641,14 +1653,14 @@
 
     try {
       const storedPayload = {
-        version: '3.6.6',
+        version: '3.6.7',
         updatedAt: new Date().toISOString(),
         films: runtimeFusion.films,
         tmdbRuntimeFilms: runtimeFusion.tmdbRuntimeFilms,
         stats: window.NEARBY_CATALOGUE_STATS
       };
       const nearbyPayload = {
-        version: '3.6.6',
+        version: '3.6.7',
         updatedAt: new Date().toISOString(),
         address: options.address || '',
         radius,
@@ -1657,7 +1669,7 @@
       };
       localStorage.setItem('cinepro_runtime_catalogue', JSON.stringify(storedPayload));
       localStorage.setItem('cinepro_nearby_ranked_catalogue', JSON.stringify(nearbyPayload));
-      console.log(`[Catalogue proche] ZIP 3.6.6 : catalogue proche rafraîchi et sauvegardé (${nearbyRankedCatalogue.length} films).`);
+      console.log(`[Catalogue proche] ZIP 3.6.7 : catalogue proche rafraîchi et sauvegardé (${nearbyRankedCatalogue.length} films).`);
       window.dispatchEvent(new CustomEvent('nearby-catalogue-runtime-ready', { detail: storedPayload }));
       window.dispatchEvent(new CustomEvent('nearby-catalogue-ranked-ready', { detail: nearbyPayload }));
     } catch (storageError) {

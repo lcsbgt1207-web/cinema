@@ -630,7 +630,7 @@ function buildPopupHTML(film) {
   const duree = film.duree || (film.runtime ? `${film.runtime} min` : '') || 'Durée inconnue';
   const annee = film.annee || film.year || '';
   const cinemas = getPopupCinemas(film);
-  console.log('[Popup] ZIP 3.6.6 : cinémas utilisés pour la fiche film', title, cinemas);
+  console.log('[Popup] ZIP 3.6.7 : cinémas utilisés pour la fiche film', title, cinemas);
   const seancesHTML = buildPopupSeancesHTML(cinemas);
 
   return `
@@ -894,15 +894,31 @@ function collectPopupCinemaShowtimes(cinema) {
   visit(cinema?.sessions || []);
   visit(cinema?.times || []);
 
-  const unique = [];
-  const seen = new Set();
+  // ZIP 3.6.7 : les horaires peuvent exister deux fois :
+  // - en texte simple : "Aujourd’hui à 13h10"
+  // - en objet structuré : { startsAt: ..., version: "VF" }
+  // On privilégie toujours l'objet structuré avec version pour afficher VF/VO,
+  // puis on déduplique proprement par jour + heure.
+  const byTime = new Map();
+  const extras = [];
   for (const item of collected.sort((a, b) => a.sortTime - b.sortTime || a.time.localeCompare(b.time, 'fr'))) {
-    const key = `${item.dayKey}|${item.time}|${item.version}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    unique.push(item);
+    const baseKey = `${item.dayKey}|${item.time}`;
+    const existing = byTime.get(baseKey);
+    if (!existing) {
+      byTime.set(baseKey, item);
+      continue;
+    }
+    if (!existing.version && item.version) {
+      byTime.set(baseKey, item);
+      continue;
+    }
+    if (existing.version && item.version && existing.version !== item.version) {
+      extras.push(item);
+    }
   }
-  return unique;
+
+  return [...byTime.values(), ...extras]
+    .sort((a, b) => a.sortTime - b.sortTime || a.time.localeCompare(b.time, 'fr'));
 }
 
 function groupPopupShowtimesByDay(showtimes) {
