@@ -127,7 +127,7 @@
   <div class="container">
     <div class="header-inner">
       <a href="index.html" class="logo">
-        <img src="img/logo.svg" alt="CinéProche" style="width:32px;height:32px;display:block;" />
+        <div class="logo-icon"><i class="ti ti-movie"></i></div>
         <span class="logo-text">Ciné<span>Proche</span></span>
       </a>
       <div class="header-right">
@@ -137,7 +137,10 @@
           <a href="agenda.html">Mon agenda</a>
           <a href="#contact">Contact</a>
         </nav>
-        <button class="btn-user" onclick="window.location.href='profil.html'"><i class="ti ti-user"></i></button>
+        <button class="btn-menu-mobile" onclick="this.closest('.header-inner').querySelector('.nav').classList.toggle('open')">
+          <i class="ti ti-menu-2"></i>
+        </button>
+        <button class="btn-user" onclick="window.location.href='agenda.html'"><i class="ti ti-user"></i></button>
       </div>
     </div>
   </div>
@@ -349,8 +352,8 @@
   // ── RECHERCHE LIEU ──
   async function searchLieu() {
     const list = document.getElementById('cinemas-list');
-    list.innerHTML = `<div class="state-box"><i class="ti ti-loader"></i><p>Recherche des cinémas…</p></div>`;
-    document.getElementById('results-info').innerHTML = `<i class="ti ti-loader"></i> Recherche en cours…`;
+    list.innerHTML = `<div class="state-box"><i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block;"></i><p>Recherche des cinémas…</p></div>`;
+    document.getElementById('results-info').innerHTML = `<i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block;"></i> Recherche en cours…`;
 
     try {
       let location;
@@ -438,7 +441,7 @@
 
   // ── RECHERCHE FILM ──
   async function searchFilm() {
-    document.getElementById('film-banner-wrap').innerHTML = `<div class="state-box"><i class="ti ti-loader"></i><p>Recherche du film…</p></div>`;
+    document.getElementById('film-banner-wrap').innerHTML = `<div class="state-box"><i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block;"></i><p>Recherche du film…</p></div>`;
     document.getElementById('film-cinemas-list').innerHTML = '';
 
     try {

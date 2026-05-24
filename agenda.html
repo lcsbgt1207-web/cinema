@@ -295,7 +295,10 @@
           <a href="agenda.html" class="active"><i class="ti ti-calendar"></i><span>Mon agenda</span></a>
           <a href="#contact"><i class="ti ti-mail"></i><span>Contact</span></a>
         </nav>
-        <button class="btn-user" id="user-btn" title="Mon profil" onclick="window.location.href='profil.html'">
+        <button class="btn-menu-mobile" onclick="this.closest('.header-inner').querySelector('.nav').classList.toggle('open')">
+          <i class="ti ti-menu-2"></i>
+        </button>
+        <button class="btn-user" id="user-btn" title="Mon profil">
           <i class="ti ti-user"></i>
         </button>
       </div>

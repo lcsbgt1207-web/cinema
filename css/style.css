@@ -500,6 +500,32 @@ img { max-width: 100%; display: block; }
 
 
 /* ══════════════════════════════
+   MENU HAMBURGER MOBILE
+══════════════════════════════ */
+.btn-menu-mobile {
+  display: none;
+  background: none;
+  border: 0.5px solid var(--gray-200);
+  border-radius: var(--radius-md);
+  padding: 7px 10px;
+  cursor: pointer;
+  font-size: 18px;
+  color: var(--black);
+}
+@media (max-width: 768px) {
+  .btn-menu-mobile { display: flex; align-items: center; justify-content: center; }
+  .nav.open { display: flex; flex-direction: column; position: absolute; top: 66px; left: 0; right: 0; background: var(--white); border-bottom: 0.5px solid var(--gray-200); padding: 12px 24px; gap: 16px; z-index: 100; }
+}
+
+/* ══════════════════════════════
+   ANIMATION SPIN (loader)
+══════════════════════════════ */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* ══════════════════════════════
    POPUP FILM — nouvelle mise en page catalogue
    ══════════════════════════════ */
 #film-popup.popup {

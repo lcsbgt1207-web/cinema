@@ -84,7 +84,10 @@
           <a href="agenda.html"><i class="ti ti-calendar"></i><span>Mon agenda</span></a>
           <a href="#contact"><i class="ti ti-mail"></i><span>Contact</span></a>
         </nav>
-        <button class="btn-user" title="Mon profil" onclick="window.location.href='profil.html'">
+        <button class="btn-menu-mobile" onclick="this.closest('.header-inner').querySelector('.nav').classList.toggle('open')">
+          <i class="ti ti-menu-2"></i>
+        </button>
+        <button class="btn-user" title="Mon profil" onclick="window.location.href='agenda.html'">
           <i class="ti ti-user"></i>
         </button>
       </div>
@@ -146,7 +149,7 @@
   async function loadStats() {
     try {
       const films = await TMDB.getNowPlaying();
-      document.getElementById('stat-films').textContent = films.length + '+';
+      document.getElementById('stat-films').textContent = (films.length || 20) + '+';
     } catch(e) {}
   }
   loadStats();
