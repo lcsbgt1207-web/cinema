@@ -259,7 +259,6 @@
 <script src="js/config.js?v=2"></script>
 <script src="js/tmdb.js?v=2"></script>
 <script src="js/places.js?v=2"></script>
-<script src="js/nearby-catalogue.js?v=3.6"></script>
 <script src="js/pagination.js?v=2"></script>
 <script>
   const params      = new URLSearchParams(window.location.search);
@@ -310,39 +309,6 @@
     else await searchFilm();
   }
 
-
-  function saveLastNearbySearchForCatalogue(location) {
-    try {
-      localStorage.setItem('cinepro_last_nearby_search', JSON.stringify({
-        mode: searchMode,
-        address: searchQuery || document.getElementById('main-search')?.value || '',
-        query: searchQuery || '',
-        location: location || null,
-        radius: currentRadius,
-        updatedAt: new Date().toISOString()
-      }));
-    } catch (error) {
-      console.warn('[Résultats] ZIP 3.5.8 : impossible de sauvegarder la dernière recherche proche :', error?.message || error);
-    }
-  }
-
-  function warmNearbyCatalogueForCatalogue(location) {
-    saveLastNearbySearchForCatalogue(location);
-    if (typeof getNearbyRankedMovies !== 'function') {
-      console.warn('[Résultats] ZIP 3.5.8 : getNearbyRankedMovies indisponible, le Catalogue générera les films proches au chargement.');
-      return;
-    }
-    getNearbyRankedMovies({
-      address: searchQuery || '',
-      location: location || null,
-      radius: currentRadius
-    }).then((ranked) => {
-      console.log(`[Résultats] ZIP 3.5.8 : catalogue proche sauvegardé automatiquement (${Array.isArray(ranked) ? ranked.length : 0} films).`);
-    }).catch((error) => {
-      console.warn('[Résultats] ZIP 3.5.8 : génération automatique du catalogue proche reportée :', error?.message || error);
-    });
-  }
-
   // ── RECHERCHE LIEU ──
   async function searchLieu() {
     const list = document.getElementById('cinemas-list');
@@ -365,7 +331,6 @@
       }
 
       const cinemas = await PLACES.findNearbycinemas(location, currentRadius);
-      warmNearbyCatalogueForCatalogue(location);
       if (!cinemas.length) {
         list.innerHTML = `<div class="state-box"><i class="ti ti-building-off"></i><p>Aucun cinéma trouvé dans ce secteur.</p></div>`;
         document.getElementById('results-info').innerHTML = 'Aucun résultat';
@@ -418,22 +383,13 @@
         renderFn: (pageCinemas, pagerHtml) => {
           list.innerHTML = pageCinemas.map((c, ci) => renderCinemaCard(c, ci)).join('');
           document.getElementById('cinemas-pager').innerHTML = pagerHtml;
-          // Charger les films seulement quand le cinéma est visible (Intersection Observer)
-          const observer = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-              if (entry.isIntersecting) {
-                const ci = parseInt(entry.target.dataset.ci);
-                const cinema = pageCinemas[ci];
-                if (cinema) loadFilmsForCinema(cinema, ci);
-                observer.unobserve(entry.target);
-              }
-            });
-          }, { rootMargin: '100px' });
-          // Observer chaque carte cinéma
-          pageCinemas.forEach((c, ci) => {
-            const card = document.getElementById('cinema-card-' + ci);
-            if (card) { card.dataset.ci = ci; observer.observe(card); }
-          });
+          // Charger les films UN PAR UN avec délai pour ne pas saturer Railway
+          (async () => {
+            for (let ci = 0; ci < pageCinemas.length; ci++) {
+              await loadFilmsForCinema(pageCinemas[ci], ci);
+              if (ci < pageCinemas.length - 1) await new Promise(res => setTimeout(res, 600));
+            }
+          })();
         }
       });
 
@@ -500,12 +456,15 @@
               </div>
               <div id="seances-fcr-${ci}" style="font-size:12px;color:var(--gray-400);padding:4px 0;">Chargement des séances…</div>
             </div>`).join('');
-          // Charger les séances en parallèle
-          cinemasList.forEach(async (c, ci) => {
-            const seances = await fetchSeancesForCinema(c.nom, film.title, c.location?.lat, c.location?.lng);
-            const el = document.getElementById('seances-fcr-'+ci);
-            if (el) el.outerHTML = '<div>'+formatSeancesHTML(seances, film.title, c.nom)+'</div>';
-          });
+          // Charger les séances UNE PAR UNE pour ne pas saturer Railway
+          (async () => {
+            for (let ci = 0; ci < cinemasList.length; ci++) {
+              const seances = await fetchSeancesForCinema(cinemasList[ci].nom, film.title, cinemasList[ci].location?.lat, cinemasList[ci].location?.lng);
+              const el = document.getElementById('seances-fcr-'+ci);
+              if (el) el.outerHTML = '<div>'+formatSeancesHTML(seances, film.title, cinemasList[ci].nom)+'</div>';
+              if (ci < cinemasList.length - 1) await new Promise(res => setTimeout(res, 600));
+            }
+          })();
         } else {
           document.getElementById('film-cinemas-list').innerHTML = `
             <div style="padding:16px 0;font-size:13px;color:var(--gray-500);">
