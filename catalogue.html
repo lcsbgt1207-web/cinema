@@ -249,11 +249,11 @@
 </div>
 
 <script src="js/config.js?v=3.3"></script>
-<script src="js/data.js?v=3.5.7"></script>
+<script src="js/data.js?v=3.5.8"></script>
 <script src="js/omdb.js?v=3.3"></script>
 <script src="js/tmdb.js?v=3.3"></script>
 <script src="js/places.js?v=3.3"></script>
-<script src="js/nearby-catalogue.js?v=3.5.7"></script>
+<script src="js/nearby-catalogue.js?v=3.5.8"></script>
 <script>
   // ZIP 3.4 — Catalogue centré sur les films proches : un seul mode, données enrichies conservées.
   // Sécurité : si aucun résultat proche n'existe, on garde le catalogue enrichi ZIP 3.0 puis js/data.js.
@@ -772,6 +772,68 @@
   }
 
 
+
+  function readLastNearbySearch() {
+    try {
+      const payload = JSON.parse(localStorage.getItem('cinepro_last_nearby_search') || 'null');
+      if (!payload || typeof payload !== 'object') return null;
+      return payload;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  let nearbyAutoBuildRunning = false;
+  async function autoBuildNearbyCatalogueFromLastSearch() {
+    if (hasNearbyCatalogue() || nearbyAutoBuildRunning) return true;
+    const lastSearch = readLastNearbySearch();
+    if (!lastSearch) return false;
+    if (typeof getNearbyRankedMovies !== 'function' || !window.PLACES) return false;
+
+    nearbyAutoBuildRunning = true;
+    try {
+      console.log('[Catalogue] ZIP 3.5.8 : génération automatique du catalogue proche depuis la dernière recherche.', lastSearch);
+      await getNearbyRankedMovies({
+        address: lastSearch.address || lastSearch.query || '',
+        location: lastSearch.location || null,
+        radius: Number(lastSearch.radius) || 15000
+      });
+      catalogue = getCatalogueSource();
+      sortKey = 'bestNote';
+      sortDir = -1;
+      currentPage = 1;
+      filterTable();
+      return true;
+    } catch (error) {
+      console.warn('[Catalogue] ZIP 3.5.8 : génération automatique impossible pour le moment :', error?.message || error);
+      return false;
+    } finally {
+      nearbyAutoBuildRunning = false;
+    }
+  }
+
+  function scheduleNearbyCatalogueAutoBuild() {
+    let tries = 0;
+    const timer = setInterval(async () => {
+      tries += 1;
+      if (hasNearbyCatalogue()) {
+        clearInterval(timer);
+        return;
+      }
+      const done = await autoBuildNearbyCatalogueFromLastSearch();
+      if (done || tries >= 10) clearInterval(timer);
+    }, 900);
+  }
+
+  window.addEventListener('nearby-catalogue-ranked-ready', () => {
+    console.log('[Catalogue] ZIP 3.5.8 : fusion runtime reçue depuis Catalogue proche. Rafraîchissement de la liste.');
+    catalogue = getCatalogueSource();
+    sortKey = 'bestNote';
+    sortDir = -1;
+    currentPage = 1;
+    filterTable();
+  });
+
   async function initCatalogue() {
     // 1) Afficher immédiatement la meilleure source disponible. Le mode utilisateur reste Films proches.
     updateCatalogueModeControl();
@@ -799,6 +861,7 @@
     }
 
     filterTable();
+    scheduleNearbyCatalogueAutoBuild();
   }
 
   initCatalogue();

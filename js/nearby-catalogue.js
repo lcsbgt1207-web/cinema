@@ -1,4 +1,4 @@
-/* CinéProche — Catalogue proche — ZIP 3.5.7
+/* CinéProche — Catalogue proche — ZIP 3.5.8
    Objectif : normalisation des horaires UGC pour la popup catalogue.
    - Les films reconnus dans js/data.js gardent leur note locale.
    - Les films absents trouvés sur TMDB deviennent utilisables directement dans la liste finale.
@@ -1507,7 +1507,7 @@
     const runtimeFusion = buildRuntimeCatalogueFusion(ranked);
     const nearbyRankedCatalogue = buildNearbyCatalogueRankedExport(ranked);
 
-    console.log(`[Catalogue proche] Résultat ZIP 3.4 : ${stats.total} film(s), ${stats.rated} avec note, ${stats.tmdbEnriched} film(s) fusionné(s) TMDB, ${stats.missing} à vérifier.`);
+    console.log(`[Catalogue proche] Résultat ZIP 3.5.8 : ${stats.total} film(s), ${stats.rated} avec note, ${stats.tmdbEnriched} film(s) fusionné(s) TMDB, ${stats.missing} à vérifier.`);
     console.group('[Catalogue proche] Debug correspondances titres');
     console.table(matchDebug);
     console.groupEnd();
@@ -1598,7 +1598,7 @@
       };
       localStorage.setItem('cinepro_runtime_catalogue', JSON.stringify(storedPayload));
       localStorage.setItem('cinepro_nearby_ranked_catalogue', JSON.stringify(nearbyPayload));
-      console.log(`[Catalogue proche] ZIP 3.4 : catalogue runtime sauvegardé pour catalogue.html (${runtimeFusion.total} films).`);
+      console.log(`[Catalogue proche] ZIP 3.5.8 : catalogue runtime sauvegardé pour catalogue.html (${runtimeFusion.total} films).`);
       window.dispatchEvent(new CustomEvent('nearby-catalogue-runtime-ready', { detail: storedPayload }));
       window.dispatchEvent(new CustomEvent('nearby-catalogue-ranked-ready', { detail: nearbyPayload }));
     } catch (storageError) {

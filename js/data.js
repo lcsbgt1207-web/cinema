@@ -630,6 +630,7 @@ function buildPopupHTML(film) {
   const duree = film.duree || (film.runtime ? `${film.runtime} min` : '') || 'Durée inconnue';
   const annee = film.annee || film.year || '';
   const cinemas = getPopupCinemas(film);
+  console.log('[Popup] ZIP 3.5.8 : cinémas utilisés pour la fiche film', title, cinemas);
   const seancesHTML = buildPopupSeancesHTML(cinemas);
 
   return `
@@ -745,7 +746,7 @@ function formatPopupShowtime(value) {
   const date = parsePopupShowtimeDate(value);
 
   if (!date) {
-    return text.replace('T', ' · ');
+    return text.replace('T', ' · ').replace(/\s+à\s+/i, ' · ');
   }
 
   const today = getStartOfLocalDay(new Date());
