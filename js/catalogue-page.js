@@ -65,7 +65,9 @@ let lastCatalogueFilterStats = {
   sourceTotal: 0,
   kept: 0,
   excludedRecent: 0,
-  unknownYearKept: 0
+  unknownYearKept: 0,
+  displayed: 0,
+  referenceSource: 'none'
 };
 window.CINEPRO_CATALOGUE_FILTER_STATS = lastCatalogueFilterStats;
 

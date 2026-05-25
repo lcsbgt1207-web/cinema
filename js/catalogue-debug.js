@@ -1,4 +1,4 @@
-/* CinéProche — Audit catalogue — ZIP 4.1
+/* CinéProche — Audit catalogue — ZIP 4.6
    Outil console volontairement discret.
    Utilisation : F12 → Console → CINEPRO_DEBUG_CATALOGUE.audit()
 */
