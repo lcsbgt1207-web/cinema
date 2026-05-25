@@ -536,12 +536,12 @@ function filterTable() {
     const vb = getSortValue(b, sortKey);
     return compareValues(va, vb) * sortDir;
   });
-  const stats = window.CINEPRO_CATALOGUE_FILTER_STATS || lastCatalogueFilterStats;
+  const filterStats = window.CINEPRO_CATALOGUE_FILTER_STATS || lastCatalogueFilterStats;
 const countLabel = document.getElementById('count-label');
 const filmCount = document.getElementById('film-count');
 
-if (stats?.sourceTotal) {
-  const label = `${data.length} reprise${data.length > 1 ? 's' : ''} affichée${data.length > 1 ? 's' : ''} sur ${stats.sourceTotal} films proches`;
+if (filterStats?.sourceTotal) {
+  const label = `${data.length} reprise${data.length > 1 ? 's' : ''} affichée${data.length > 1 ? 's' : ''} sur ${filterStats.sourceTotal} films proches`;
   if (countLabel) countLabel.textContent = label;
   if (filmCount) filmCount.textContent = label;
 } else {
