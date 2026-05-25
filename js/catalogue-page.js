@@ -271,6 +271,42 @@ function formatClassicRating(value, suffix = '') {
   return rating !== null ? `${rating.toFixed(1)}${suffix}` : '—';
 }
 
+
+function getCatalogueReleaseYear(film) {
+  const candidates = [
+    film?.annee,
+    film?.year,
+    film?.releaseYear,
+    film?.release_year
+  ];
+
+  for (const value of candidates) {
+    const year = Number(value);
+    if (Number.isFinite(year) && year >= 1888 && year <= 2100) return year;
+  }
+
+  const dateCandidates = [
+    film?.releaseDate,
+    film?.release_date,
+    film?.dateSortie,
+    film?.sortie,
+    film?.first_air_date
+  ];
+
+  for (const value of dateCandidates) {
+    const match = String(value || '').match(/\b(19\d{2}|20\d{2})\b/);
+    if (match) return Number(match[1]);
+  }
+
+  return null;
+}
+
+function isCatalogueLegacyFilm(film) {
+  // ZIP 4.4 : le Catalogue est réservé aux reprises / films déjà sortis en 2024 ou avant.
+  const year = getCatalogueReleaseYear(film);
+  return Number.isFinite(year) && year <= 2024;
+}
+
 function getCatalogueSource() {
   const active = getActiveRawCatalogueSource();
   const source = active.source;
@@ -280,6 +316,7 @@ function getCatalogueSource() {
   source.forEach((film, index) => {
     if (!film || film.isMock) return;
     const prepared = prepareCatalogueFilm(film, index);
+    if (!isCatalogueLegacyFilm(prepared)) return;
     const key = prepared.tmdbId ? `tmdb:${prepared.tmdbId}` : normalizeRuntimeCatalogueKey(prepared.titre || prepared.original || prepared.id);
     if (!key || seen.has(key)) return;
     seen.add(key);
@@ -287,7 +324,7 @@ function getCatalogueSource() {
   });
 
   if (isCatalogueDebugEnabled()) {
-    console.log(`[Catalogue] ZIP 4.0 : ${active.label} utilisé (${merged.length} films).`);
+    console.log(`[Catalogue] ZIP 4.4 : ${active.label} utilisé (${merged.length} films 2024 et antérieurs).`);
   }
   return merged;
 }
@@ -422,6 +459,7 @@ function filterTable() {
   const g = document.getElementById('genre-filter').value;
   const d = document.getElementById('decade-filter').value;
   let data = catalogue.filter(f =>
+    isCatalogueLegacyFilm(f) &&
     (!q || String(f.titre || '').toLowerCase().includes(q) || String(f.real || '').toLowerCase().includes(q) || String(f.original || '').toLowerCase().includes(q)) &&
     (!g || String(f.genre || '').toLowerCase().includes(g.toLowerCase())) &&
     decadeMatch(f.annee, d)
