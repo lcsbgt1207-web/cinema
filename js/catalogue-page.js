@@ -524,37 +524,41 @@ function filterTable() {
   const q = document.getElementById('search-input').value.toLowerCase();
   const g = document.getElementById('genre-filter').value;
   const d = document.getElementById('decade-filter').value;
-
   let data = catalogue.filter(f =>
     isCatalogueLegacyFilm(f) &&
     (!q || String(f.titre || '').toLowerCase().includes(q) || String(f.real || '').toLowerCase().includes(q) || String(f.original || '').toLowerCase().includes(q)) &&
     (!g || String(f.genre || '').toLowerCase().includes(g.toLowerCase())) &&
     decadeMatch(f.annee, d)
   );
-
   if (catalogueMode === 'nearby' && sortKey === 'imdb') sortKey = 'bestNote';
-
   data.sort((a, b) => {
     const va = getSortValue(a, sortKey);
     const vb = getSortValue(b, sortKey);
     return compareValues(va, vb) * sortDir;
   });
+  const stats = window.CINEPRO_CATALOGUE_FILTER_STATS || lastCatalogueFilterStats;
+const countLabel = document.getElementById('count-label');
+const filmCount = document.getElementById('film-count');
 
+if (stats?.sourceTotal) {
+  const label = `${data.length} reprise${data.length > 1 ? 's' : ''} affichée${data.length > 1 ? 's' : ''} sur ${stats.sourceTotal} films proches`;
+  if (countLabel) countLabel.textContent = label;
+  if (filmCount) filmCount.textContent = label;
+} else {
+  if (countLabel) countLabel.textContent = `${data.length} film${data.length > 1 ? 's' : ''} proche${data.length > 1 ? 's' : ''}`;
+  if (filmCount) filmCount.textContent = `${data.length} film${data.length > 1 ? 's' : ''} proche${data.length > 1 ? 's' : ''}`;
+}
   const stats = window.CINEPRO_CATALOGUE_FILTER_STATS || lastCatalogueFilterStats;
   stats.displayed = data.length;
   window.CINEPRO_CATALOGUE_FILTER_STATS = stats;
-
   const countLabel = document.getElementById('count-label');
   const filmCount = document.getElementById('film-count');
   const total = Number(stats?.sourceTotal || 0);
-
   const label = total && total !== data.length
     ? `${data.length} reprise${data.length > 1 ? 's' : ''} affichée${data.length > 1 ? 's' : ''} sur ${total} films proches`
     : `${data.length} reprise${data.length > 1 ? 's' : ''} affichée${data.length > 1 ? 's' : ''}`;
-
   if (countLabel) countLabel.textContent = label;
   if (filmCount) filmCount.textContent = label;
-
   renderTable(data);
   updateIcons();
 }
