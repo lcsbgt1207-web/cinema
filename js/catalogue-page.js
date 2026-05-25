@@ -549,16 +549,19 @@ if (filterStats?.sourceTotal) {
   if (filmCount) filmCount.textContent = `${data.length} film${data.length > 1 ? 's' : ''} proche${data.length > 1 ? 's' : ''}`;
 }
   const stats = window.CINEPRO_CATALOGUE_FILTER_STATS || lastCatalogueFilterStats;
-  stats.displayed = data.length;
-  window.CINEPRO_CATALOGUE_FILTER_STATS = stats;
-  const countLabel = document.getElementById('count-label');
-  const filmCount = document.getElementById('film-count');
-  const total = Number(stats?.sourceTotal || 0);
-  const label = total && total !== data.length
-    ? `${data.length} reprise${data.length > 1 ? 's' : ''} affichée${data.length > 1 ? 's' : ''} sur ${total} films proches`
-    : `${data.length} reprise${data.length > 1 ? 's' : ''} affichée${data.length > 1 ? 's' : ''}`;
-  if (countLabel) countLabel.textContent = label;
-  if (filmCount) filmCount.textContent = label;
+stats.displayed = data.length;
+window.CINEPRO_CATALOGUE_FILTER_STATS = stats;
+
+const countLabel = document.getElementById('count-label');
+const filmCount = document.getElementById('film-count');
+const total = Number(stats?.sourceTotal || 0);
+
+const label = total && total !== data.length
+  ? `${data.length} reprise${data.length > 1 ? 's' : ''} affichée${data.length > 1 ? 's' : ''} sur ${total} films proches`
+  : `${data.length} reprise${data.length > 1 ? 's' : ''} affichée${data.length > 1 ? 's' : ''}`;
+
+if (countLabel) countLabel.textContent = label;
+if (filmCount) filmCount.textContent = label;
   renderTable(data);
   updateIcons();
 }
