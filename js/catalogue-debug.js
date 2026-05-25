@@ -64,7 +64,7 @@
       .filter(row => row.exists && expectedRadius && Number(row.radius || 0) && Number(row.radius) !== expectedRadius)
       .map(row => ({ cache: row.cache, cacheRadius: row.radius, lastSearchRadius: expectedRadius }));
 
-    console.group('[CinéProche] Audit catalogue ZIP 4.4.1');
+    console.group('[CinéProche] Audit catalogue ZIP 4.5');
     console.log('Dernière recherche proche :', lastSearch || 'Aucune');
     console.table(rows);
     if (mismatches.length) {
@@ -78,6 +78,12 @@
       NEARBY_CATALOGUE_RUNTIME_DATA: Array.isArray(window.NEARBY_CATALOGUE_RUNTIME_DATA) ? window.NEARBY_CATALOGUE_RUNTIME_DATA.length : 0
     };
     console.log('Variables runtime :', runtime);
+    console.log('Stats filtre Catalogue :', window.CINEPRO_CATALOGUE_FILTER_STATS || {
+  sourceTotal: 0,
+  kept: 0,
+  excludedRecent: 0,
+  unknownYearKept: 0
+});
     console.groupEnd();
 
     return { lastSearch, caches: rows, mismatches, runtime }; 
