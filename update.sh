@@ -9,11 +9,12 @@ echo "======================================"
 
 ZIP_PATTERN="cinema-updates*.zip"
 UPDATE_DIR="cinema-updates"
+EXTRACT_DIR=".cinepro-update-extract"
 DESKTOP_DIR="$HOME/Desktop"
 DOWNLOADS_DIR="$HOME/Downloads"
 DOWNLOADS_DIR_FR="$HOME/Téléchargements"
 PROJECT_DIR="$DESKTOP_DIR/cinema"
-REPO_URL="https://github.com/Icsbgt1207-web/cinema.git"
+REPO_URL="https://github.com/lcsbgt1207-web/cinema.git"
 
 pause_exit() {
   echo ""
@@ -56,6 +57,7 @@ ensure_git_identity() {
 }
 
 COMMIT_MESSAGE=""
+UPDATE_SOURCE_DIR=""
 
 ask_commit_message() {
   echo ""
@@ -100,6 +102,9 @@ sync_git_before_update() {
 push_git_after_everything() {
   [ -d ".git" ] || return 0
 
+  echo "État Git avant commit :"
+  git status --short || true
+
   commit_if_needed "$COMMIT_MESSAGE"
 
   echo "Synchronisation finale avec GitHub..."
@@ -114,11 +119,13 @@ push_git_after_everything() {
   }
 
   echo "GitHub mis à jour."
+  echo "Dernier commit :"
+  git log --oneline -1 || true
 }
 
 copy_dir() {
   local name="$1"
-  local src="$PROJECT_DIR/$UPDATE_DIR/$name"
+  local src="$UPDATE_SOURCE_DIR/$name"
   local dest="$PROJECT_DIR/$name"
 
   if [ -d "$src" ]; then
@@ -147,7 +154,7 @@ cleanup_obsolete_project_files() {
 
 copy_file() {
   local name="$1"
-  local src="$PROJECT_DIR/$UPDATE_DIR/$name"
+  local src="$UPDATE_SOURCE_DIR/$name"
   local dest="$PROJECT_DIR/$name"
 
   if [ -f "$src" ]; then
@@ -159,20 +166,23 @@ copy_file() {
 cleanup_project_structure() {
   echo "Nettoyage de la structure du projet..."
 
-  # Supprime les dossiers imbriqués créés par erreur.
   rm -rf "$PROJECT_DIR/cinema-main"
-
-  # Supprime les anciens ZIP qui ne doivent jamais rester dans le dépôt.
   find "$PROJECT_DIR" -maxdepth 1 -type f \( -name 'cinema-update*.zip' -o -name 'cinema-updates*.zip' \) -delete 2>/dev/null || true
-
-  # Supprime les anciens fichiers de sauvegarde inutiles.
   find "$PROJECT_DIR" -type f \( -name '*.backup.js' -o -name '*.backup.css' -o -name '*.backup.*' -o -name '*.bak' \) -delete 2>/dev/null || true
-
-  # Supprime les anciens doublons HTML qui ne sont pas utilisés par GitHub Pages.
   rm -f "$PROJECT_DIR/html/catalogue.html"
-
-  # Supprime le fichier encodé accidentellement.
   rm -f "$PROJECT_DIR/[Cin#U00e9Proche]"
+}
+
+resolve_update_source_dir() {
+  if [ -d "$PROJECT_DIR/$EXTRACT_DIR/$UPDATE_DIR" ]; then
+    UPDATE_SOURCE_DIR="$PROJECT_DIR/$EXTRACT_DIR/$UPDATE_DIR"
+    echo "Structure ZIP détectée : dossier $UPDATE_DIR/"
+    return 0
+  fi
+
+  UPDATE_SOURCE_DIR="$PROJECT_DIR/$EXTRACT_DIR"
+  echo "Structure ZIP détectée : contenu directement à la racine du ZIP."
+  return 0
 }
 
 if ! command -v git >/dev/null 2>&1; then
@@ -205,19 +215,20 @@ if [ -z "$FOUND_ZIP" ]; then
 fi
 
 echo "ZIP trouvé : $FOUND_ZIP"
+if command -v stat >/dev/null 2>&1; then
+  echo "Date du ZIP : $(stat -c '%y' "$FOUND_ZIP" 2>/dev/null || echo 'inconnue')"
+fi
 
 ask_commit_message
 
 stop_node_processes
 
-rm -rf "$PROJECT_DIR/$UPDATE_DIR"
+rm -rf "$PROJECT_DIR/$UPDATE_DIR" "$PROJECT_DIR/$EXTRACT_DIR"
+mkdir -p "$PROJECT_DIR/$EXTRACT_DIR"
 echo "Extraction du ZIP..."
-unzip -o "$FOUND_ZIP" -d "$PROJECT_DIR" || pause_exit 1
+unzip -o "$FOUND_ZIP" -d "$PROJECT_DIR/$EXTRACT_DIR" || pause_exit 1
 
-if [ ! -d "$PROJECT_DIR/$UPDATE_DIR" ]; then
-  echo "Erreur : le dossier $UPDATE_DIR est introuvable après extraction."
-  pause_exit 1
-fi
+resolve_update_source_dir
 
 cleanup_obsolete_project_files
 
@@ -244,7 +255,10 @@ copy_file ".env.example"
 
 cleanup_project_structure
 
-rm -rf "$PROJECT_DIR/$UPDATE_DIR"
+rm -rf "$PROJECT_DIR/$UPDATE_DIR" "$PROJECT_DIR/$EXTRACT_DIR"
+
+echo "Fichiers modifiés après copie :"
+git status --short || true
 
 echo "Nettoyage du ZIP de mise à jour..."
 rm -f "$FOUND_ZIP" 2>/dev/null || true
@@ -266,8 +280,6 @@ if [ -f "$PROJECT_DIR/backend/package.json" ]; then
   fi
 fi
 
-# IMPORTANT : on push seulement à la toute fin, après le scraper.
-# Comme ça, backend/data/letterboxd-films.json ne reste plus en modification locale.
 push_git_after_everything
 
 echo "======================================"
