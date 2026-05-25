@@ -302,9 +302,11 @@ function getCatalogueReleaseYear(film) {
 }
 
 function isCatalogueLegacyFilm(film) {
-  // ZIP 4.4 : le Catalogue est réservé aux reprises / films déjà sortis en 2024 ou avant.
+  // ZIP 4.4.1 : on exclut seulement les films dont l'année récente est clairement connue.
+  // Les films sans année fiable sont conservés pour éviter de vider le catalogue à cause de données incomplètes.
   const year = getCatalogueReleaseYear(film);
-  return Number.isFinite(year) && year <= 2024;
+  if (!Number.isFinite(year)) return true;
+  return year <= 2024;
 }
 
 function getCatalogueSource() {
@@ -324,7 +326,7 @@ function getCatalogueSource() {
   });
 
   if (isCatalogueDebugEnabled()) {
-    console.log(`[Catalogue] ZIP 4.4 : ${active.label} utilisé (${merged.length} films 2024 et antérieurs).`);
+    console.log(`[Catalogue] ZIP 4.4.1 : ${active.label} utilisé (${merged.length} films conservés, années inconnues gardées).`);
   }
   return merged;
 }
