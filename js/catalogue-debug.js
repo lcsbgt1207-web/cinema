@@ -64,7 +64,7 @@
       .filter(row => row.exists && expectedRadius && Number(row.radius || 0) && Number(row.radius) !== expectedRadius)
       .map(row => ({ cache: row.cache, cacheRadius: row.radius, lastSearchRadius: expectedRadius }));
 
-    console.group('[CinéProche] Audit catalogue ZIP 4.5');
+    console.group('[CinéProche] Audit catalogue ZIP 4.6');
     console.log('Dernière recherche proche :', lastSearch || 'Aucune');
     console.table(rows);
     if (mismatches.length) {
@@ -82,7 +82,9 @@
   sourceTotal: 0,
   kept: 0,
   excludedRecent: 0,
-  unknownYearKept: 0
+  unknownYearKept: 0,
+  displayed: 0,
+  referenceSource: 'none'
 });
     console.groupEnd();
 
