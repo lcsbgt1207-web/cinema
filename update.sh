@@ -143,6 +143,7 @@ cleanup_obsolete_project_files() {
   rm -f "$PROJECT_DIR/cinema-update.zip"
   rm -f "$PROJECT_DIR/cinema-updates.zip"
   rm -f "$PROJECT_DIR/[Cin#U00e9Proche]"
+  rm -f "$PROJECT_DIR/backend/scripts/cleanup-project.js"
 
   find "$PROJECT_DIR" \
     -path "$PROJECT_DIR/.git" -prune -o \
