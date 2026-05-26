@@ -172,6 +172,7 @@ cleanup_project_structure() {
   find "$PROJECT_DIR" -type f \( -name '*.backup.js' -o -name '*.backup.css' -o -name '*.backup.*' -o -name '*.bak' \) -delete 2>/dev/null || true
   rm -f "$PROJECT_DIR/html/catalogue.html"
   rm -f "$PROJECT_DIR/[Cin#U00e9Proche]"
+  rm -f "$PROJECT_DIR/backend/scripts/cleanup-project.js"
 }
 
 resolve_update_source_dir() {
