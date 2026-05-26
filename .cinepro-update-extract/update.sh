@@ -3,9 +3,8 @@
 set -u
 clear
 
-echo "======================================"
-echo "  CinéProche — Mise à jour automatique"
-echo "======================================"
+SCRIPT_PATH="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+SCRIPT_NAME="$(basename "$0")"
 
 ZIP_PATTERN="cinema-updates*.zip"
 UPDATE_DIR="cinema-updates"
@@ -16,10 +15,36 @@ DOWNLOADS_DIR_FR="$HOME/Téléchargements"
 PROJECT_DIR="$DESKTOP_DIR/cinema"
 REPO_URL="https://github.com/lcsbgt1207-web/cinema.git"
 
+COMMIT_MESSAGE=""
+UPDATE_SOURCE_DIR=""
+FOUND_ZIP=""
+
+OBSOLETE_PATHS=(
+  "backend/scripts/cleanup-project.js"
+  "js/catalogue-debug.js"
+  "scripts/apply-cinema-update.js"
+  "README-CINEMA-UPDATE.txt"
+  "overlays.html"
+  "js/overlays.html"
+  "backend/cache"
+  "backend/data/letterboxd-ratings-verified.json"
+)
+
+cleanup_temp() {
+  rm -rf "$PROJECT_DIR/$UPDATE_DIR" "$PROJECT_DIR/$EXTRACT_DIR" 2>/dev/null || true
+}
+trap cleanup_temp EXIT
+
 pause_exit() {
   echo ""
-  read -p "Appuyez sur Entrée pour quitter..."
+  read -r -p "Appuyez sur Entrée pour quitter..." _
   exit "${1:-0}"
+}
+
+say_header() {
+  echo "======================================"
+  echo "  CinéProche — Mise à jour automatique"
+  echo "======================================"
 }
 
 find_latest_zip() {
@@ -56,18 +81,42 @@ ensure_git_identity() {
   git config user.name >/dev/null 2>&1 || git config user.name "CineProche Auto Update" || true
 }
 
-COMMIT_MESSAGE=""
-UPDATE_SOURCE_DIR=""
-
 ask_commit_message() {
   echo ""
   echo "Nom du commit GitHub pour cette mise à jour :"
-  echo "Exemple : [CinéProche] ZIP 2.9.8 - Enrichissement TMDB"
-  read -p "> " COMMIT_MESSAGE
+  echo "Exemple : [CinéProche] Stabilisation - mise à jour propre"
+  read -r -p "> " COMMIT_MESSAGE
 
   if [ -z "${COMMIT_MESSAGE// }" ]; then
     COMMIT_MESSAGE="Mise à jour CinéProche automatique"
   fi
+}
+
+confirm_zip() {
+  local zip_name
+  zip_name="$(basename "$FOUND_ZIP")"
+
+  echo ""
+  echo "ZIP trouvé : $FOUND_ZIP"
+  if command -v stat >/dev/null 2>&1; then
+    echo "Date du ZIP : $(stat -c '%y' "$FOUND_ZIP" 2>/dev/null || echo 'inconnue')"
+  fi
+
+  if [ "$zip_name" != "cinema-updates.zip" ]; then
+    echo ""
+    echo "Attention : le ZIP ne s'appelle pas exactement cinema-updates.zip"
+    echo "Nom actuel : $zip_name"
+  fi
+
+  echo ""
+  read -r -p "Continuer avec ce ZIP ? [o/N] " answer
+  case "${answer:-}" in
+    o|O|oui|OUI|y|Y|yes|YES) ;;
+    *)
+      echo "Mise à jour annulée."
+      pause_exit 1
+      ;;
+  esac
 }
 
 commit_if_needed() {
@@ -123,6 +172,38 @@ push_git_after_everything() {
   git log --oneline -1 || true
 }
 
+resolve_update_source_dir() {
+  if [ -d "$PROJECT_DIR/$EXTRACT_DIR/$UPDATE_DIR" ]; then
+    UPDATE_SOURCE_DIR="$PROJECT_DIR/$EXTRACT_DIR/$UPDATE_DIR"
+    echo "Structure ZIP détectée : dossier $UPDATE_DIR/"
+    return 0
+  fi
+
+  local first_level_dirs=()
+  while IFS= read -r dir; do
+    first_level_dirs+=("$dir")
+  done < <(find "$PROJECT_DIR/$EXTRACT_DIR" -mindepth 1 -maxdepth 1 -type d | sort)
+
+  if [ "${#first_level_dirs[@]}" -eq 1 ]; then
+    UPDATE_SOURCE_DIR="${first_level_dirs[0]}"
+    echo "Structure ZIP détectée : dossier racine $(basename "$UPDATE_SOURCE_DIR")/"
+    return 0
+  fi
+
+  UPDATE_SOURCE_DIR="$PROJECT_DIR/$EXTRACT_DIR"
+  echo "Structure ZIP détectée : contenu directement à la racine du ZIP."
+  return 0
+}
+
+remove_obsolete_from_dir() {
+  local base_dir="$1"
+  local rel
+
+  for rel in "${OBSOLETE_PATHS[@]}"; do
+    rm -rf "$base_dir/$rel" 2>/dev/null || true
+  done
+}
+
 copy_dir() {
   local name="$1"
   local src="$UPDATE_SOURCE_DIR/$name"
@@ -135,6 +216,24 @@ copy_dir() {
   fi
 }
 
+copy_file() {
+  local name="$1"
+  local src="$UPDATE_SOURCE_DIR/$name"
+  local dest="$PROJECT_DIR/$name"
+
+  if [ ! -f "$src" ]; then
+    return 0
+  fi
+
+  if [ "$name" = "$SCRIPT_NAME" ]; then
+    echo "Copie du fichier $name ignorée pendant l'exécution pour éviter l'auto-remplacement."
+    return 0
+  fi
+
+  echo "Copie du fichier $name"
+  cp "$src" "$dest"
+}
+
 cleanup_obsolete_project_files() {
   echo "Nettoyage des fichiers parasites du projet..."
 
@@ -144,23 +243,14 @@ cleanup_obsolete_project_files() {
   rm -f "$PROJECT_DIR/cinema-updates.zip"
   rm -f "$PROJECT_DIR/[Cin#U00e9Proche]"
 
+  remove_obsolete_from_dir "$PROJECT_DIR"
+
   find "$PROJECT_DIR" \
     -path "$PROJECT_DIR/.git" -prune -o \
     -path "$PROJECT_DIR/backend/node_modules" -prune -o \
     -path "$PROJECT_DIR/node_modules" -prune -o \
     \( -name "*.backup.*" -o -name "*.bak" -o -name "cinema-update*.zip" -o -name "cinema-updates*.zip" \) \
     -type f -print -delete 2>/dev/null || true
-}
-
-copy_file() {
-  local name="$1"
-  local src="$UPDATE_SOURCE_DIR/$name"
-  local dest="$PROJECT_DIR/$name"
-
-  if [ -f "$src" ]; then
-    echo "Copie du fichier $name"
-    cp "$src" "$dest"
-  fi
 }
 
 cleanup_project_structure() {
@@ -171,19 +261,48 @@ cleanup_project_structure() {
   find "$PROJECT_DIR" -type f \( -name '*.backup.js' -o -name '*.backup.css' -o -name '*.backup.*' -o -name '*.bak' \) -delete 2>/dev/null || true
   rm -f "$PROJECT_DIR/html/catalogue.html"
   rm -f "$PROJECT_DIR/[Cin#U00e9Proche]"
+
+  remove_obsolete_from_dir "$PROJECT_DIR"
 }
 
-resolve_update_source_dir() {
-  if [ -d "$PROJECT_DIR/$EXTRACT_DIR/$UPDATE_DIR" ]; then
-    UPDATE_SOURCE_DIR="$PROJECT_DIR/$EXTRACT_DIR/$UPDATE_DIR"
-    echo "Structure ZIP détectée : dossier $UPDATE_DIR/"
+install_backend_if_present() {
+  if [ ! -f "$PROJECT_DIR/backend/package.json" ]; then
     return 0
   fi
 
-  UPDATE_SOURCE_DIR="$PROJECT_DIR/$EXTRACT_DIR"
-  echo "Structure ZIP détectée : contenu directement à la racine du ZIP."
-  return 0
+  echo "Backend détecté."
+
+  if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
+    echo "Node.js/npm non détecté : étape backend ignorée."
+    return 0
+  fi
+
+  cd "$PROJECT_DIR/backend" || pause_exit 1
+  echo "Installation automatique des dépendances backend..."
+  npm install || echo "npm install échoué, la mise à jour locale reste valide."
+
+  echo "Scraping Letterboxd ignoré."
+  echo "Pour mettre à jour les notes Letterboxd manuellement :"
+  echo "cd ~/Desktop/cinema/backend && npm run scrape"
+  cd "$PROJECT_DIR" || pause_exit 1
 }
+
+start_backend_if_possible() {
+  if [ ! -f "$PROJECT_DIR/backend/package.json" ]; then
+    pause_exit 0
+  fi
+
+  if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
+    pause_exit 0
+  fi
+
+  cd "$PROJECT_DIR/backend" || pause_exit 0
+  echo "Lancement API locale..."
+  echo "Garde cette fenêtre Git Bash ouverte."
+  npm start || pause_exit 0
+}
+
+say_header
 
 if ! command -v git >/dev/null 2>&1; then
   echo "Erreur : Git n'est pas installé ou pas détecté."
@@ -207,29 +326,24 @@ cd "$PROJECT_DIR" || pause_exit 1
 sync_git_before_update
 
 FOUND_ZIP=$(find_latest_zip)
-
 if [ -z "$FOUND_ZIP" ]; then
   echo "Aucun cinema-updates*.zip trouvé."
   echo "Télécharge le ZIP, laisse-le dans Téléchargements, puis relance ./update.sh."
   pause_exit 1
 fi
 
-echo "ZIP trouvé : $FOUND_ZIP"
-if command -v stat >/dev/null 2>&1; then
-  echo "Date du ZIP : $(stat -c '%y' "$FOUND_ZIP" 2>/dev/null || echo 'inconnue')"
-fi
-
+confirm_zip
 ask_commit_message
-
 stop_node_processes
 
-rm -rf "$PROJECT_DIR/$UPDATE_DIR" "$PROJECT_DIR/$EXTRACT_DIR"
+cleanup_temp
 mkdir -p "$PROJECT_DIR/$EXTRACT_DIR"
+
 echo "Extraction du ZIP..."
-unzip -o "$FOUND_ZIP" -d "$PROJECT_DIR/$EXTRACT_DIR" || pause_exit 1
+unzip -o "$FOUND_ZIP" -d "$PROJECT_DIR/$EXTRACT_DIR" >/dev/null || pause_exit 1
 
 resolve_update_source_dir
-
+remove_obsolete_from_dir "$UPDATE_SOURCE_DIR"
 cleanup_obsolete_project_files
 
 copy_dir "html"
@@ -241,21 +355,20 @@ copy_dir "api"
 copy_dir "scrapers"
 copy_dir "data"
 
+copy_file ".gitignore"
+copy_file ".nojekyll"
 copy_file "README.md"
 copy_file "index.html"
 copy_file "catalogue.html"
 copy_file "nouveautes.html"
 copy_file "resultats.html"
 copy_file "agenda.html"
+copy_file "portfolio.html"
 copy_file "profil.html"
-copy_file "overlays.html"
-copy_file "update.sh"
-copy_file ".gitignore"
 copy_file ".env.example"
+copy_file "$SCRIPT_NAME"
 
 cleanup_project_structure
-
-rm -rf "$PROJECT_DIR/$UPDATE_DIR" "$PROJECT_DIR/$EXTRACT_DIR"
 
 echo "Fichiers modifiés après copie :"
 git status --short || true
@@ -263,34 +376,11 @@ git status --short || true
 echo "Nettoyage du ZIP de mise à jour..."
 rm -f "$FOUND_ZIP" 2>/dev/null || true
 
-if [ -f "$PROJECT_DIR/backend/package.json" ]; then
-  echo "Backend détecté."
-
-  if command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
-    cd "$PROJECT_DIR/backend" || pause_exit 1
-    echo "Installation automatique des dépendances backend..."
-    npm install || echo "npm install échoué, la mise à jour locale reste valide."
-
-    echo "Scraping Letterboxd ignoré."
-    echo "Pour mettre à jour les notes Letterboxd manuellement :"
-    echo "cd ~/Desktop/cinema/backend && npm run scrape"
-    cd "$PROJECT_DIR" || pause_exit 1
-  else
-    echo "Node.js/npm non détecté : étape backend ignorée."
-  fi
-fi
-
+install_backend_if_present
 push_git_after_everything
 
 echo "======================================"
 echo "  Mise à jour terminée"
 echo "======================================"
 
-if [ -f "$PROJECT_DIR/backend/package.json" ] && command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
-  cd "$PROJECT_DIR/backend" || pause_exit 0
-  echo "Lancement API locale..."
-  echo "Garde cette fenêtre Git Bash ouverte."
-  npm start || pause_exit 0
-else
-  pause_exit 0
-fi
+start_backend_if_possible
