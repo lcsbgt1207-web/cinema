@@ -1,4 +1,4 @@
-/* CinéProche — Catalogue proche — ZIP 4.9.3
+/* CinéProche — Catalogue proche — ZIP 4.9.4.2
    Objectif : stabiliser le catalogue proche et réduire les logs/traitements inutiles.
    Objectif précédent : normalisation des horaires UGC pour la popup catalogue.
    - Les films reconnus dans js/data.js gardent leur note locale.
@@ -694,6 +694,28 @@
     return combined;
   }
 
+  function hasExplicitShowtimeTime(value) {
+    if (value === null || value === undefined) return false;
+    if (value instanceof Date && !Number.isNaN(value.getTime())) return true;
+    if (typeof value === 'number') return false;
+    if (typeof value === 'string') {
+      const text = String(value).trim();
+      if (!text) return false;
+      return /\b(\d{1,2})[:h](\d{2})\b/.test(text)
+        || /(20\d{2}-\d{2}-\d{2})(?:[T\s]+\d{1,2}[:h]\d{2})/.test(text)
+        || /\b(midi|minuit)\b/i.test(text);
+    }
+    if (typeof value === 'object') {
+      const direct = [
+        value.startsAt, value.startAt, value.start, value.datetime, value.dateTime,
+        value.showtime, value.showTime, value.time, value.horaire, value.hour, value.heure,
+        value.displayTime, value.timeLabel, value.hourLabel
+      ];
+      return direct.some(item => hasExplicitShowtimeTime(item));
+    }
+    return false;
+  }
+
   function parseShowtimeDate(value, fallbackDate = null) {
     if (value === null || value === undefined) return null;
     if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
@@ -773,7 +795,7 @@
     function push(value) {
       const text = String(value || '').trim();
       if (!text) return;
-      if (!textLooksLikeDateCarrier(text) && !/\b\d{1,2}[:h]\d{2}\b/.test(text)) return;
+      if (!hasExplicitShowtimeTime(text)) return;
       if (seen.has(text)) return;
       seen.add(text);
       found.push(text);
@@ -809,6 +831,7 @@
     const seenObjects = new WeakSet();
 
     function pushDate(rawValue, fallbackDate = null) {
+      if (!hasExplicitShowtimeTime(rawValue)) return;
       const parsed = parseShowtimeDate(rawValue, fallbackDate);
       if (!parsed || !isShowtimeInNearbyWindow(parsed)) return;
       entries.push({ date: parsed, label: formatNearbyShowtime(parsed), raw: rawValue });
@@ -818,7 +841,7 @@
       if (node === null || node === undefined || depth > 10) return;
 
       if (typeof node === 'string' || typeof node === 'number' || node instanceof Date) {
-        if (keyLooksLikeShowtimeDate(path) || textLooksLikeDateCarrier(node) || /\b\d{1,2}[:h]\d{2}\b/.test(String(node))) {
+        if (keyLooksLikeShowtimeDate(path) || hasExplicitShowtimeTime(node)) {
           pushDate(node, fallbackDate);
         }
         return;
@@ -838,7 +861,7 @@
       const directValues = [
         node.startsAt, node.startAt, node.start, node.datetime, node.dateTime,
         node.showtime, node.showTime, node.time, node.horaire, node.hour, node.heure,
-        node.label, node.displayLabel, node.displayDate, node.displayTime, node.caption, node.text
+        node.displayTime, node.timeLabel, node.hourLabel
       ];
       for (const value of directValues) pushDate(value, objectDate);
 
@@ -885,16 +908,16 @@
     for (const arr of possibleArrays) {
       if (!Array.isArray(arr)) continue;
       for (const value of arr) {
-        const parsed = parseShowtimeDate(
-          typeof value === 'string'
-            ? value
-            : firstString(
-                value?.startsAt, value?.startAt, value?.time, value?.horaire, value?.hour, value?.heure,
-                value?.label, value?.displayLabel, value?.displayDate, value?.displayTime, value?.caption, value?.text,
-                value?.date, value?.day, value?.jour
-              ),
-          itemDate
-        );
+        const rawCandidate = typeof value === 'string'
+          ? value
+          : firstString(
+              value?.startsAt, value?.startAt, value?.time, value?.horaire, value?.hour, value?.heure,
+              value?.displayTime, value?.timeLabel, value?.hourLabel,
+              value?.label, value?.displayLabel, value?.displayDate, value?.caption, value?.text,
+              value?.date, value?.day, value?.jour
+            );
+        if (!hasExplicitShowtimeTime(typeof value === 'string' ? value : value || rawCandidate)) continue;
+        const parsed = parseShowtimeDate(rawCandidate, itemDate);
         if (parsed && isShowtimeInNearbyWindow(parsed)) fallback.push(formatNearbyShowtime(parsed));
       }
     }
@@ -1506,7 +1529,8 @@
     const extras = [];
 
     for (const value of values) {
-      const rawDate = value?.startsAt || value?.startAt || value?.datetime || value?.dateTime || value?.showtime || value?.showTime || value?.time || value?.horaire || value?.date || value;
+      const rawDate = value?.startsAt || value?.startAt || value?.datetime || value?.dateTime || value?.showtime || value?.showTime || value?.time || value?.horaire || value?.displayTime || value?.date || value;
+      if (!hasExplicitShowtimeTime(value || rawDate)) continue;
       const parsed = parseShowtimeDate(rawDate);
       if (!parsed || !isShowtimeInNearbyWindow(parsed)) continue;
       const version = getExportedShowtimeVersion(value);
@@ -1695,7 +1719,7 @@
     }
     if (!location) location = await window.PLACES.geolocate();
 
-    console.log(`[Catalogue proche] ZIP 4.9.3 actif — séances proches analysées sur ${lookaheadDays} jour(s).`);
+    console.log(`[Catalogue proche] ZIP 4.9 actif — séances proches analysées sur ${lookaheadDays} jour(s).`);
     debugLog('[Catalogue proche] Position utilisée :', location);
 
     // ZIP 3.6.7 : une nouvelle recherche remplace toujours l'ancien cache.
@@ -1861,7 +1885,7 @@
     const runtimeFusion = buildRuntimeCatalogueFusion(ranked);
     const nearbyRankedCatalogue = buildNearbyCatalogueRankedExport(ranked);
 
-    console.log(`[Catalogue proche] Résultat ZIP 4.9.3 : ${stats.total} film(s), ${stats.rated} avec note, ${stats.tmdbEnriched} film(s) fusionné(s) TMDB.`);
+    console.log(`[Catalogue proche] Résultat ZIP 3.9.2 : ${stats.total} film(s), ${stats.rated} avec note, ${stats.tmdbEnriched} film(s) fusionné(s) TMDB.`);
     debugGroup('[Catalogue proche] Debug correspondances titres');
     debugTable(matchDebug);
     debugGroupEnd();
