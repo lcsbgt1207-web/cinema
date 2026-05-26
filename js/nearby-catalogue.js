@@ -1,16 +1,12 @@
-/* CinéProche — Catalogue proche — ZIP 3.9.2
-   Objectif : stabiliser le catalogue proche et réduire les logs/traitements inutiles.
-   Objectif précédent : normalisation des horaires UGC pour la popup catalogue.
-   - Les films reconnus dans js/data.js gardent leur note locale.
-   - Les films absents trouvés sur TMDB deviennent utilisables directement dans la liste finale.
-   - Ajout d'un catalogue temporaire exportable window.NEARBY_CATALOGUE_RUNTIME_DATA.
-   - Aucun ajout définitif dans js/data.js : la fusion reste côté navigateur pour validation.
+/* CinéProche — Catalogue proche — ZIP 4.9.1
+   Objectif : mieux remonter les films proches à venir, y compris les reprises et
+   séances spéciales dont les dates sont exprimées en libellés français (ex : mer. 28 mai).
 */
 (function () {
   'use strict';
 
   const NEARBY_CATALOGUE_API = 'https://cinepro-api-yal8.onrender.com';
-  let currentNearbyLookaheadDays = 7;
+  let currentNearbyLookaheadDays = 21;
   let currentNearbyApiBaseUrl = NEARBY_CATALOGUE_API;
   // ZIP 3.8.1 : logs debug désactivés par défaut.
   // Pour les réactiver ponctuellement : localStorage.setItem('cinepro_debug', '1') puis recharger.
@@ -210,8 +206,8 @@
 
   function getConfiguredNearbyLookaheadDays(options = {}) {
     const cfg = getNearbyConfig();
-    const raw = Number(options.lookaheadDays ?? cfg.CATALOGUE_LOOKAHEAD_DAYS ?? currentNearbyLookaheadDays ?? 7);
-    return Math.max(7, Math.min(30, Number.isFinite(raw) ? Math.round(raw) : 14));
+    const raw = Number(options.lookaheadDays ?? cfg.CATALOGUE_LOOKAHEAD_DAYS ?? currentNearbyLookaheadDays ?? 21);
+    return Math.max(7, Math.min(45, Number.isFinite(raw) ? Math.round(raw) : 21));
   }
 
   function getConfiguredNearbyMaxCinemas(radius, options = {}) {
@@ -220,9 +216,9 @@
 
     const cfg = getNearbyConfig();
     const defaults = cfg.CATALOGUE_MAX_CINEMAS || {};
-    if (radius >= 50000) return Number(defaults.large) || 24;
-    if (radius >= 30000) return Number(defaults.medium) || 18;
-    return Number(defaults.small) || 12;
+    if (radius >= 50000) return Number(defaults.large) || 48;
+    if (radius >= 30000) return Number(defaults.medium) || 36;
+    return Number(defaults.small) || 24;
   }
 
   function getTmdbImageBase(size = 'w500') {
@@ -579,6 +575,34 @@
     );
   }
 
+  const NEARBY_MONTH_INDEX = {
+    janvier: 0, janv: 0, jan: 0,
+    fevrier: 1, fevr: 1, fev: 1, february: 1,
+    mars: 2,
+    avril: 3, avr: 3, april: 3,
+    mai: 4, may: 4,
+    juin: 5, jun: 5, june: 5,
+    juillet: 6, juil: 6, jul: 6, july: 6,
+    aout: 7, aou: 7, aug: 7, august: 7,
+    septembre: 8, sept: 8, sep: 8,
+    octobre: 9, oct: 9,
+    novembre: 10, nov: 10,
+    decembre: 11, dec: 11
+  };
+
+  function normalizeMonthToken(value) {
+    return stripAccents(String(value || '').toLowerCase()).replace(/\.$/, '').trim();
+  }
+
+  function buildNearbyAbsoluteDate(year, monthIndex, day) {
+    const safeYear = Number(year);
+    const safeMonth = Number(monthIndex);
+    const safeDay = Number(day);
+    if (!Number.isFinite(safeYear) || !Number.isFinite(safeMonth) || !Number.isFinite(safeDay)) return null;
+    const date = new Date(safeYear, safeMonth, safeDay);
+    return Number.isNaN(date.getTime()) ? null : startOfLocalDay(date);
+  }
+
   function startOfLocalDay(date = new Date()) {
     return new Date(date.getFullYear(), date.getMonth(), date.getDate());
   }
@@ -640,14 +664,46 @@
     }
     if (relativeDate) return relativeDate;
 
+    const normalized = stripAccents(text.toLowerCase())
+      .replace(/[,()]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    const monthMatch = normalized.match(/\b(?:lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche|lun|mar|mer|jeu|ven|sam|dim)?\.?\s*(\d{1,2})(?:er)?\s+(janvier|janv|jan|fevrier|fevr|fev|mars|avril|avr|mai|juin|juillet|juil|aout|aou|septembre|sept|octobre|oct|novembre|nov|decembre|dec)(?:\s+(\d{4}))?/i);
+    if (monthMatch) {
+      const day = Number(monthMatch[1]);
+      const monthIndex = NEARBY_MONTH_INDEX[normalizeMonthToken(monthMatch[2])];
+      const fallbackYear = (fallbackDate instanceof Date && !Number.isNaN(fallbackDate.getTime())) ? fallbackDate.getFullYear() : new Date().getFullYear();
+      const year = monthMatch[3] ? Number(monthMatch[3]) : fallbackYear;
+      const absoluteDate = buildNearbyAbsoluteDate(year, monthIndex, day);
+      if (absoluteDate) {
+        const timeMatch = text.match(/\b(\d{1,2})[:h](\d{2})\b/);
+        if (timeMatch) return combineDayAndTime(absoluteDate, timeMatch[1], timeMatch[2]);
+        return absoluteDate;
+      }
+    }
+
+    const slashMatch = normalized.match(/\b(\d{1,2})[\/-](\d{1,2})(?:[\/-](\d{2,4}))?\b/);
+    if (slashMatch) {
+      const day = Number(slashMatch[1]);
+      const monthIndex = Number(slashMatch[2]) - 1;
+      const fallbackYear = (fallbackDate instanceof Date && !Number.isNaN(fallbackDate.getTime())) ? fallbackDate.getFullYear() : new Date().getFullYear();
+      let year = slashMatch[3] ? Number(slashMatch[3]) : fallbackYear;
+      if (year < 100) year += 2000;
+      const absoluteDate = buildNearbyAbsoluteDate(year, monthIndex, day);
+      if (absoluteDate) {
+        const timeMatch = text.match(/\b(\d{1,2})[:h](\d{2})\b/);
+        if (timeMatch) return combineDayAndTime(absoluteDate, timeMatch[1], timeMatch[2]);
+        return absoluteDate;
+      }
+    }
+
     // Format ISO : 2026-05-23T17:00:00 ou 2026-05-23 17:00.
     const isoMatch = text.match(/(20\d{2}-\d{2}-\d{2})(?:[T\s]+(\d{1,2})[:h](\d{2}))?/);
     if (isoMatch) {
       const [, day, hour = '0', minute = '0'] = isoMatch;
       const parsed = new Date(`${day}T${String(hour).padStart(2, '0')}:${minute}:00`);
 
-      // Correction 3.5.3 : certains cinémas renvoient une ancienne date ISO mais le bloc parent
-      // porte la vraie date relative (ex : Demain). Dans ce cas on garde l'heure et on utilise le jour parent.
       if (fallbackDate && hour && minute && (!parsed || !isShowtimeInNearbyWindow(parsed))) {
         const rebased = combineDayAndTime(fallbackDate, hour, minute);
         if (rebased) return rebased;
@@ -687,7 +743,7 @@
   }
 
   function keyLooksLikeShowtimeDate(key = '') {
-    return /(startsAt|startAt|datetime|dateTime|showtime|showTime|horaire|time|date|jour|day|seance|séance|session)/i.test(String(key));
+    return /(startsAt|startAt|datetime|dateTime|showtime|showTime|horaire|time|date|jour|day|seance|séance|session|label|display)/i.test(String(key));
   }
 
   function extractShowtimeEntries(item) {
@@ -701,10 +757,11 @@
     }
 
     function visit(node, path = '$', fallbackDate = null, depth = 0) {
-      if (node === null || node === undefined || depth > 8) return;
+      if (node === null || node === undefined || depth > 12) return;
 
       if (typeof node === 'string' || typeof node === 'number' || node instanceof Date) {
-        if (keyLooksLikeShowtimeDate(path)) pushDate(node, fallbackDate);
+        const parsedDirect = parseShowtimeDate(node, fallbackDate);
+        if (keyLooksLikeShowtimeDate(path) || parsedDirect) pushDate(node, fallbackDate);
         return;
       }
 
@@ -715,7 +772,8 @@
       const objectDate = parseShowtimeDate(firstString(
         node.__nearbyFallbackDate, node.__nearbyRequestedDate, node.__nearbyApiDate,
         node.date, node.day, node.jour, node.showDate, node.sessionDate,
-        node.dateLabel, node.dayLabel, node.label, node.tabLabel, node.displayDate, node.displayDay
+        node.dateLabel, node.dayLabel, node.label, node.tabLabel, node.displayDate, node.displayDay,
+        node.sessionLabel, node.dayText, node.dateText, node.heading, node.header
       ), fallbackDate) || fallbackDate;
 
       const directValues = [
@@ -759,7 +817,8 @@
     const itemDate = parseShowtimeDate(firstString(
       item.__nearbyFallbackDate, item.__nearbyRequestedDate, item.__nearbyApiDate,
       item.date, item.day, item.jour, item.showDate, item.sessionDate,
-      item.dateLabel, item.dayLabel, item.label, item.tabLabel, item.displayDate, item.displayDay
+      item.dateLabel, item.dayLabel, item.label, item.tabLabel, item.displayDate, item.displayDay,
+      item.sessionLabel, item.dayText, item.dateText, item.heading, item.header
     ));
     for (const arr of possibleArrays) {
       if (!Array.isArray(arr)) continue;
@@ -1204,7 +1263,7 @@
         <div class="nearby-catalogue-head">
           <div>
             <h2>Films proches trouvés</h2>
-            <p>ZIP 4.9 : films avec au moins une séance proche dans les prochains jours, avec horaires lisibles.</p>
+            <p>ZIP 4.9.1 : films avec au moins une séance proche dans les prochains jours, y compris les libellés de dates françaises.</p>
           </div>
           <div class="nearby-catalogue-stats">
             <div class="nearby-catalogue-stat"><strong>${stats.total}</strong> films</div>
@@ -1554,7 +1613,7 @@
     }
     if (!location) location = await window.PLACES.geolocate();
 
-    console.log(`[Catalogue proche] ZIP 4.9 actif — séances proches analysées sur ${lookaheadDays} jour(s).`);
+    console.log(`[Catalogue proche] ZIP 4.9.1 actif — séances proches analysées sur ${lookaheadDays} jour(s).`);
     debugLog('[Catalogue proche] Position utilisée :', location);
 
     // ZIP 3.6.7 : une nouvelle recherche remplace toujours l'ancien cache.
@@ -1678,13 +1737,18 @@
       return b.ratingValue - a.ratingValue;
     });
 
+    const cinemasWithShowtimes = Array.from(moviesByKey.values()).filter(movie => Array.isArray(movie.cinemas) && movie.cinemas.length).length;
+
     const stats = {
       total: ranked.length,
       rated: ranked.filter(movie => movie.ratingValue !== null && movie.ratingValue !== undefined).length,
       local: ranked.filter(movie => movie.ratingKind === 'local').length,
       tmdb: ranked.filter(movie => movie.ratingKind === 'tmdb').length,
       missing: ranked.filter(movie => movie.enrichmentStatus === 'missing').length,
-      tmdbEnriched: ranked.filter(movie => movie.enrichmentStatus === 'tmdb-enriched').length
+      tmdbEnriched: ranked.filter(movie => movie.enrichmentStatus === 'tmdb-enriched').length,
+      scannedCinemas: Math.min(cinemas.length, maxCinemas),
+      cinemasFound: cinemas.length,
+      cinemasWithShowtimes
     };
 
     const missingDraft = buildMissingCatalogueDraft(ranked);
@@ -1692,7 +1756,8 @@
     const runtimeFusion = buildRuntimeCatalogueFusion(ranked);
     const nearbyRankedCatalogue = buildNearbyCatalogueRankedExport(ranked);
 
-    console.log(`[Catalogue proche] Résultat ZIP 3.9.2 : ${stats.total} film(s), ${stats.rated} avec note, ${stats.tmdbEnriched} film(s) fusionné(s) TMDB.`);
+    console.log(`[Catalogue proche] Résultat ZIP 4.9.1 : ${stats.total} film(s), ${stats.rated} avec note, ${stats.tmdbEnriched} film(s) fusionné(s) TMDB.`);
+    console.log(`[Catalogue proche] Cinémas trouvés : ${stats.cinemasFound}, analysés : ${stats.scannedCinemas}, avec séances exploitables : ${stats.cinemasWithShowtimes}.`);
     debugGroup('[Catalogue proche] Debug correspondances titres');
     debugTable(matchDebug);
     debugGroupEnd();
@@ -1767,7 +1832,7 @@
 
     try {
       const storedPayload = {
-        version: '4.9.0',
+        version: '4.9.1',
         updatedAt: new Date().toISOString(),
         lookaheadDays,
         radius,
@@ -1776,7 +1841,7 @@
         stats: window.NEARBY_CATALOGUE_STATS
       };
       const activePayload = {
-        version: '4.9.0',
+        version: '4.9.1',
         source: 'active-nearby-catalogue',
         searchDate: formatLocalDateYYYYMMDD(new Date()),
         updatedAt: new Date().toISOString(),
@@ -1791,7 +1856,7 @@
       localStorage.setItem('cinepro_nearby_ranked_catalogue', JSON.stringify(nearbyPayload));
       localStorage.setItem('cinepro_active_catalogue', JSON.stringify(activePayload));
       window.CINEPRO_ACTIVE_CATALOGUE = nearbyRankedCatalogue;
-      console.log(`[Catalogue proche] ZIP 4.9 : catalogue actif sauvegardé (${nearbyRankedCatalogue.length} films, fenêtre ${lookaheadDays} jours).`);
+      console.log(`[Catalogue proche] ZIP 4.9.1 : catalogue actif sauvegardé (${nearbyRankedCatalogue.length} films, fenêtre ${lookaheadDays} jours).`);
       window.dispatchEvent(new CustomEvent('nearby-catalogue-runtime-ready', { detail: storedPayload }));
       window.dispatchEvent(new CustomEvent('nearby-catalogue-ranked-ready', { detail: nearbyPayload }));
       window.dispatchEvent(new CustomEvent('cinepro-active-catalogue-ready', { detail: activePayload }));

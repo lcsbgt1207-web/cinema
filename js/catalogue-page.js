@@ -9,7 +9,7 @@ const CATALOGUE_BACKEND_BASE_URL = (window.CONFIG && CONFIG.BACKEND_BASE_URL) ||
 const LETTERBOXD_API_URL = `${CATALOGUE_BACKEND_BASE_URL}/api/films-letterboxd`;
 const IMDB_SYNOPSIS_API_URL = `${CATALOGUE_BACKEND_BASE_URL}/api/imdb-synopsis`;
 const CATALOGUE_RECENT_MONTHS_LIMIT = 12;
-const CATALOGUE_LOOKAHEAD_DAYS = Number((window.CONFIG && CONFIG.CATALOGUE_LOOKAHEAD_DAYS) || 14) || 14;
+const CATALOGUE_LOOKAHEAD_DAYS = Number((window.CONFIG && CONFIG.CATALOGUE_LOOKAHEAD_DAYS) || 21) || 21;
 const LETTERBOXD_MIN_VALID_RATING = 0.5;
 const CINEPRO_STORAGE = window.CINEPRO_STORAGE || null;
 const STORAGE_KEYS = CINEPRO_STORAGE?.KEYS || {
@@ -182,7 +182,7 @@ function isFreshNearbyPayload(payload) {
   // ZIP 3.8.1 : un seul catalogue proche actif, valable toute la journée.
   // On ne rejette plus un bon catalogue après 30 minutes : cela faisait retomber la page sur les 80 films.
   if (!payload || typeof payload !== 'object') return false;
-  const acceptedVersions = new Set(['3.7.3', '3.7.4', '3.8.1', '3.8.3', '3.8.4', '3.8.5', '3.8.6', '3.9.2', '3.9.4', '3.9.8', '4.9.0']);
+  const acceptedVersions = new Set(['3.7.3', '3.7.4', '3.8.1', '3.8.3', '3.8.4', '3.8.5', '3.8.6', '3.9.2', '3.9.4', '3.9.8', '4.9.0', '4.9.1']);
   if (payload.version && !acceptedVersions.has(String(payload.version))) return false;
   if (!Array.isArray(payload.films) || !payload.films.length) return false;
   const stamp = payload.searchDate || payload.updatedAt || payload.createdAt;
@@ -228,7 +228,7 @@ function writeActiveCatalogueFromFilms(films, meta = {}) {
   const now = new Date();
   const lastSearch = readLastNearbySearch();
   const payload = {
-    version: '4.9.0',
+    version: '4.9.1',
     source: meta.source || 'active-nearby-catalogue',
     searchDate: getLocalDateKey(now),
     updatedAt: now.toISOString(),
@@ -444,7 +444,7 @@ function getCatalogueSource() {
   window.CINEPRO_CATALOGUE_FILTER_STATS = stats;
 
   if (isCatalogueDebugEnabled()) {
-    console.log(`[Catalogue] ZIP 4.8 : ${active.label} utilisé (${stats.kept}/${stats.sourceTotal} reprises, ${stats.excludedRecent} récents exclus, ${stats.unknownYearKept} années inconnues gardées, référence ${stats.referenceSource}).`);
+    console.log(`[Catalogue] ZIP 4.9.1 : ${active.label} utilisé (${stats.kept}/${stats.sourceTotal} reprises, ${stats.excludedRecent} récents exclus, ${stats.unknownYearKept} années inconnues gardées, référence ${stats.referenceSource}).`);
   }
   return merged;
 }
@@ -548,7 +548,7 @@ async function runCatalogueLocationSearch(target = {}) {
     filterTable();
     return true;
   } catch (error) {
-    console.warn('[Catalogue] ZIP 4.9 : recherche autonome impossible :', error?.message || error);
+    console.warn('[Catalogue] ZIP 4.9.1 : recherche autonome impossible :', error?.message || error);
     if (!hasNearbyCatalogue()) {
       setCatalogueSearchStatus('Recherche impossible. Autorisez la position ou entrez une ville pour voir les séances des prochains jours.');
     } else {

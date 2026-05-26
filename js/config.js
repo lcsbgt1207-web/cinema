@@ -19,12 +19,13 @@ const CONFIG = {
   BACKEND_LOCAL_URL: 'http://localhost:3000',
   BACKEND_PROD_URL: 'https://cinepro-api-yal8.onrender.com',
 
-  // ZIP 4.9 : paramètres Catalogue à venir.
-  CATALOGUE_LOOKAHEAD_DAYS: 14,
+  // ZIP 4.9.1 : on regarde plus loin et sur plus de cinémas pour mieux remonter
+  // les reprises, séances spéciales et films à venir du Catalogue.
+  CATALOGUE_LOOKAHEAD_DAYS: 21,
   CATALOGUE_MAX_CINEMAS: {
-    small: 12,
-    medium: 18,
-    large: 24
+    small: 24,
+    medium: 36,
+    large: 48
   }
 };
 
