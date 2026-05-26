@@ -145,7 +145,7 @@
   <div class="toolbar">
     <div class="toolbar-search">
       <i class="ti ti-search"></i>
-      <input type="text" id="search-input" placeholder="Titre, réalisateur…" oninput="filterTable()" />
+      <input type="text" id="search-input" placeholder="Ville ou adresse…" oninput="scheduleCatalogueLocationSearch()" autocomplete="street-address" />
     </div>
     <select class="filter-select" id="genre-filter" onchange="filterTable()">
       <option value="">Tous les genres</option>
@@ -172,7 +172,7 @@
       <option>Années 1990</option>
       <option>Avant 1990</option>
     </select>
-    <select class="filter-select" id="radius-filter">
+    <select class="filter-select" id="radius-filter" onchange="handleCatalogueRadiusChange()">
       <option>Rayon : 5 km</option>
       <option selected>Rayon : 15 km</option>
       <option>Rayon : 30 km</option>
@@ -260,9 +260,9 @@
 <script src="js/nearby-catalogue.js?v=3.8.5"></script>
 <script src="js/storage.js?v=3.9.4"></script>
 <script src="js/catalogue-render.js?v=3.9.5"></script>
-<script src="js/catalogue-debug.js?v=4.7.5"></script>
+<script src="js/catalogue-debug.js?v=4.7.6"></script>
 <script src="js/film-modal.js?v=4.3.1"></script>
-<script src="js/catalogue-page.js?v=4.7.5"></script>
+<script src="js/catalogue-page.js?v=4.7.6"></script>
 <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAx4ILK4VPFvYxaZX-HwpUPMEOpkQLJEmE&libraries=places&language=fr&callback=initNearbyCatalogueGoogleMaps"></script>
 </body>
 </html>

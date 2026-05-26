@@ -61,6 +61,10 @@ const favs = new Set(readCatalogueFavorites());
 let sortKey = 'imdb', sortDir = -1;
 let currentPage = 1;
 let pageSize = 8;
+let lastCatalogueSearchTarget = null;
+let catalogueLocationSearchTimer = null;
+let catalogueAutoSearchStarted = false;
+let catalogueSearchRunning = false;
 let lastCatalogueFilterStats = {
   sourceTotal: 0,
   kept: 0,
@@ -387,7 +391,7 @@ function getCatalogueSource() {
   window.CINEPRO_CATALOGUE_FILTER_STATS = stats;
 
   if (isCatalogueDebugEnabled()) {
-    console.log(`[Catalogue] ZIP 4.7.5 : ${active.label} utilisé (${stats.kept}/${stats.sourceTotal} reprises, ${stats.excludedRecent} récents exclus, ${stats.unknownYearKept} années inconnues gardées, référence ${stats.referenceSource}).`);
+    console.log(`[Catalogue] ZIP 4.7.6 : ${active.label} utilisé (${stats.kept}/${stats.sourceTotal} reprises, ${stats.excludedRecent} récents exclus, ${stats.unknownYearKept} années inconnues gardées, référence ${stats.referenceSource}).`);
   }
   return merged;
 }
@@ -422,6 +426,90 @@ function setCatalogueMode(_mode) {
   refreshCatalogueFromRuntime();
 }
 window.setCatalogueMode = setCatalogueMode;
+
+function getCatalogueSelectedRadius() {
+  const select = document.getElementById('radius-filter');
+  const raw = select?.value || select?.selectedOptions?.[0]?.textContent || '15';
+  const km = Number(String(raw).match(/\d+/)?.[0] || 15);
+  return Math.max(1000, km * 1000);
+}
+
+function setCatalogueSearchStatus(message) {
+  const countLabel = document.getElementById('count-label');
+  const filmCount = document.getElementById('film-count');
+  if (countLabel) countLabel.textContent = message;
+  if (filmCount) filmCount.textContent = message;
+}
+
+async function runCatalogueLocationSearch(target = {}) {
+  if (catalogueSearchRunning || typeof getNearbyRankedMovies !== 'function') return false;
+  const radius = getCatalogueSelectedRadius();
+  const address = String(target.address || '').trim();
+  const location = target.location || null;
+  if (!address && !location) return false;
+
+  catalogueSearchRunning = true;
+  lastCatalogueSearchTarget = { address, location };
+  setCatalogueSearchStatus(address ? `Recherche des reprises près de ${address}…` : 'Recherche des reprises autour de vous…');
+
+  try {
+    await getNearbyRankedMovies({ address, location, radius });
+    catalogue = getCatalogueSource();
+    sortKey = 'bestNote';
+    sortDir = -1;
+    currentPage = 1;
+    filterTable();
+    return true;
+  } catch (error) {
+    console.warn('[Catalogue] ZIP 4.7.6 : recherche autonome impossible :', error?.message || error);
+    setCatalogueSearchStatus('Recherche impossible. Autorisez la position ou entrez une ville.');
+    return false;
+  } finally {
+    catalogueSearchRunning = false;
+  }
+}
+
+function scheduleCatalogueLocationSearch() {
+  window.clearTimeout(catalogueLocationSearchTimer);
+  catalogueLocationSearchTimer = window.setTimeout(() => {
+    const input = document.getElementById('search-input');
+    const address = String(input?.value || '').trim();
+    if (address.length >= 3) runCatalogueLocationSearch({ address });
+  }, 700);
+}
+window.scheduleCatalogueLocationSearch = scheduleCatalogueLocationSearch;
+
+function handleCatalogueRadiusChange() {
+  if (lastCatalogueSearchTarget) {
+    runCatalogueLocationSearch(lastCatalogueSearchTarget);
+    return;
+  }
+  const input = document.getElementById('search-input');
+  const address = String(input?.value || '').trim();
+  if (address.length >= 3) runCatalogueLocationSearch({ address });
+}
+window.handleCatalogueRadiusChange = handleCatalogueRadiusChange;
+
+function startCatalogueAutonomousSearch() {
+  if (catalogueAutoSearchStarted) return;
+  catalogueAutoSearchStarted = true;
+  if (!navigator.geolocation) {
+    setCatalogueSearchStatus('Autorisez votre position ou entrez une ville pour afficher les reprises.');
+    return;
+  }
+  setCatalogueSearchStatus('Autorisez votre position pour afficher les reprises près de vous…');
+  navigator.geolocation.getCurrentPosition(
+    position => {
+      runCatalogueLocationSearch({
+        location: { lat: position.coords.latitude, lng: position.coords.longitude }
+      });
+    },
+    () => {
+      setCatalogueSearchStatus('Position refusée. Entrez une ville pour afficher les reprises.');
+    },
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }
+  );
+}
 
 function refreshCatalogueFromRuntime() {
   updateCatalogueModeControl();
@@ -521,7 +609,7 @@ function updateIcons() {
 }
 
 function filterTable() {
-  const q = document.getElementById('search-input').value.toLowerCase();
+  const q = '';
   const g = document.getElementById('genre-filter').value;
   const d = document.getElementById('decade-filter').value;
 
@@ -848,7 +936,9 @@ async function initCatalogue() {
   // Si aucune donnée proche n'est prête, le tableau affiche un état d'attente au lieu des 80 films classiques.
   scheduleNearbyCatalogueAutoBuild();
 
-  // 1) Afficher immédiatement la meilleure source disponible. Le mode utilisateur reste Films proches.
+  // 1) Le Catalogue est autonome : on demande la position puis on peut chercher une ville.
+  startCatalogueAutonomousSearch();
+
   updateCatalogueModeControl();
   catalogue = getCatalogueSource();
   sortKey = 'bestNote'; sortDir = -1;
