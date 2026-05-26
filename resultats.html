@@ -655,23 +655,7 @@
     }
   }
 
-  function renderFilmsFallback(cinema) {
-    // Fallback : afficher les films TMDB populaires
-    const filmsToShow = nowPlayingFilms.slice(0, 5);
-    return filmsToShow.map(f => {
-      const poster = TMDB.posterUrl(f.poster_path, 'w92');
-      const cineData = JSON.stringify({
-        id: cinema.id, nom: cinema.nom, adresse: cinema.adresse,
-        location: cinema.location, dist: cinema.dist, ouvert: cinema.ouvert
-      }).replace(/"/g,'&quot;');
-      return `<div class="film-thumb" onclick="openFilmPopup(${f.id}, JSON.parse(this.dataset.c))" data-c="${cineData}">
-        <div class="film-thumb-poster">
-          ${poster ? `<img src="${poster}" alt="${f.title}" loading="lazy" />` : `<i class="ti ti-photo" style="font-size:20px;color:var(--gray-300);"></i>`}
-        </div>
-        <div class="film-thumb-title">${f.title}</div>
-      </div>`;
-    }).join('');
-  }
+
 
   async function openFilmPopupByTitle(titre, cinema) {
     const overlay = document.getElementById('film-overlay');
