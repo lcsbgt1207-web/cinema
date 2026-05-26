@@ -387,7 +387,7 @@ function getCatalogueSource() {
   window.CINEPRO_CATALOGUE_FILTER_STATS = stats;
 
   if (isCatalogueDebugEnabled()) {
-    console.log(`[Catalogue] ZIP 4.6 : ${active.label} utilisé (${stats.kept}/${stats.sourceTotal} reprises, ${stats.excludedRecent} récents exclus, ${stats.unknownYearKept} années inconnues gardées, référence ${stats.referenceSource}).`);
+    console.log(`[Catalogue] ZIP 4.7.2 : ${active.label} utilisé (${stats.kept}/${stats.sourceTotal} reprises, ${stats.excludedRecent} récents exclus, ${stats.unknownYearKept} années inconnues gardées, référence ${stats.referenceSource}).`);
   }
   return merged;
 }
@@ -407,7 +407,7 @@ function updateCatalogueModeControl() {
         : readStoredNearbyCatalogue().length));
     const stats = window.CINEPRO_CATALOGUE_FILTER_STATS || lastCatalogueFilterStats;
     nearbyOption.textContent = stats?.sourceTotal && stats.sourceTotal !== stats.kept
-      ? `Reprises affichées — ${stats.kept}/${stats.sourceTotal} films`
+      ? `Reprises — ${stats.kept}/${stats.sourceTotal} films`
       : (count ? `Reprises affichées — ${count} films` : 'Reprises et films anciens — lance une recherche');
   }
 }
