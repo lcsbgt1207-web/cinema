@@ -11,3 +11,4 @@ getNearbyRankedMovies({ address: 'Cergy', radius: 15000 })
 
 Tu dois voir dans la console :
 [Catalogue proche] ZIP 2.9.2 actif.
+force pages redeploy Tue May 26 14:09:58     2026
