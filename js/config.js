@@ -17,7 +17,15 @@ const CONFIG = {
   // ZIP 4.8 : URLs backend centralisées.
   // En local on utilise le backend lancé sur localhost:3000 ; en production, Render.
   BACKEND_LOCAL_URL: 'http://localhost:3000',
-  BACKEND_PROD_URL: 'https://cinepro-api-yal8.onrender.com'
+  BACKEND_PROD_URL: 'https://cinepro-api-yal8.onrender.com',
+
+  // ZIP 4.9 : paramètres Catalogue à venir.
+  CATALOGUE_LOOKAHEAD_DAYS: 14,
+  CATALOGUE_MAX_CINEMAS: {
+    small: 12,
+    medium: 18,
+    large: 24
+  }
 };
 
 CONFIG.BACKEND_BASE_URL = (() => {

@@ -969,7 +969,7 @@ function buildPopupSeancesHTML(cinemas) {
                `).join('')}</div>
              </div>
            `).join('')}`
-        : '<div class="popup-showtimes-muted">Aucune séance dans les 7 prochains jours.</div>';
+        : '<div class="popup-showtimes-muted">Aucune séance trouvée dans les prochains jours.</div>';
       return `<div class="popup-cinema-row">
         <div class="popup-cinema-name"><i class="ti ti-map-pin"></i>${escapeHTML(nom)}${distanceLabel}</div>
         ${horairesHTML}

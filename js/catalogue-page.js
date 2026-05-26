@@ -1,4 +1,4 @@
-// CinéProche — Catalogue proche — ZIP 4.8
+// CinéProche — Catalogue proche — ZIP 4.9
 // Rôle : orchestrer le catalogue des films projetés près de la dernière recherche.
 // Flux stable : cache avec rayon -> réhydratation runtime -> affichage via catalogue-render.js.
 // Ce fichier ne gère pas le HTML du tableau et ne modifie pas les séances directement.
@@ -9,6 +9,7 @@ const CATALOGUE_BACKEND_BASE_URL = (window.CONFIG && CONFIG.BACKEND_BASE_URL) ||
 const LETTERBOXD_API_URL = `${CATALOGUE_BACKEND_BASE_URL}/api/films-letterboxd`;
 const IMDB_SYNOPSIS_API_URL = `${CATALOGUE_BACKEND_BASE_URL}/api/imdb-synopsis`;
 const CATALOGUE_RECENT_MONTHS_LIMIT = 12;
+const CATALOGUE_LOOKAHEAD_DAYS = Number((window.CONFIG && CONFIG.CATALOGUE_LOOKAHEAD_DAYS) || 14) || 14;
 const LETTERBOXD_MIN_VALID_RATING = 0.5;
 const CINEPRO_STORAGE = window.CINEPRO_STORAGE || null;
 const STORAGE_KEYS = CINEPRO_STORAGE?.KEYS || {
@@ -181,7 +182,7 @@ function isFreshNearbyPayload(payload) {
   // ZIP 3.8.1 : un seul catalogue proche actif, valable toute la journée.
   // On ne rejette plus un bon catalogue après 30 minutes : cela faisait retomber la page sur les 80 films.
   if (!payload || typeof payload !== 'object') return false;
-  const acceptedVersions = new Set(['3.7.3', '3.7.4', '3.8.1', '3.8.3', '3.8.4', '3.8.5', '3.8.6', '3.9.2', '3.9.4', '3.9.8']);
+  const acceptedVersions = new Set(['3.7.3', '3.7.4', '3.8.1', '3.8.3', '3.8.4', '3.8.5', '3.8.6', '3.9.2', '3.9.4', '3.9.8', '4.9.0']);
   if (payload.version && !acceptedVersions.has(String(payload.version))) return false;
   if (!Array.isArray(payload.films) || !payload.films.length) return false;
   const stamp = payload.searchDate || payload.updatedAt || payload.createdAt;
@@ -227,7 +228,7 @@ function writeActiveCatalogueFromFilms(films, meta = {}) {
   const now = new Date();
   const lastSearch = readLastNearbySearch();
   const payload = {
-    version: '3.9.8',
+    version: '4.9.0',
     source: meta.source || 'active-nearby-catalogue',
     searchDate: getLocalDateKey(now),
     updatedAt: now.toISOString(),
@@ -295,8 +296,20 @@ function getNearbyRatingSource(film) {
 }
 
 function getNearbyCinemaLabel(film) {
+  if (film?.nextCinemaName) return String(film.nextCinemaName);
   const cinemas = Array.isArray(film.nearbyCinemas) && film.nearbyCinemas.length ? film.nearbyCinemas : (Array.isArray(film.cinemas) ? film.cinemas : []);
   return cinemas.map(c => c?.nom || c?.name || '').filter(Boolean).slice(0, 2).join(', ') || 'cinéma proche';
+}
+
+function getNearbyNextShowtimeLabel(film) {
+  if (film?.nextShowtimeLabel) return String(film.nextShowtimeLabel);
+  const cinemas = Array.isArray(film?.nearbyCinemas) ? film.nearbyCinemas : (Array.isArray(film?.cinemas) ? film.cinemas : []);
+  for (const cinema of cinemas) {
+    const structured = Array.isArray(cinema?.structuredHoraires) ? cinema.structuredHoraires : (Array.isArray(cinema?.showtimes) ? cinema.showtimes : []);
+    const first = structured.find(item => item && (item.label || item.startsAt));
+    if (first?.label) return String(first.label);
+  }
+  return '';
 }
 
 function formatNearbyBestNote(film) {
@@ -516,17 +529,17 @@ async function runCatalogueLocationSearch(target = {}) {
 
   catalogueSearchRunning = true;
   lastCatalogueSearchTarget = { address, location };
-  setCatalogueSearchStatus(address ? `Recherche des films proches hors nouveautés près de ${address}…` : 'Recherche des films proches hors nouveautés autour de vous…');
+  setCatalogueSearchStatus(address ? `Recherche des films proches hors nouveautés dans les ${CATALOGUE_LOOKAHEAD_DAYS} prochains jours près de ${address}…` : `Recherche des films proches hors nouveautés dans les ${CATALOGUE_LOOKAHEAD_DAYS} prochains jours autour de vous…`);
 
   try {
     setCatalogueSearchStatus('Chargement de Google Maps…');
     await waitForCatalogueSearchServices();
-    setCatalogueSearchStatus(address ? `Recherche des films proches hors nouveautés près de ${address}…` : 'Recherche des films proches hors nouveautés autour de vous…');
+    setCatalogueSearchStatus(address ? `Recherche des films proches hors nouveautés dans les ${CATALOGUE_LOOKAHEAD_DAYS} prochains jours près de ${address}…` : `Recherche des films proches hors nouveautés dans les ${CATALOGUE_LOOKAHEAD_DAYS} prochains jours autour de vous…`);
 
     const searchFn = getNearbyRankedMoviesSafe();
     if (!searchFn) throw new Error('Recherche catalogue indisponible.');
 
-    const options = location ? { location, radius } : { address, radius };
+    const options = location ? { location, radius, lookaheadDays: CATALOGUE_LOOKAHEAD_DAYS } : { address, radius, lookaheadDays: CATALOGUE_LOOKAHEAD_DAYS };
     await searchFn(options);
     catalogue = getCatalogueSource();
     sortKey = 'bestNote';
@@ -535,9 +548,9 @@ async function runCatalogueLocationSearch(target = {}) {
     filterTable();
     return true;
   } catch (error) {
-    console.warn('[Catalogue] ZIP 4.8 : recherche autonome impossible :', error?.message || error);
+    console.warn('[Catalogue] ZIP 4.9 : recherche autonome impossible :', error?.message || error);
     if (!hasNearbyCatalogue()) {
-      setCatalogueSearchStatus('Recherche impossible. Autorisez la position ou entrez une ville.');
+      setCatalogueSearchStatus('Recherche impossible. Autorisez la position ou entrez une ville pour voir les séances des prochains jours.');
     } else {
       refreshCatalogueFromRuntime();
     }
@@ -572,10 +585,10 @@ function startCatalogueAutonomousSearch() {
   if (catalogueAutoSearchStarted) return;
   catalogueAutoSearchStarted = true;
   if (!navigator.geolocation) {
-    setCatalogueSearchStatus('Autorisez votre position ou entrez une ville pour afficher les films proches hors nouveautés.');
+    setCatalogueSearchStatus('Autorisez votre position ou entrez une ville pour afficher les films proches hors nouveautés des prochains jours.');
     return;
   }
-  setCatalogueSearchStatus('Autorisez votre position pour afficher les films proches hors nouveautés…');
+  setCatalogueSearchStatus('Autorisez votre position pour afficher les films proches hors nouveautés des prochains jours…');
   navigator.geolocation.getCurrentPosition(
     position => {
       runCatalogueLocationSearch({
@@ -583,7 +596,7 @@ function startCatalogueAutonomousSearch() {
       });
     },
     () => {
-      setCatalogueSearchStatus('Position refusée. Entrez une ville pour afficher les films proches hors nouveautés.');
+      setCatalogueSearchStatus('Position refusée. Entrez une ville pour afficher les films proches hors nouveautés des prochains jours.');
     },
     { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }
   );
@@ -655,11 +668,14 @@ function renderTable(data) {
     currentPage,
     pageSize,
     catalogueMode,
+    lookaheadDays: CATALOGUE_LOOKAHEAD_DAYS,
+    preserveCountLabels: true,
     nearbyMode: isNearbyModeActive(),
     favs,
     formatNearbyBestNote,
     getNearbyRatingSource,
     getNearbyCinemaLabel,
+    getNearbyNextShowtimeLabel,
     formatClassicRating,
     formatImdbNote
   });

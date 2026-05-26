@@ -1,4 +1,4 @@
-// ZIP 3.9.5 — Rendu du catalogue.
+// ZIP 4.9 — Rendu du catalogue.
 // Rôle : construire uniquement le HTML visible du tableau catalogue et de la pagination.
 // Important : ce fichier ne lit pas localStorage, ne contacte pas TMDB et ne modifie pas les données.
 
@@ -41,13 +41,13 @@
     if (headers.sc) headers.sc.innerHTML = '<span class="source-dot dot-sc"></span> SensCritique <i class="ti ti-selector" id="icon-sc"></i>';
   }
 
-  function renderEmptyNearbyCatalogue() {
+  function renderEmptyNearbyCatalogue(lookaheadDays = 14) {
     setHtml('table-body', `
       <tr>
         <td colspan="8">
           <div class="catalogue-empty-row">
-            <strong>Catalogue proche en attente</strong>
-            Lance une recherche depuis l’accueil, ou attends la fin de la récupération des séances proches.
+            <strong>Aucun film proche trouvé pour le moment</strong>
+            Lance une recherche depuis l’accueil ou réessaie avec un rayon plus large. Le Catalogue vérifie les séances des ${lookaheadDays} prochains jours.
           </div>
         </td>
       </tr>`);
@@ -63,6 +63,7 @@
       formatNearbyBestNote,
       getNearbyRatingSource,
       getNearbyCinemaLabel,
+      getNearbyNextShowtimeLabel,
       formatClassicRating,
       formatImdbNote
     } = context;
@@ -71,11 +72,8 @@
     const poster = film.poster
       ? `<img src="${escapeHtml(film.poster)}" alt="Affiche ${escapeHtml(film.titre)}" loading="lazy">`
       : '<i class="ti ti-photo"></i>';
-    const nearbyCinemaText = (film.nearbyCinemas || film.cinemas || [])
-      .slice(0, 2)
-      .map(cinema => cinema && cinema.nom)
-      .filter(Boolean)
-      .join(', ') || 'cinéma proche';
+    const nearbyCinemaText = getNearbyCinemaLabel(film);
+    const nextShowtimeText = typeof getNearbyNextShowtimeLabel === 'function' ? getNearbyNextShowtimeLabel(film) : '';
 
     return `
       <tr onclick='openCatalogueFilmPopup(${JSON.stringify(id)})'>
@@ -87,7 +85,8 @@
             <div>
               <div class="film-name">${film.lbRank ? '#' + escapeHtml(film.lbRank) + ' · ' : ''}${escapeHtml(film.titre)}</div>
               ${film.original ? `<div class="film-original">${escapeHtml(film.original)}</div>` : ''}
-              ${film.isNearbyShowing ? `<div class="film-original">À l’affiche près de toi · ${escapeHtml(nearbyCinemaText)}</div>` : ''}
+              ${film.isNearbyShowing ? `<div class="film-original">Près de toi · ${escapeHtml(nearbyCinemaText)}</div>` : ''}
+              ${nextShowtimeText ? `<div class="film-original">Prochaine séance · ${escapeHtml(nextShowtimeText)}</div>` : ''}
             </div>
           </div>
         </td>
@@ -158,15 +157,17 @@
     updateTableHeaders(nearbyMode);
 
     if (!data.length && catalogueMode === 'nearby') {
-      renderEmptyNearbyCatalogue();
+      renderEmptyNearbyCatalogue(Number(options.lookaheadDays) || 14);
       return;
     }
 
     setHtml('table-body', pageData.map(film => buildFilmRow(film, options)).join(''));
 
-    const label = data.length + ' film' + (data.length > 1 ? 's' : '') + (nearbyMode ? ' proches' : '');
-    setText('count-label', label);
-    setText('film-count', label);
+    if (!options.preserveCountLabels) {
+      const label = data.length + ' film' + (data.length > 1 ? 's' : '') + (nearbyMode ? ' proches' : '');
+      setText('count-label', label);
+      setText('film-count', label);
+    }
     renderPagination(safePage, totalPages, pageSize);
   }
 

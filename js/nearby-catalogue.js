@@ -10,6 +10,8 @@
   'use strict';
 
   const NEARBY_CATALOGUE_API = 'https://cinepro-api-yal8.onrender.com';
+  let currentNearbyLookaheadDays = 7;
+  let currentNearbyApiBaseUrl = NEARBY_CATALOGUE_API;
   // ZIP 3.8.1 : logs debug désactivés par défaut.
   // Pour les réactiver ponctuellement : localStorage.setItem('cinepro_debug', '1') puis recharger.
   const NEARBY_CATALOGUE_DEBUG = (() => {
@@ -199,6 +201,28 @@
     if (window.CONFIG) return window.CONFIG;
     try { if (typeof CONFIG !== 'undefined') return CONFIG; } catch (_) {}
     return {};
+  }
+
+  function resolveNearbyApiBaseUrl() {
+    const cfg = getNearbyConfig();
+    return String(cfg.BACKEND_BASE_URL || cfg.BACKEND_PROD_URL || NEARBY_CATALOGUE_API || '').replace(/\/$/, '') || NEARBY_CATALOGUE_API;
+  }
+
+  function getConfiguredNearbyLookaheadDays(options = {}) {
+    const cfg = getNearbyConfig();
+    const raw = Number(options.lookaheadDays ?? cfg.CATALOGUE_LOOKAHEAD_DAYS ?? currentNearbyLookaheadDays ?? 7);
+    return Math.max(7, Math.min(30, Number.isFinite(raw) ? Math.round(raw) : 14));
+  }
+
+  function getConfiguredNearbyMaxCinemas(radius, options = {}) {
+    const explicit = Number(options.maxCinemas);
+    if (Number.isFinite(explicit) && explicit > 0) return Math.round(explicit);
+
+    const cfg = getNearbyConfig();
+    const defaults = cfg.CATALOGUE_MAX_CINEMAS || {};
+    if (radius >= 50000) return Number(defaults.large) || 24;
+    if (radius >= 30000) return Number(defaults.medium) || 18;
+    return Number(defaults.small) || 12;
   }
 
   function getTmdbImageBase(size = 'w500') {
@@ -566,14 +590,14 @@
     return `${y}-${m}-${d}`;
   }
 
-  function getNearbyWindowBounds() {
-    // ZIP 3.7.3 : on ne garde plus les séances déjà passées aujourd'hui.
-    // Les sites cinéma masquent généralement les horaires passés, donc le catalogue doit faire pareil.
+  function getNearbyWindowBounds(days = currentNearbyLookaheadDays) {
+    // ZIP 4.9 : le Catalogue doit aussi remonter les séances à venir.
+    // On garde tout à partir de maintenant jusqu'à la fin de la fenêtre demandée.
+    const safeDays = Math.max(1, Number.isFinite(Number(days)) ? Number(days) : currentNearbyLookaheadDays || 14);
     const now = new Date();
     const start = new Date(now.getTime() - 5 * 60 * 1000);
     const endExclusive = startOfLocalDay(now);
-    // J+7 inclus = on garde tout jusqu'au début de J+8.
-    endExclusive.setDate(endExclusive.getDate() + 8);
+    endExclusive.setDate(endExclusive.getDate() + safeDays + 1);
     return { start, endExclusive };
   }
 
@@ -644,9 +668,9 @@
     return Number.isNaN(parsed.getTime()) ? null : parsed;
   }
 
-  function isShowtimeInNearbyWindow(date) {
+  function isShowtimeInNearbyWindow(date, days = currentNearbyLookaheadDays) {
     if (!(date instanceof Date) || Number.isNaN(date.getTime())) return false;
-    const { start, endExclusive } = getNearbyWindowBounds();
+    const { start, endExclusive } = getNearbyWindowBounds(days);
     return date >= start && date < endExclusive;
   }
 
@@ -755,7 +779,7 @@
     const title = extractMovieTitle(movieObject) || extractMovieTitle(rawItem);
     if (!title || !looksLikeRealMovieTitle(title)) return null;
     const horaires = extractShowtimes(rawItem);
-    // ZIP 3.5 : le Catalogue ne garde que les films avec au moins une séance entre aujourd'hui et J+7.
+    // ZIP 4.9 : le Catalogue garde les films avec au moins une séance dans la fenêtre configurée.
     if (!horaires.length) return null;
     return {
       title,
@@ -887,7 +911,8 @@
       lat: cinema?.location?.lat || '',
       lng: cinema?.location?.lng || ''
     });
-    const data = await fetchJsonWithDebug(`${NEARBY_CATALOGUE_API}/search-cinema?${params}`, `search-cinema pour ${cinema?.nom}`);
+    const apiBaseUrl = String(currentNearbyApiBaseUrl || resolveNearbyApiBaseUrl()).replace(/\/$/, '');
+    const data = await fetchJsonWithDebug(`${apiBaseUrl}/search-cinema?${params}`, `search-cinema pour ${cinema?.nom}`);
 
     const candidates = collectCinemaIdCandidates(data, cinema?.nom || '');
     if (candidates.length) {
@@ -1051,14 +1076,16 @@
     return unique;
   }
 
-  async function getCinemaShowtimes(cinema) {
+  async function getCinemaShowtimes(cinema, options = {}) {
     const allocineId = await getCinemaAllocineId(cinema);
     if (!allocineId) return [];
 
     // ZIP 3.5.4 : surtout ne pas utiliser toISOString() ici.
     // toISOString() passe en UTC et peut demander la veille après minuit en France.
     const requestedDate = formatLocalDateYYYYMMDD(new Date());
-    const url = `${NEARBY_CATALOGUE_API}/seances-auto?id=${encodeURIComponent(allocineId)}&date=${requestedDate}&days=7`;
+    const lookaheadDays = getConfiguredNearbyLookaheadDays(options);
+    const apiBaseUrl = String(options.apiBaseUrl || currentNearbyApiBaseUrl || resolveNearbyApiBaseUrl()).replace(/\/$/, '');
+    const url = `${apiBaseUrl}/seances-auto?id=${encodeURIComponent(allocineId)}&date=${requestedDate}&days=${lookaheadDays}`;
     const data = await fetchJsonWithDebug(url, `seances-auto pour ${cinema?.nom}`);
 
     debugLog(`[Catalogue proche][DEBUG] JSON complet /seances-auto pour ${cinema?.nom} :`, data);
@@ -1177,7 +1204,7 @@
         <div class="nearby-catalogue-head">
           <div>
             <h2>Films proches trouvés</h2>
-            <p>ZIP 3.5.4 : uniquement les films avec une séance entre aujourd’hui et J+7, avec horaires lisibles.</p>
+            <p>ZIP 4.9 : films avec au moins une séance proche dans les prochains jours, avec horaires lisibles.</p>
           </div>
           <div class="nearby-catalogue-stats">
             <div class="nearby-catalogue-stat"><strong>${stats.total}</strong> films</div>
@@ -1402,6 +1429,28 @@
     return '';
   }
 
+  function getNextUpcomingMovieShowtime(movie) {
+    const candidates = [];
+
+    for (const cinema of Array.isArray(movie?.cinemas) ? movie.cinemas : []) {
+      const structuredHoraires = collectExportedCinemaShowtimes(cinema);
+      for (const item of structuredHoraires) {
+        const parsed = parseShowtimeDate(item?.startsAt || item?.dateTime || item?.label || item);
+        if (!parsed || !isShowtimeInNearbyWindow(parsed)) continue;
+        candidates.push({
+          startsAt: item?.startsAt || '',
+          label: item?.label || formatNearbyShowtime(parsed),
+          time: item?.time || parsed.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }).replace(':', 'h'),
+          version: item?.version || '',
+          cinemaName: cinema?.nom || '',
+          cinemaDistanceKm: cinema?.distanceKm ?? null
+        });
+      }
+    }
+
+    return candidates.sort((a, b) => String(a.startsAt).localeCompare(String(b.startsAt)))[0] || null;
+  }
+
   function buildNearbyCatalogueRankedExport(ranked) {
     return ranked.map((movie, index) => {
       const local = movie.localFilm || null;
@@ -1415,6 +1464,7 @@
       const bestActors = pickUsefulNearbyCatalogueText(local?.acteurs, tmdb?.acteurs) || 'Non renseigné';
       const bestPoster = local?.poster || tmdb?.poster || movie.poster || '';
       const bestSynopsis = pickUsefulNearbyCatalogueText(local?.synopsis, tmdb?.synopsis) || 'Synopsis à compléter.';
+      const nextShowtime = getNextUpcomingMovieShowtime(movie);
       const bestYear = local?.annee ?? tmdb?.annee ?? null;
       const bestTmdb = Number.isFinite(Number(local?.tmdb)) ? Number(local.tmdb) : (Number.isFinite(Number(tmdb?.tmdb)) ? Number(tmdb.tmdb) : null);
       const bestImdb = Number.isFinite(Number(local?.imdb)) ? Number(local.imdb) : null;
@@ -1457,6 +1507,13 @@
         nearbyMatchedTitle: movie.matchedTitle || tmdb?.titre || '',
         nearbyRatingValue: bestRating,
         nearbyRatingSource: ratingSource,
+        nextShowtimeAt: nextShowtime?.startsAt || '',
+        nextShowtimeLabel: nextShowtime?.label || '',
+        nextShowtimeTime: nextShowtime?.time || '',
+        nextShowtimeVersion: nextShowtime?.version || '',
+        nextCinemaName: nextShowtime?.cinemaName || '',
+        nextCinemaDistanceKm: nextShowtime?.cinemaDistanceKm ?? null,
+        nearbyLookaheadDays: currentNearbyLookaheadDays,
         nearbyCinemas: movie.cinemas.map(c => {
           const structuredHoraires = collectExportedCinemaShowtimes(c);
           return {
@@ -1487,6 +1544,9 @@
 
     const nearbyConfig = getNearbyConfig();
     const radius = options.radius || nearbyConfig.SEARCH_RADIUS || 15000;
+    const lookaheadDays = getConfiguredNearbyLookaheadDays(options);
+    currentNearbyLookaheadDays = lookaheadDays;
+    currentNearbyApiBaseUrl = resolveNearbyApiBaseUrl();
     let location = options.location || null;
     if (!location && options.address) {
       const geocoded = await window.PLACES.geocodeAddress(options.address);
@@ -1494,7 +1554,7 @@
     }
     if (!location) location = await window.PLACES.geolocate();
 
-    console.log('[Catalogue proche] ZIP 3.9.2 actif — catalogue proche stabilisé.');
+    console.log(`[Catalogue proche] ZIP 4.9 actif — séances proches analysées sur ${lookaheadDays} jour(s).`);
     debugLog('[Catalogue proche] Position utilisée :', location);
 
     // ZIP 3.6.7 : une nouvelle recherche remplace toujours l'ancien cache.
@@ -1506,9 +1566,8 @@
     } catch (_) {}
 
     const cinemas = await window.PLACES.findNearbycinemas(location, radius);
-    const defaultMaxCinemas = radius >= 50000 ? 18 : (radius >= 30000 ? 14 : 8);
-    const maxCinemas = Number.isFinite(Number(options.maxCinemas)) ? Number(options.maxCinemas) : defaultMaxCinemas;
-    console.log(`[Catalogue proche] ${cinemas.length} cinéma(s) trouvé(s). Analyse sur ${Math.min(cinemas.length, maxCinemas)} cinéma(s).`);
+    const maxCinemas = getConfiguredNearbyMaxCinemas(radius, options);
+    console.log(`[Catalogue proche] ${cinemas.length} cinéma(s) trouvé(s). Analyse sur ${Math.min(cinemas.length, maxCinemas)} cinéma(s) et ${lookaheadDays} jour(s).`);
     debugLog('[Catalogue proche] Cinémas trouvés :', cinemas);
 
     const moviesByKey = new Map();
@@ -1517,7 +1576,7 @@
     for (const cinema of cinemas.slice(0, maxCinemas)) {
       try {
         debugLog(`[Catalogue proche] Recherche films pour ${cinema.nom}...`);
-        const showtimes = await getCinemaShowtimes(cinema);
+        const showtimes = await getCinemaShowtimes(cinema, { lookaheadDays, apiBaseUrl: currentNearbyApiBaseUrl });
         debugLog(`[Catalogue proche] ${cinema.nom} : ${showtimes.length} film(s) trouvé(s).`, showtimes);
 
         for (const item of showtimes) {
@@ -1708,19 +1767,22 @@
 
     try {
       const storedPayload = {
-        version: '3.9.2',
+        version: '4.9.0',
         updatedAt: new Date().toISOString(),
+        lookaheadDays,
+        radius,
         films: runtimeFusion.films,
         tmdbRuntimeFilms: runtimeFusion.tmdbRuntimeFilms,
         stats: window.NEARBY_CATALOGUE_STATS
       };
       const activePayload = {
-        version: '3.9.2',
+        version: '4.9.0',
         source: 'active-nearby-catalogue',
         searchDate: formatLocalDateYYYYMMDD(new Date()),
         updatedAt: new Date().toISOString(),
         address: options.address || '',
         radius,
+        lookaheadDays,
         films: nearbyRankedCatalogue,
         stats: { total: nearbyRankedCatalogue.length, rated: nearbyRankedCatalogue.filter(f => Number.isFinite(Number(f.bestNote))).length }
       };
@@ -1729,7 +1791,7 @@
       localStorage.setItem('cinepro_nearby_ranked_catalogue', JSON.stringify(nearbyPayload));
       localStorage.setItem('cinepro_active_catalogue', JSON.stringify(activePayload));
       window.CINEPRO_ACTIVE_CATALOGUE = nearbyRankedCatalogue;
-      console.log(`[Catalogue proche] ZIP 3.9.2 : catalogue actif sauvegardé (${nearbyRankedCatalogue.length} films).`);
+      console.log(`[Catalogue proche] ZIP 4.9 : catalogue actif sauvegardé (${nearbyRankedCatalogue.length} films, fenêtre ${lookaheadDays} jours).`);
       window.dispatchEvent(new CustomEvent('nearby-catalogue-runtime-ready', { detail: storedPayload }));
       window.dispatchEvent(new CustomEvent('nearby-catalogue-ranked-ready', { detail: nearbyPayload }));
       window.dispatchEvent(new CustomEvent('cinepro-active-catalogue-ready', { detail: activePayload }));
