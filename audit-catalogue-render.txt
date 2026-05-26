@@ -1,0 +1,90 @@
+=== AUDIT js/catalogue-render.js ===
+
+=== Taille ===
+179 js/catalogue-render.js
+
+=== Références table / rendu / pagination ===
+2:// Rôle : construire uniquement le HTML visible du tableau catalogue et de la pagination.
+44:  function renderEmptyNearbyCatalogue() {
+45:    setHtml('table-body', `
+56:    renderPagination(1, 1);
+113:    const pages = [];
+114:    for (let page = start; page <= Math.min(start + 2, totalPages); page++) pages.push(page);
+116:    if (!pages.includes(totalPages)) {
+117:      if (pages[pages.length - 1] < totalPages - 1) pages.push('ellipsis');
+118:      pages.push(totalPages);
+121:    return pages;
+124:  function renderPagination(currentPage, totalPages, pageSize = 8) {
+125:    const bottom = document.getElementById('catalogue-bottom');
+128:    const pages = getVisiblePaginationPages(currentPage, totalPages);
+130:      <div class="page-state">Page ${currentPage} sur ${totalPages}</div>
+131:      <div class="pagination-controls">
+132:        <button class="page-btn" ${currentPage === 1 ? 'disabled' : ''} onclick="changePage(${currentPage - 1})"><i class="ti ti-chevron-left"></i></button>
+133:        ${pages.map(page => page === 'ellipsis'
+134:          ? '<span class="page-ellipsis">…</span>'
+135:          : `<button class="page-btn ${page === currentPage ? 'active' : ''}" onclick="changePage(${page})">${page}</button>`
+137:        <button class="page-btn" ${currentPage === totalPages ? 'disabled' : ''} onclick="changePage(${currentPage + 1})"><i class="ti ti-chevron-right"></i></button>
+139:      <select class="page-size-select" onchange="changePageSize(this.value)">
+140:        <option value="8" ${pageSize === 8 ? 'selected' : ''}>8 par page</option>
+141:        <option value="12" ${pageSize === 12 ? 'selected' : ''}>12 par page</option>
+142:        <option value="25" ${pageSize === 25 ? 'selected' : ''}>25 par page</option>
+147:  function renderTable(options) {
+150:    const pageSize = Number(options.pageSize) || 8;
+153:    const totalPages = Math.max(1, Math.ceil(data.length / pageSize));
+155:    const start = (safePage - 1) * pageSize;
+156:    const pageData = data.slice(start, start + pageSize);
+161:      renderEmptyNearbyCatalogue();
+165:    setHtml('table-body', pageData.map(film => buildFilmRow(film, options)).join(''));
+170:    renderPagination(safePage, totalPages, pageSize);
+174:    renderTable,
+175:    renderPagination,
+
+=== Références popup / film / click ===
+62:      favs,
+81:      <tr onclick='openCatalogueFilmPopup(${JSON.stringify(id)})'>
+82:        <td><button class="fav-btn ${favs.has(id) ? 'active' : ''}" onclick='event.stopPropagation(); toggleFav(${JSON.stringify(id)}, this)'>
+132:        <button class="page-btn" ${currentPage === 1 ? 'disabled' : ''} onclick="changePage(${currentPage - 1})"><i class="ti ti-chevron-left"></i></button>
+135:          : `<button class="page-btn ${page === currentPage ? 'active' : ''}" onclick="changePage(${page})">${page}</button>`
+137:        <button class="page-btn" ${currentPage === totalPages ? 'disabled' : ''} onclick="changePage(${currentPage + 1})"><i class="ti ti-chevron-right"></i></button>
+
+=== Références notes / source / nearby ===
+3:// Important : ce fichier ne lit pas localStorage, ne contacte pas TMDB et ne modifie pas les données.
+25:  function updateTableHeaders(nearbyMode) {
+32:    if (nearbyMode) {
+33:      if (headers.lb) headers.lb.innerHTML = '<span class="source-dot dot-sc"></span> Note <i class="ti ti-selector" id="icon-lb"></i>';
+34:      if (headers.imdb) headers.imdb.innerHTML = '<span class="source-dot dot-imdb"></span> Source <i class="ti ti-selector" id="icon-imdb"></i>';
+35:      if (headers.sc) headers.sc.innerHTML = '<span class="source-dot dot-lb"></span> Cinéma <i class="ti ti-selector" id="icon-sc"></i>';
+39:    if (headers.lb) headers.lb.innerHTML = '<span class="source-dot dot-lb"></span> Letterboxd <i class="ti ti-selector" id="icon-lb"></i>';
+40:    if (headers.imdb) headers.imdb.innerHTML = '<span class="source-dot dot-imdb"></span> IMDb <i class="ti ti-selector" id="icon-imdb"></i>';
+41:    if (headers.sc) headers.sc.innerHTML = '<span class="source-dot dot-sc"></span> SensCritique <i class="ti ti-selector" id="icon-sc"></i>';
+61:      nearbyMode,
+74:    const nearbyCinemaText = (film.nearbyCinemas || film.cinemas || [])
+90:              ${film.isNearbyShowing ? `<div class="film-original">À l’affiche près de toi · ${escapeHtml(nearbyCinemaText)}</div>` : ''}
+96:        ${nearbyMode ? `
+97:          <td class="td-note sep-left"><span class="nearby-note-main">${escapeHtml(formatNearbyBestNote(film))}</span></td>
+98:          <td class="td-source"><span class="nearby-source-pill">${escapeHtml(getNearbyRatingSource(film))}</span></td>
+99:          <td class="td-cinema"><span class="nearby-cinema-pill"><i class="ti ti-map-pin"></i>${escapeHtml(getNearbyCinemaLabel(film))}</span></td>
+151:    const nearbyMode = Boolean(options.nearbyMode);
+152:    const catalogueMode = options.catalogueMode || 'nearby';
+158:    updateTableHeaders(nearbyMode);
+160:    if (!data.length && catalogueMode === 'nearby') {
+167:    const label = data.length + ' film' + (data.length > 1 ? 's' : '') + (nearbyMode ? ' proches' : '');
+
+=== Références exportées / dépendances globales ===
+132:        <button class="page-btn" ${currentPage === 1 ? 'disabled' : ''} onclick="changePage(${currentPage - 1})"><i class="ti ti-chevron-left"></i></button>
+135:          : `<button class="page-btn ${page === currentPage ? 'active' : ''}" onclick="changePage(${page})">${page}</button>`
+137:        <button class="page-btn" ${currentPage === totalPages ? 'disabled' : ''} onclick="changePage(${currentPage + 1})"><i class="ti ti-chevron-right"></i></button>
+139:      <select class="page-size-select" onchange="changePageSize(this.value)">
+173:  window.CINEPRO_CATALOGUE_RENDER = {
+
+=== Fonctions ===
+5:(function () {
+6:  function escapeHtml(value) {
+15:  function setHtml(id, html) {
+20:  function setText(id, text) {
+25:  function updateTableHeaders(nearbyMode) {
+44:  function renderEmptyNearbyCatalogue() {
+59:  function buildFilmRow(film, context) {
+109:  function getVisiblePaginationPages(currentPage, totalPages) {
+124:  function renderPagination(currentPage, totalPages, pageSize = 8) {
+147:  function renderTable(options) {
