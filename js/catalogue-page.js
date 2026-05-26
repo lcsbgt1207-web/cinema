@@ -387,7 +387,7 @@ function getCatalogueSource() {
   window.CINEPRO_CATALOGUE_FILTER_STATS = stats;
 
   if (isCatalogueDebugEnabled()) {
-    console.log(`[Catalogue] ZIP 4.7.3 : ${active.label} utilisé (${stats.kept}/${stats.sourceTotal} reprises, ${stats.excludedRecent} récents exclus, ${stats.unknownYearKept} années inconnues gardées, référence ${stats.referenceSource}).`);
+    console.log(`[Catalogue] ZIP 4.7.4 : ${active.label} utilisé (${stats.kept}/${stats.sourceTotal} reprises, ${stats.excludedRecent} récents exclus, ${stats.unknownYearKept} années inconnues gardées, référence ${stats.referenceSource}).`);
   }
   return merged;
 }
@@ -408,7 +408,7 @@ function updateCatalogueModeControl() {
     const stats = window.CINEPRO_CATALOGUE_FILTER_STATS || lastCatalogueFilterStats;
     nearbyOption.textContent = stats?.sourceTotal && stats.sourceTotal !== stats.kept
       ? `Reprises — ${stats.kept}/${stats.sourceTotal} films`
-      : (count ? `Reprises affichées — ${count} films` : 'Reprises et films anciens — lance une recherche');
+      : (count ? `Reprises — ${count} films` : 'Reprises et films anciens — lance une recherche');
   }
 }
 
@@ -552,8 +552,18 @@ function filterTable() {
     ? `${data.length} reprise${data.length > 1 ? 's' : ''} affichée${data.length > 1 ? 's' : ''} sur ${total} films proches`
     : `${data.length} reprise${data.length > 1 ? 's' : ''} affichée${data.length > 1 ? 's' : ''}`;
 
-  if (countLabel) countLabel.textContent = label;
-  if (filmCount) filmCount.textContent = label;
+  const detailLabel = Number(stats?.excludedRecent || 0) > 0
+    ? `${label} · ${stats.excludedRecent} film${stats.excludedRecent > 1 ? 's' : ''} récent${stats.excludedRecent > 1 ? 's' : ''} exclu${stats.excludedRecent > 1 ? 's' : ''}`
+    : label;
+
+  if (countLabel) {
+    countLabel.textContent = label;
+    countLabel.title = detailLabel;
+  }
+  if (filmCount) {
+    filmCount.textContent = label;
+    filmCount.title = detailLabel;
+  }
 
   renderTable(data);
   updateIcons();
