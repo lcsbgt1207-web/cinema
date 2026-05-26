@@ -387,7 +387,7 @@ function getCatalogueSource() {
   window.CINEPRO_CATALOGUE_FILTER_STATS = stats;
 
   if (isCatalogueDebugEnabled()) {
-    console.log(`[Catalogue] ZIP 4.7.4 : ${active.label} utilisé (${stats.kept}/${stats.sourceTotal} reprises, ${stats.excludedRecent} récents exclus, ${stats.unknownYearKept} années inconnues gardées, référence ${stats.referenceSource}).`);
+    console.log(`[Catalogue] ZIP 4.7.5 : ${active.label} utilisé (${stats.kept}/${stats.sourceTotal} reprises, ${stats.excludedRecent} récents exclus, ${stats.unknownYearKept} années inconnues gardées, référence ${stats.referenceSource}).`);
   }
   return merged;
 }
