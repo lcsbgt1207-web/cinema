@@ -51,6 +51,98 @@
     };
   }
 
+
+
+  function pickFirstArray(...values) {
+    for (const value of values) {
+      if (Array.isArray(value) && value.length) return value;
+    }
+    return [];
+  }
+
+  function getPayloadFilms(key) {
+    const payload = readJSON(key, null);
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload && payload.films)) return payload.films;
+    return [];
+  }
+
+  function getDiagnosticFilms() {
+    return pickFirstArray(
+      Array.isArray(window.CINEPRO_ACTIVE_CATALOGUE) ? window.CINEPRO_ACTIVE_CATALOGUE : [],
+      getPayloadFilms(STORAGE_KEYS.ACTIVE_CATALOGUE),
+      Array.isArray(window.NEARBY_CATALOGUE_NEARBY_RANKED) ? window.NEARBY_CATALOGUE_NEARBY_RANKED : [],
+      getPayloadFilms(STORAGE_KEYS.NEARBY_RANKED_CATALOGUE),
+      Array.isArray(window.NEARBY_CATALOGUE_RUNTIME_DATA) ? window.NEARBY_CATALOGUE_RUNTIME_DATA : [],
+      getPayloadFilms(STORAGE_KEYS.RUNTIME_CATALOGUE)
+    );
+  }
+
+  function detectFilmYear(film) {
+    const direct = [film?.annee, film?.year, film?.releaseYear, film?.release_year];
+    for (const value of direct) {
+      const year = Number(value);
+      if (Number.isFinite(year) && year >= 1888 && year <= 2100) return year;
+    }
+    const dated = [film?.releaseDate, film?.release_date, film?.dateSortie, film?.sortie, film?.first_air_date];
+    for (const value of dated) {
+      const match = String(value || '').match(/\b(19\d{2}|20\d{2})\b/);
+      if (match) return Number(match[1]);
+    }
+    return null;
+  }
+
+  function getFilmTitle(film) {
+    return film?.titre || film?.title || film?.name || film?.original || film?.originalTitle || 'Film sans titre';
+  }
+
+  function getFilmCinema(film) {
+    const cinemas = Array.isArray(film?.nearbyCinemas) && film.nearbyCinemas.length ? film.nearbyCinemas : (Array.isArray(film?.cinemas) ? film.cinemas : []);
+    return cinemas.map(c => c?.nom || c?.name || c?.title || '').filter(Boolean).slice(0, 2).join(', ');
+  }
+
+  function getFilmBestNote(film) {
+    const values = [film?.bestNote, film?.nearbyRatingValue, film?.imdb, film?.tmdb, film?.sc, film?.lb];
+    for (const value of values) {
+      const rating = Number(value);
+      if (Number.isFinite(rating) && rating > 0) return Math.round(rating * 10) / 10;
+    }
+    return '';
+  }
+
+  function buildExclusionRows() {
+    const films = getDiagnosticFilms();
+    return films.filter(film => film && !film.isMock).map((film, index) => {
+      const year = detectFilmYear(film);
+      const kept = !Number.isFinite(year) || year <= 2024;
+      const rawYearFields = [film?.annee, film?.year, film?.releaseYear, film?.release_year, film?.releaseDate, film?.release_date, film?.dateSortie, film?.sortie]
+        .filter(value => value !== undefined && value !== null && value !== '')
+        .join(' | ');
+      return {
+        index: index + 1,
+        titre: getFilmTitle(film),
+        anneeDetectee: Number.isFinite(year) ? year : 'inconnue',
+        garde: kept ? 'oui' : 'non',
+        raison: kept ? (Number.isFinite(year) ? `gardé : année ${year}` : 'gardé : année inconnue') : `exclu : année ${year}`,
+        cinema: getFilmCinema(film),
+        source: film?.source || film?.sourceType || film?.badge || film?.bestNoteSource || film?.nearbyRatingSource || '',
+        note: getFilmBestNote(film),
+        champsAnnee: rawYearFields
+      };
+    });
+  }
+
+  function exclusions() {
+    const rows = buildExclusionRows();
+    const kept = rows.filter(row => row.garde === 'oui').length;
+    const excluded = rows.length - kept;
+    console.group('[CinéProche] Diagnostic exclusions Catalogue ZIP 4.7.7');
+    console.log(`${rows.length} films analysés · ${kept} gardés · ${excluded} exclus`);
+    console.table(rows);
+    console.groupEnd();
+    return rows;
+  }
+
   function audit() {
     const lastSearch = readJSON(STORAGE_KEYS.LAST_NEARBY_SEARCH, null);
     const rows = [
@@ -64,7 +156,7 @@
       .filter(row => row.exists && expectedRadius && Number(row.radius || 0) && Number(row.radius) !== expectedRadius)
       .map(row => ({ cache: row.cache, cacheRadius: row.radius, lastSearchRadius: expectedRadius }));
 
-    console.group('[CinéProche] Audit catalogue ZIP 4.7.6.1');
+    console.group('[CinéProche] Audit catalogue ZIP 4.7.7');
     console.log('Dernière recherche proche :', lastSearch || 'Aucune');
     console.table(rows);
     if (mismatches.length) {
@@ -86,6 +178,7 @@
   displayed: 0,
   referenceSource: 'none'
 });
+    console.table(buildExclusionRows());
     console.groupEnd();
 
     return { lastSearch, caches: rows, mismatches, runtime }; 
@@ -102,5 +195,5 @@
     console.info('[CinéProche] Caches catalogue supprimés. Relance une recherche pour reconstruire le catalogue proche.');
   }
 
-  window.CINEPRO_DEBUG_CATALOGUE = { audit, clearCatalogueCaches, keys: STORAGE_KEYS };
+  window.CINEPRO_DEBUG_CATALOGUE = { audit, exclusions, clearCatalogueCaches, keys: STORAGE_KEYS };
 })();
