@@ -1,4 +1,4 @@
-// CinéProche — Catalogue proche — ZIP 4.0
+// CinéProche — Catalogue proche — ZIP 4.7.6.1
 // Rôle : orchestrer le catalogue des films projetés près de la dernière recherche.
 // Flux stable : cache avec rayon -> réhydratation runtime -> affichage via catalogue-render.js.
 // Ce fichier ne gère pas le HTML du tableau et ne modifie pas les séances directement.
@@ -391,7 +391,7 @@ function getCatalogueSource() {
   window.CINEPRO_CATALOGUE_FILTER_STATS = stats;
 
   if (isCatalogueDebugEnabled()) {
-    console.log(`[Catalogue] ZIP 4.7.6 : ${active.label} utilisé (${stats.kept}/${stats.sourceTotal} reprises, ${stats.excludedRecent} récents exclus, ${stats.unknownYearKept} années inconnues gardées, référence ${stats.referenceSource}).`);
+    console.log(`[Catalogue] ZIP 4.7.6.1 : ${active.label} utilisé (${stats.kept}/${stats.sourceTotal} reprises, ${stats.excludedRecent} récents exclus, ${stats.unknownYearKept} années inconnues gardées, référence ${stats.referenceSource}).`);
   }
   return merged;
 }
@@ -441,8 +441,34 @@ function setCatalogueSearchStatus(message) {
   if (filmCount) filmCount.textContent = message;
 }
 
+function waitForCatalogueSearchServices(timeout = 12000) {
+  const startedAt = Date.now();
+  return new Promise((resolve, reject) => {
+    const check = () => {
+      const placesReady = Boolean(window.PLACES && window.PLACES.geocoder && window.PLACES.placesService);
+      const catalogueReady = typeof window.getNearbyRankedMovies === 'function' || typeof getNearbyRankedMovies === 'function';
+      if (placesReady && catalogueReady) {
+        resolve(true);
+        return;
+      }
+      if (Date.now() - startedAt >= timeout) {
+        reject(new Error('Google Maps/Places ou le catalogue proche ne sont pas encore prêts.'));
+        return;
+      }
+      setTimeout(check, 250);
+    };
+    check();
+  });
+}
+
+function getNearbyRankedMoviesSafe() {
+  if (typeof window.getNearbyRankedMovies === 'function') return window.getNearbyRankedMovies;
+  if (typeof getNearbyRankedMovies === 'function') return getNearbyRankedMovies;
+  return null;
+}
+
 async function runCatalogueLocationSearch(target = {}) {
-  if (catalogueSearchRunning || typeof getNearbyRankedMovies !== 'function') return false;
+  if (catalogueSearchRunning) return false;
   const radius = getCatalogueSelectedRadius();
   const address = String(target.address || '').trim();
   const location = target.location || null;
@@ -453,7 +479,15 @@ async function runCatalogueLocationSearch(target = {}) {
   setCatalogueSearchStatus(address ? `Recherche des reprises près de ${address}…` : 'Recherche des reprises autour de vous…');
 
   try {
-    await getNearbyRankedMovies({ address, location, radius });
+    setCatalogueSearchStatus('Chargement de Google Maps…');
+    await waitForCatalogueSearchServices();
+    setCatalogueSearchStatus(address ? `Recherche des reprises près de ${address}…` : 'Recherche des reprises autour de vous…');
+
+    const searchFn = getNearbyRankedMoviesSafe();
+    if (!searchFn) throw new Error('Recherche catalogue indisponible.');
+
+    const options = location ? { location, radius } : { address, radius };
+    await searchFn(options);
     catalogue = getCatalogueSource();
     sortKey = 'bestNote';
     sortDir = -1;
@@ -461,8 +495,12 @@ async function runCatalogueLocationSearch(target = {}) {
     filterTable();
     return true;
   } catch (error) {
-    console.warn('[Catalogue] ZIP 4.7.6 : recherche autonome impossible :', error?.message || error);
-    setCatalogueSearchStatus('Recherche impossible. Autorisez la position ou entrez une ville.');
+    console.warn('[Catalogue] ZIP 4.7.6.1 : recherche autonome impossible :', error?.message || error);
+    if (!hasNearbyCatalogue()) {
+      setCatalogueSearchStatus('Recherche impossible. Autorisez la position ou entrez une ville.');
+    } else {
+      refreshCatalogueFromRuntime();
+    }
     return false;
   } finally {
     catalogueSearchRunning = false;
