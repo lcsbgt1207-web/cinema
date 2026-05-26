@@ -694,50 +694,27 @@
     return combined;
   }
 
-  function extractExplicitTimeParts(value) {
-    const text = stripAccents(String(value || '').toLowerCase()).replace(/\s+/g, ' ').trim();
+  function extractExplicitShowtimeTime(value) {
+    const text = stripAccents(String(value || '').toLowerCase())
+      .replace(/\s+/g, ' ')
+      .trim();
     if (!text) return null;
 
-    let match = text.match(/\b(\d{1,2})\s*:\s*(\d{2})\b/);
-    if (match) {
-      const hour = Number(match[1]);
-      const minute = Number(match[2]);
-      if (hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59) return { hour, minute, raw: match[0] };
+    const isoTime = text.match(/(?:^|\b)([01]?\d|2[0-3])[:h]([0-5]\d)(?:[:h]([0-5]\d))?(?:\b|$)/i);
+    if (isoTime) {
+      return { hour: Number(isoTime[1]), minute: Number(isoTime[2]), explicit: true };
     }
 
-    match = text.match(/\b(\d{1,2})\s*h\s*(\d{2})\b/);
-    if (match) {
-      const hour = Number(match[1]);
-      const minute = Number(match[2]);
-      if (hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59) return { hour, minute, raw: match[0] };
-    }
-
-    match = text.match(/\b(\d{1,2})\s*h\b/);
-    if (match) {
-      const hour = Number(match[1]);
-      if (hour >= 0 && hour <= 23) return { hour, minute: 0, raw: match[0] };
+    const frenchTime = text.match(/(?:^|\b)([01]?\d|2[0-3])\s*h\s*([0-5]\d)?(?:\b|$)/i);
+    if (frenchTime) {
+      return { hour: Number(frenchTime[1]), minute: Number(frenchTime[2] || '0'), explicit: true };
     }
 
     return null;
   }
 
-  function hasExplicitTimeInfo(value) {
-    if (value === null || value === undefined) return false;
-    if (typeof value === 'string' || typeof value === 'number') return Boolean(extractExplicitTimeParts(value));
-    if (value instanceof Date) return value.getHours() !== 0 || value.getMinutes() !== 0;
-    if (typeof value !== 'object') return false;
-
-    const directValues = [
-      value.startsAt, value.startAt, value.start,
-      value.datetime, value.dateTime,
-      value.showtime, value.showTime,
-      value.time, value.horaire, value.hour, value.heure,
-      value.displayTime, value.displayLabel,
-      value.label, value.caption, value.text,
-      value.rawTime, value.formattedTime
-    ];
-
-    return directValues.some(candidate => Boolean(extractExplicitTimeParts(candidate)));
+  function hasExplicitShowtimeTime(value) {
+    return Boolean(extractExplicitShowtimeTime(value));
   }
 
   function parseShowtimeDate(value, fallbackDate = null) {
@@ -748,27 +725,31 @@
 
     const relativeDate = getDateFromRelativeFrenchLabel(text);
     const frenchCalendarDate = parseFrenchCalendarDate(text);
-    const explicitTime = extractExplicitTimeParts(text);
+    const explicitTime = extractExplicitShowtimeTime(text);
     if ((relativeDate || frenchCalendarDate) && explicitTime) {
       return combineDayAndTime(relativeDate || frenchCalendarDate, explicitTime.hour, explicitTime.minute);
     }
     if (relativeDate) return relativeDate;
     if (frenchCalendarDate) return frenchCalendarDate;
 
-    const isoMatch = text.match(/(20\d{2}-\d{2}-\d{2})(?:[T\s]+(\d{1,2})(?:[:h]\s*(\d{2}))?)?/);
+    // Format ISO : 2026-05-23T17:00:00 ou 2026-05-23 17:00.
+    const isoMatch = text.match(/(20\d{2}-\d{2}-\d{2})(?:[T\s]+([01]?\d|2[0-3])[:h]([0-5]\d))?/);
     if (isoMatch) {
       const [, day, hour = '0', minute = '0'] = isoMatch;
-      const parsed = new Date(`${day}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`);
+      const parsed = new Date(`${day}T${String(hour).padStart(2, '0')}:${minute}:00`);
+
       if (fallbackDate && explicitTime && (!parsed || !isShowtimeInNearbyWindow(parsed))) {
-        const rebased = combineDayAndTime(fallbackDate, hour, minute);
+        const rebased = combineDayAndTime(fallbackDate, explicitTime.hour, explicitTime.minute);
         if (rebased) return rebased;
       }
+
       return Number.isNaN(parsed.getTime()) ? null : parsed;
     }
 
+    // Format heure seule : 17:00, 17h00 ou 17 h. On rattache à la date de la séance si elle existe, sinon aujourd'hui.
     if (explicitTime) {
       const base = fallbackDate ? startOfLocalDay(fallbackDate) : startOfLocalDay(new Date());
-      base.setHours(Number(explicitTime.hour), Number(explicitTime.minute), 0, 0);
+      base.setHours(explicitTime.hour, explicitTime.minute, 0, 0);
       return base;
     }
 
@@ -814,10 +795,7 @@
     function push(value) {
       const text = String(value || '').trim();
       if (!text) return;
-      const hasExplicitTime = Boolean(extractExplicitTimeParts(text));
-      const hasCalendarCarrier = textLooksLikeDateCarrier(text);
-      if (!hasExplicitTime && !hasCalendarCarrier) return;
-      if (!hasExplicitTime) return;
+      if (!hasExplicitShowtimeTime(text)) return;
       if (seen.has(text)) return;
       seen.add(text);
       found.push(text);
@@ -848,30 +826,14 @@
     return found;
   }
 
-  function hasNearbyScheduleSignal(item) {
-    if (!item || typeof item !== 'object') return false;
-    if (hasExplicitTimeInfo(item)) return true;
-
-    const contextualDate = firstString(
-      item.__nearbyFallbackDate, item.__nearbyRequestedDate, item.__nearbyApiDate,
-      item.date, item.day, item.jour, item.showDate, item.sessionDate,
-      item.dateLabel, item.dayLabel, item.label, item.tabLabel, item.displayDate, item.displayDay,
-      item.displayLabel, item.caption, item.text
-    );
-    if (contextualDate && parseShowtimeDate(contextualDate)) return true;
-
-    return ['horaires', 'times', 'showtimes', 'seances', 'sessions', 'scr', 'slots', 'schedule', 'events', 'performances', 'days', 'calendar', 'screenings']
-      .some(key => Array.isArray(item[key]) && item[key].length > 0);
-  }
-
   function extractShowtimeEntries(item) {
     const entries = [];
     const seenObjects = new WeakSet();
 
-    function pushDate(rawValue, fallbackDate = null, requireExplicitTime = true) {
+    function pushDate(rawValue, fallbackDate = null) {
       const parsed = parseShowtimeDate(rawValue, fallbackDate);
       if (!parsed || !isShowtimeInNearbyWindow(parsed)) return;
-      if (requireExplicitTime && !hasExplicitTimeInfo(rawValue)) return;
+      if (typeof rawValue === 'string' && !hasExplicitShowtimeTime(rawValue)) return;
       entries.push({ date: parsed, label: formatNearbyShowtime(parsed), raw: rawValue });
     }
 
@@ -879,7 +841,7 @@
       if (node === null || node === undefined || depth > 10) return;
 
       if (typeof node === 'string' || typeof node === 'number' || node instanceof Date) {
-        if (keyLooksLikeShowtimeDate(path) || textLooksLikeDateCarrier(node) || hasExplicitTimeInfo(node)) {
+        if (keyLooksLikeShowtimeDate(path) || hasExplicitShowtimeTime(node)) {
           pushDate(node, fallbackDate);
         }
         return;
@@ -946,20 +908,22 @@
     for (const arr of possibleArrays) {
       if (!Array.isArray(arr)) continue;
       for (const value of arr) {
-        const parsed = parseShowtimeDate(
-          typeof value === 'string'
-            ? value
-            : firstString(
-                value?.startsAt, value?.startAt, value?.time, value?.horaire, value?.hour, value?.heure,
-                value?.label, value?.displayLabel, value?.displayDate, value?.displayTime, value?.caption, value?.text,
-                value?.date, value?.day, value?.jour
-              ),
-          itemDate
-        );
-        const hasTime = typeof value === 'string' || typeof value === 'number'
-          ? hasExplicitTimeInfo(value)
-          : hasExplicitTimeInfo(value) || hasExplicitTimeInfo(firstString(value?.label, value?.displayLabel, value?.displayTime, value?.caption, value?.text, value?.time, value?.horaire, value?.hour, value?.heure, value?.startsAt, value?.startAt, value?.dateTime));
-        if (parsed && isShowtimeInNearbyWindow(parsed) && hasTime) fallback.push(formatNearbyShowtime(parsed));
+        const rawCandidate = typeof value === 'string'
+          ? value
+          : firstString(
+              value?.startsAt, value?.startAt, value?.time, value?.horaire, value?.hour, value?.heure,
+              value?.label, value?.displayLabel, value?.displayTime, value?.caption, value?.text
+            );
+        const valueDate = typeof value === 'string'
+          ? itemDate
+          : (parseShowtimeDate(firstString(
+              value?.date, value?.day, value?.jour, value?.showDate, value?.sessionDate,
+              value?.dateLabel, value?.dayLabel, value?.displayDate, value?.displayDay
+            ), itemDate) || itemDate);
+        const parsed = parseShowtimeDate(rawCandidate, valueDate);
+        if (parsed && isShowtimeInNearbyWindow(parsed) && (!(typeof rawCandidate === 'string') || hasExplicitShowtimeTime(rawCandidate))) {
+          fallback.push(formatNearbyShowtime(parsed));
+        }
       }
     }
 
@@ -968,9 +932,23 @@
     const loose = [];
     for (const rawValue of collectLooseShowtimeStrings(item)) {
       const parsed = parseShowtimeDate(rawValue, itemDate);
-      if (parsed && isShowtimeInNearbyWindow(parsed) && hasExplicitTimeInfo(rawValue)) loose.push(formatNearbyShowtime(parsed));
+      if (parsed && isShowtimeInNearbyWindow(parsed)) loose.push(formatNearbyShowtime(parsed));
     }
     return [...new Set(loose)];
+  }
+
+
+  function hasPotentialShowtimeSignal(item) {
+    if (!item || typeof item !== 'object') return false;
+    const arrays = [
+      item.horaires, item.times, item.showtimes, item.seances, item.sessions, item.scr,
+      item.version?.times, item.slots, item.schedule, item.events, item.performances,
+      item.days, item.calendar, item.screenings
+    ];
+    if (arrays.some(value => Array.isArray(value) && value.length)) return true;
+    return [item.startsAt, item.startAt, item.start, item.datetime, item.dateTime, item.showtime, item.showTime,
+      item.time, item.horaire, item.hour, item.heure, item.label, item.displayLabel, item.displayTime,
+      item.displayDate, item.caption, item.text, item.date, item.day, item.jour].some(value => String(value || '').trim());
   }
 
   function normalizeShowtimeItem(rawItem) {
@@ -980,8 +958,8 @@
     const horaires = extractShowtimes(rawItem);
     const movieHoraires = movieObject && movieObject !== rawItem ? extractShowtimes(movieObject) : [];
     const mergedHoraires = [...new Set([...(Array.isArray(horaires) ? horaires : []), ...(Array.isArray(movieHoraires) ? movieHoraires : [])])];
-    const hasScheduleSignal = hasNearbyScheduleSignal(rawItem) || (movieObject && movieObject !== rawItem && hasNearbyScheduleSignal(movieObject));
-    if (!mergedHoraires.length && !hasScheduleSignal) {
+    const hasSignal = hasPotentialShowtimeSignal(rawItem) || (movieObject && movieObject !== rawItem && hasPotentialShowtimeSignal(movieObject));
+    if (!mergedHoraires.length && !hasSignal) {
       return null;
     }
     return {
@@ -990,9 +968,8 @@
       rawMovie: movieObject || rawItem,
       rawItem,
       poster: extractPoster(movieObject, rawItem),
-      horaires: mergedHoraires,
-      hasScheduleSignal,
-      hasPreciseHoraires: mergedHoraires.length > 0
+      horaires: mergedHoraires.length ? mergedHoraires : ['Horaires à confirmer'],
+      hasUnparsedShowtimes: !mergedHoraires.length && hasSignal
     };
   }
 
@@ -1575,8 +1552,7 @@
     for (const value of values) {
       const rawDate = value?.startsAt || value?.startAt || value?.datetime || value?.dateTime || value?.showtime || value?.showTime || value?.time || value?.horaire || value?.date || value;
       const parsed = parseShowtimeDate(rawDate);
-      const hasTime = hasExplicitTimeInfo(value) || hasExplicitTimeInfo(rawDate);
-      if (!parsed || !isShowtimeInNearbyWindow(parsed) || !hasTime) continue;
+      if (!parsed || !isShowtimeInNearbyWindow(parsed)) continue;
       const version = getExportedShowtimeVersion(value);
       const item = {
         startsAt: `${formatLocalDateYYYYMMDD(parsed)}T${String(parsed.getHours()).padStart(2, '0')}:${String(parsed.getMinutes()).padStart(2, '0')}:00`,
@@ -1644,9 +1620,8 @@
     for (const cinema of Array.isArray(movie?.cinemas) ? movie.cinemas : []) {
       const structuredHoraires = collectExportedCinemaShowtimes(cinema);
       for (const item of structuredHoraires) {
-        const rawCandidate = item?.startsAt || item?.dateTime || item?.label || item;
-        const parsed = parseShowtimeDate(rawCandidate);
-        if (!parsed || !isShowtimeInNearbyWindow(parsed) || !(hasExplicitTimeInfo(item) || hasExplicitTimeInfo(rawCandidate))) continue;
+        const parsed = parseShowtimeDate(item?.startsAt || item?.dateTime || item?.label || item);
+        if (!parsed || !isShowtimeInNearbyWindow(parsed)) continue;
         candidates.push({
           startsAt: item?.startsAt || '',
           label: item?.label || formatNearbyShowtime(parsed),
@@ -1724,6 +1699,7 @@
         nextCinemaName: nextShowtime?.cinemaName || '',
         nextCinemaDistanceKm: nextShowtime?.cinemaDistanceKm ?? null,
         nearbyLookaheadDays: currentNearbyLookaheadDays,
+        hasUnparsedShowtimes: Boolean(movie.hasUnparsedShowtimes),
         nearbyCinemas: movie.cinemas.map(c => {
           const structuredHoraires = collectExportedCinemaShowtimes(c);
           return {
@@ -1867,6 +1843,7 @@
               existing.matchedTitle = existing.matchedTitle || rating.matchedTitle;
             }
             existing.matchScore = Math.max(existing.matchScore || 0, localMatch?.score || 0, rating?.matchScore || 0);
+            existing.hasUnparsedShowtimes = Boolean(existing.hasUnparsedShowtimes || item.hasUnparsedShowtimes);
           }
 
           const movie = moviesByKey.get(key);
