@@ -1004,7 +1004,7 @@ async function loadCachedSynopsisForCatalogue(film) {
     params.set('mode', 'cache-imdb-then-local');
     params.set('_', String(Date.now()));
 
-    const response = await fetch(`http://localhost:3000/api/imdb-synopsis?${params.toString()}`, { cache: 'no-store' });
+    const response = await fetch(`${((window.CONFIG && CONFIG.BACKEND_BASE_URL) || 'https://cinepro-api-yal8.onrender.com')}/api/imdb-synopsis?${params.toString()}`, { cache: 'no-store' });
     if (!response.ok) return localFallback;
     const data = await response.json();
     const synopsis = String(data?.synopsis || '').trim();

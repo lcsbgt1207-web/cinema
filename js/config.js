@@ -13,4 +13,19 @@ const CONFIG = {
   LANGUAGE:       'fr-FR',
   REGION:         'FR',
   SEARCH_RADIUS:  15000, // mètres autour de l'utilisateur (défaut 15km)
+
+  // ZIP 4.8 : URLs backend centralisées.
+  // En local on utilise le backend lancé sur localhost:3000 ; en production, Render.
+  BACKEND_LOCAL_URL: 'http://localhost:3000',
+  BACKEND_PROD_URL: 'https://cinepro-api-yal8.onrender.com'
 };
+
+CONFIG.BACKEND_BASE_URL = (() => {
+  try {
+    const host = window.location.hostname;
+    if (host === 'localhost' || host === '127.0.0.1' || host === '') {
+      return CONFIG.BACKEND_LOCAL_URL;
+    }
+  } catch (_) {}
+  return CONFIG.BACKEND_PROD_URL;
+})();

@@ -1,11 +1,14 @@
-// CinéProche — Catalogue proche — ZIP 4.7.6.1
+// CinéProche — Catalogue proche — ZIP 4.8
 // Rôle : orchestrer le catalogue des films projetés près de la dernière recherche.
 // Flux stable : cache avec rayon -> réhydratation runtime -> affichage via catalogue-render.js.
 // Ce fichier ne gère pas le HTML du tableau et ne modifie pas les séances directement.
 const STATIC_CATALOGUE = FILMS.filter(f => f && !f.isMock);
 let catalogue = [];
 let catalogueMode = 'nearby';
-const LETTERBOXD_API_URL = 'http://localhost:3000/api/films-letterboxd';
+const CATALOGUE_BACKEND_BASE_URL = (window.CONFIG && CONFIG.BACKEND_BASE_URL) || 'https://cinepro-api-yal8.onrender.com';
+const LETTERBOXD_API_URL = `${CATALOGUE_BACKEND_BASE_URL}/api/films-letterboxd`;
+const IMDB_SYNOPSIS_API_URL = `${CATALOGUE_BACKEND_BASE_URL}/api/imdb-synopsis`;
+const CATALOGUE_RECENT_MONTHS_LIMIT = 12;
 const LETTERBOXD_MIN_VALID_RATING = 0.5;
 const CINEPRO_STORAGE = window.CINEPRO_STORAGE || null;
 const STORAGE_KEYS = CINEPRO_STORAGE?.KEYS || {
@@ -105,7 +108,34 @@ function isUsefulCatalogueText(value) {
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
-  return !['a completer', 'non renseigne', 'non renseignee', '-', '—', 'n/a'].includes(normalized);
+  if (['a completer', 'synopsis a completer.', 'aucun synopsis disponible pour ce film.', 'non renseigne', 'non renseignee', '-', '—', 'n/a'].includes(normalized)) return false;
+  return !isRejectedCatalogueSynopsis(text);
+}
+
+function isRejectedCatalogueSynopsis(value) {
+  const text = String(value || '').trim();
+  if (!text) return true;
+  const normalized = text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const rejectedPatterns = [
+    'javascript est desactive',
+    'enable javascript',
+    'captcha',
+    'robot',
+    'security check',
+    'access denied',
+    'please verify',
+    'unusual traffic',
+    'imdb.com',
+    'reference id'
+  ];
+
+  return rejectedPatterns.some(pattern => normalized.includes(pattern));
 }
 
 function pickUsefulCatalogueText(...values) {
@@ -224,20 +254,12 @@ function hasNearbyCatalogue() {
 }
 
 function getActiveRawCatalogueSource() {
-  // ZIP 3.4 : le Catalogue est centré sur les films proches.
-  // On utilise toujours en priorité la liste complète enrichie des films proches,
-  // afin de ne jamais perdre réalisateur, genre, affiche, année ou note après un changement de filtre.
+  // ZIP 4.8 : une seule source officielle pour la page Catalogue.
+  // Les caches nearby/runtime ne servent plus qu'à alimenter cinepro_active_catalogue,
+  // puis la page relit toujours cette source officielle.
   const active = Array.isArray(window.CINEPRO_ACTIVE_CATALOGUE) && window.CINEPRO_ACTIVE_CATALOGUE.length
     ? window.CINEPRO_ACTIVE_CATALOGUE
     : readStoredActiveCatalogue();
-
-  const nearby = Array.isArray(window.NEARBY_CATALOGUE_NEARBY_RANKED) && window.NEARBY_CATALOGUE_NEARBY_RANKED.length
-    ? window.NEARBY_CATALOGUE_NEARBY_RANKED
-    : readStoredNearbyCatalogue();
-
-  const runtime = Array.isArray(window.NEARBY_CATALOGUE_RUNTIME_DATA) && window.NEARBY_CATALOGUE_RUNTIME_DATA.length
-    ? window.NEARBY_CATALOGUE_RUNTIME_DATA
-    : readStoredRuntimeCatalogue();
 
   if (active.length) {
     catalogueMode = 'nearby';
@@ -245,13 +267,17 @@ function getActiveRawCatalogueSource() {
     return { source: active, label: 'catalogue proche actif' };
   }
 
+  const nearby = Array.isArray(window.NEARBY_CATALOGUE_NEARBY_RANKED) && window.NEARBY_CATALOGUE_NEARBY_RANKED.length
+    ? window.NEARBY_CATALOGUE_NEARBY_RANKED
+    : readStoredNearbyCatalogue();
+
   if (nearby.length) {
-    writeActiveCatalogueFromFilms(nearby);
+    const payload = writeActiveCatalogueFromFilms(nearby, { source: 'nearby-ranked-promoted-to-active' });
     catalogueMode = 'nearby';
     setStoredCatalogueMode('nearby');
-    return { source: nearby, label: 'films proches classés' };
+    return { source: payload?.films || nearby, label: 'catalogue proche actif' };
   }
-  // Tant que la recherche proche n'a pas produit de cache valide, on affiche un état d'attente.
+
   return { source: [], label: 'catalogue proche en attente de recherche' };
 }
 
@@ -313,12 +339,28 @@ function getCatalogueReleaseYear(film) {
   return null;
 }
 
+function getCatalogueReleaseDate(film) {
+  const candidates = [film?.releaseDate, film?.release_date, film?.dateSortie, film?.sortie, film?.first_air_date];
+  for (const value of candidates) {
+    const date = new Date(value);
+    if (!Number.isNaN(date.getTime())) return date;
+  }
+  return null;
+}
+
 function isCatalogueLegacyFilm(film) {
-  // ZIP 4.6 : on exclut seulement les films dont l'année récente est clairement connue.
-  // Les films sans année fiable sont conservés pour éviter de vider le catalogue à cause de données incomplètes.
+  // ZIP 4.8 : plus d'année fixe comme 2024.
+  // Le Catalogue garde les films proches hors nouveautés récentes.
+  const releaseDate = getCatalogueReleaseDate(film);
+  if (releaseDate) {
+    const limit = new Date();
+    limit.setMonth(limit.getMonth() - CATALOGUE_RECENT_MONTHS_LIMIT);
+    return releaseDate <= limit;
+  }
+
   const year = getCatalogueReleaseYear(film);
   if (!Number.isFinite(year)) return true;
-  return year <= 2024;
+  return year < new Date().getFullYear();
 }
 
 
@@ -357,7 +399,7 @@ function createCatalogueFilterStats(source, reference) {
   referenceSource.forEach(film => {
     if (!film || film.isMock) return;
     const year = getCatalogueReleaseYear(film);
-    if (Number.isFinite(year) && year >= 2025) stats.excludedRecent++;
+    if (!isCatalogueLegacyFilm(film)) stats.excludedRecent++;
     else if (!Number.isFinite(year)) stats.unknownYearKept++;
   });
 
@@ -375,9 +417,7 @@ function getCatalogueSource() {
   source.forEach((film, index) => {
     if (!film || film.isMock) return;
     const prepared = prepareCatalogueFilm(film, index);
-    const year = getCatalogueReleaseYear(prepared);
-
-    if (Number.isFinite(year) && year >= 2025) return;
+    if (!isCatalogueLegacyFilm(prepared)) return;
 
     const key = prepared.tmdbId ? `tmdb:${prepared.tmdbId}` : normalizeRuntimeCatalogueKey(prepared.titre || prepared.original || prepared.id);
     if (!key || seen.has(key)) return;
@@ -391,7 +431,7 @@ function getCatalogueSource() {
   window.CINEPRO_CATALOGUE_FILTER_STATS = stats;
 
   if (isCatalogueDebugEnabled()) {
-    console.log(`[Catalogue] ZIP 4.7.6.1 : ${active.label} utilisé (${stats.kept}/${stats.sourceTotal} reprises, ${stats.excludedRecent} récents exclus, ${stats.unknownYearKept} années inconnues gardées, référence ${stats.referenceSource}).`);
+    console.log(`[Catalogue] ZIP 4.8 : ${active.label} utilisé (${stats.kept}/${stats.sourceTotal} reprises, ${stats.excludedRecent} récents exclus, ${stats.unknownYearKept} années inconnues gardées, référence ${stats.referenceSource}).`);
   }
   return merged;
 }
@@ -411,8 +451,8 @@ function updateCatalogueModeControl() {
         : readStoredNearbyCatalogue().length));
     const stats = window.CINEPRO_CATALOGUE_FILTER_STATS || lastCatalogueFilterStats;
     nearbyOption.textContent = stats?.sourceTotal && stats.sourceTotal !== stats.kept
-      ? `Reprises — ${stats.kept}/${stats.sourceTotal} films`
-      : (count ? `Reprises — ${count} films` : 'Reprises et films anciens — lance une recherche');
+      ? `Films proches hors nouveautés — ${stats.kept}/${stats.sourceTotal}`
+      : (count ? `Films proches hors nouveautés — ${count}` : 'Films proches hors nouveautés — lance une recherche');
   }
 }
 
@@ -476,12 +516,12 @@ async function runCatalogueLocationSearch(target = {}) {
 
   catalogueSearchRunning = true;
   lastCatalogueSearchTarget = { address, location };
-  setCatalogueSearchStatus(address ? `Recherche des reprises près de ${address}…` : 'Recherche des reprises autour de vous…');
+  setCatalogueSearchStatus(address ? `Recherche des films proches hors nouveautés près de ${address}…` : 'Recherche des films proches hors nouveautés autour de vous…');
 
   try {
     setCatalogueSearchStatus('Chargement de Google Maps…');
     await waitForCatalogueSearchServices();
-    setCatalogueSearchStatus(address ? `Recherche des reprises près de ${address}…` : 'Recherche des reprises autour de vous…');
+    setCatalogueSearchStatus(address ? `Recherche des films proches hors nouveautés près de ${address}…` : 'Recherche des films proches hors nouveautés autour de vous…');
 
     const searchFn = getNearbyRankedMoviesSafe();
     if (!searchFn) throw new Error('Recherche catalogue indisponible.');
@@ -495,7 +535,7 @@ async function runCatalogueLocationSearch(target = {}) {
     filterTable();
     return true;
   } catch (error) {
-    console.warn('[Catalogue] ZIP 4.7.6.1 : recherche autonome impossible :', error?.message || error);
+    console.warn('[Catalogue] ZIP 4.8 : recherche autonome impossible :', error?.message || error);
     if (!hasNearbyCatalogue()) {
       setCatalogueSearchStatus('Recherche impossible. Autorisez la position ou entrez une ville.');
     } else {
@@ -532,10 +572,10 @@ function startCatalogueAutonomousSearch() {
   if (catalogueAutoSearchStarted) return;
   catalogueAutoSearchStarted = true;
   if (!navigator.geolocation) {
-    setCatalogueSearchStatus('Autorisez votre position ou entrez une ville pour afficher les reprises.');
+    setCatalogueSearchStatus('Autorisez votre position ou entrez une ville pour afficher les films proches hors nouveautés.');
     return;
   }
-  setCatalogueSearchStatus('Autorisez votre position pour afficher les reprises près de vous…');
+  setCatalogueSearchStatus('Autorisez votre position pour afficher les films proches hors nouveautés…');
   navigator.geolocation.getCurrentPosition(
     position => {
       runCatalogueLocationSearch({
@@ -543,7 +583,7 @@ function startCatalogueAutonomousSearch() {
       });
     },
     () => {
-      setCatalogueSearchStatus('Position refusée. Entrez une ville pour afficher les reprises.');
+      setCatalogueSearchStatus('Position refusée. Entrez une ville pour afficher les films proches hors nouveautés.');
     },
     { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }
   );
@@ -675,11 +715,11 @@ function filterTable() {
   const total = Number(stats?.sourceTotal || 0);
 
   const label = total && total !== data.length
-    ? `${data.length} reprise${data.length > 1 ? 's' : ''} affichée${data.length > 1 ? 's' : ''} sur ${total} films proches`
-    : `${data.length} reprise${data.length > 1 ? 's' : ''} affichée${data.length > 1 ? 's' : ''}`;
+    ? `${data.length} film${data.length > 1 ? 's' : ''} proche${data.length > 1 ? 's' : ''} hors nouveautés sur ${total} films proches`
+    : `${data.length} film${data.length > 1 ? 's' : ''} proche${data.length > 1 ? 's' : ''} hors nouveautés`;
 
   const detailLabel = Number(stats?.excludedRecent || 0) > 0
-    ? `${label} · ${stats.excludedRecent} film${stats.excludedRecent > 1 ? 's' : ''} récent${stats.excludedRecent > 1 ? 's' : ''} exclu${stats.excludedRecent > 1 ? 's' : ''}`
+    ? `${label} · ${stats.excludedRecent} nouveauté${stats.excludedRecent > 1 ? 's' : ''} exclue${stats.excludedRecent > 1 ? 's' : ''}`
     : label;
 
   if (countLabel) {

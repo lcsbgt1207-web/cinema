@@ -137,7 +137,7 @@
 <main class="container page-content">
   <div class="page-header">
     <div class="page-title">Catalogue</div>
-    <div class="page-subtitle" style="font-size:13px;color:var(--gray-500);margin-top:4px;">Films cultes, reprises et films sortis en 2024 ou avant, projetés près de vous.</div>
+    <div class="page-subtitle" style="font-size:13px;color:var(--gray-500);margin-top:4px;">Films proches hors nouveautés récentes, reprises et classiques projetés près de vous.</div>
     <div class="page-count" id="film-count"></div>
   </div>
 
@@ -179,7 +179,7 @@
       <option>Rayon : 50 km</option>
     </select>
     <select class="filter-select" id="catalogue-mode-filter" onchange="setCatalogueMode(this.value)" title="Le Catalogue affiche maintenant les meilleurs films projetés près de vous.">
-      <option value="nearby" selected>Reprises et films anciens</option>
+      <option value="nearby" selected>Films proches hors nouveautés</option>
     </select>
     <span class="toolbar-count" id="count-label"></span>
   </div>
@@ -257,11 +257,11 @@
 <script src="js/omdb.js?v=3.3"></script>
 <script src="js/tmdb.js?v=3.3"></script>
 <script src="js/places.js?v=3.3"></script>
-<script src="js/nearby-catalogue.js?v=3.8.5"></script>
+<script src="js/nearby-catalogue.js?v=4.8"></script>
 <script src="js/storage.js?v=3.9.4"></script>
-<script src="js/catalogue-render.js?v=3.9.5"></script>
+<script src="js/catalogue-render.js?v=4.8"></script>
 <script src="js/film-modal.js?v=4.3.1"></script>
-<script src="js/catalogue-page.js?v=4.7.7"></script>
+<script src="js/catalogue-page.js?v=4.8"></script>
 <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAx4ILK4VPFvYxaZX-HwpUPMEOpkQLJEmE&libraries=places&language=fr&callback=initNearbyCatalogueGoogleMaps"></script>
 </body>
 </html>
