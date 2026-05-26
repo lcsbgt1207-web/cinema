@@ -137,7 +137,7 @@
 <main class="container page-content">
   <div class="page-header">
     <div class="page-title">Catalogue</div>
-    <div class="page-subtitle" style="font-size:13px;color:var(--gray-500);margin-top:4px;">Films proches hors nouveautés récentes, reprises et classiques projetés près de vous dans les prochains jours.</div>
+    <div class="page-subtitle" style="font-size:13px;color:var(--gray-500);margin-top:4px;">Films projetés près de vous dans les prochains jours, avec reprise, classique ou nouveauté selon les séances trouvées.</div>
     <div class="page-count" id="film-count"></div>
   </div>
 
@@ -178,8 +178,8 @@
       <option>Rayon : 30 km</option>
       <option>Rayon : 50 km</option>
     </select>
-    <select class="filter-select" id="catalogue-mode-filter" onchange="setCatalogueMode(this.value)" title="Le Catalogue affiche maintenant les meilleurs films projetés près de vous.">
-      <option value="nearby" selected>Films proches hors nouveautés</option>
+    <select class="filter-select" id="catalogue-mode-filter" onchange="setCatalogueMode(this.value)" title="Le Catalogue affiche maintenant les films projetés près de vous.">
+      <option value="nearby" selected>Films proches</option>
     </select>
     <span class="toolbar-count" id="count-label"></span>
   </div>
@@ -252,16 +252,16 @@
   </div>
 </div>
 
-<script src="js/config.js?v=4.9.2"></script>
+<script src="js/config.js?v=5.0.0"></script>
 <script src="js/data.js?v=3.8.5"></script>
 <script src="js/omdb.js?v=3.3"></script>
 <script src="js/tmdb.js?v=3.3"></script>
 <script src="js/places.js?v=3.3"></script>
-<script src="js/nearby-catalogue.js?v=4.9.2"></script>
+<script src="js/nearby-catalogue.js?v=5.0.0"></script>
 <script src="js/storage.js?v=3.9.4"></script>
 <script src="js/catalogue-render.js?v=4.8"></script>
 <script src="js/film-modal.js?v=4.3.1"></script>
-<script src="js/catalogue-page.js?v=4.9.2"></script>
+<script src="js/catalogue-page.js?v=5.0.0"></script>
 <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAx4ILK4VPFvYxaZX-HwpUPMEOpkQLJEmE&libraries=places&language=fr&callback=initNearbyCatalogueGoogleMaps"></script>
 </body>
 </html>
