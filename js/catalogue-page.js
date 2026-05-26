@@ -309,6 +309,7 @@ function getNearbyNextShowtimeLabel(film) {
     const first = structured.find(item => item && (item.label || item.startsAt));
     if (first?.label) return String(first.label);
   }
+  if (film?.isNearbyShowing && cinemas.length) return 'Horaires à confirmer';
   return '';
 }
 
