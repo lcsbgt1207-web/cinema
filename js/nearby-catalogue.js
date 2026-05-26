@@ -1,12 +1,16 @@
-/* CinéProche — Catalogue proche — ZIP 4.9.1
-   Objectif : mieux remonter les films proches à venir, y compris les reprises et
-   séances spéciales dont les dates sont exprimées en libellés français (ex : mer. 28 mai).
+/* CinéProche — Catalogue proche — ZIP 4.9.2
+   Objectif : stabiliser le catalogue proche et réduire les logs/traitements inutiles.
+   Objectif précédent : normalisation des horaires UGC pour la popup catalogue.
+   - Les films reconnus dans js/data.js gardent leur note locale.
+   - Les films absents trouvés sur TMDB deviennent utilisables directement dans la liste finale.
+   - Ajout d'un catalogue temporaire exportable window.NEARBY_CATALOGUE_RUNTIME_DATA.
+   - Aucun ajout définitif dans js/data.js : la fusion reste côté navigateur pour validation.
 */
 (function () {
   'use strict';
 
   const NEARBY_CATALOGUE_API = 'https://cinepro-api-yal8.onrender.com';
-  let currentNearbyLookaheadDays = 21;
+  let currentNearbyLookaheadDays = 7;
   let currentNearbyApiBaseUrl = NEARBY_CATALOGUE_API;
   // ZIP 3.8.1 : logs debug désactivés par défaut.
   // Pour les réactiver ponctuellement : localStorage.setItem('cinepro_debug', '1') puis recharger.
@@ -206,8 +210,8 @@
 
   function getConfiguredNearbyLookaheadDays(options = {}) {
     const cfg = getNearbyConfig();
-    const raw = Number(options.lookaheadDays ?? cfg.CATALOGUE_LOOKAHEAD_DAYS ?? currentNearbyLookaheadDays ?? 21);
-    return Math.max(7, Math.min(45, Number.isFinite(raw) ? Math.round(raw) : 21));
+    const raw = Number(options.lookaheadDays ?? cfg.CATALOGUE_LOOKAHEAD_DAYS ?? currentNearbyLookaheadDays ?? 7);
+    return Math.max(7, Math.min(30, Number.isFinite(raw) ? Math.round(raw) : 14));
   }
 
   function getConfiguredNearbyMaxCinemas(radius, options = {}) {
@@ -216,9 +220,9 @@
 
     const cfg = getNearbyConfig();
     const defaults = cfg.CATALOGUE_MAX_CINEMAS || {};
-    if (radius >= 50000) return Number(defaults.large) || 48;
-    if (radius >= 30000) return Number(defaults.medium) || 36;
-    return Number(defaults.small) || 24;
+    if (radius >= 50000) return Number(defaults.large) || 24;
+    if (radius >= 30000) return Number(defaults.medium) || 18;
+    return Number(defaults.small) || 12;
   }
 
   function getTmdbImageBase(size = 'w500') {
@@ -575,34 +579,6 @@
     );
   }
 
-  const NEARBY_MONTH_INDEX = {
-    janvier: 0, janv: 0, jan: 0,
-    fevrier: 1, fevr: 1, fev: 1, february: 1,
-    mars: 2,
-    avril: 3, avr: 3, april: 3,
-    mai: 4, may: 4,
-    juin: 5, jun: 5, june: 5,
-    juillet: 6, juil: 6, jul: 6, july: 6,
-    aout: 7, aou: 7, aug: 7, august: 7,
-    septembre: 8, sept: 8, sep: 8,
-    octobre: 9, oct: 9,
-    novembre: 10, nov: 10,
-    decembre: 11, dec: 11
-  };
-
-  function normalizeMonthToken(value) {
-    return stripAccents(String(value || '').toLowerCase()).replace(/\.$/, '').trim();
-  }
-
-  function buildNearbyAbsoluteDate(year, monthIndex, day) {
-    const safeYear = Number(year);
-    const safeMonth = Number(monthIndex);
-    const safeDay = Number(day);
-    if (!Number.isFinite(safeYear) || !Number.isFinite(safeMonth) || !Number.isFinite(safeDay)) return null;
-    const date = new Date(safeYear, safeMonth, safeDay);
-    return Number.isNaN(date.getTime()) ? null : startOfLocalDay(date);
-  }
-
   function startOfLocalDay(date = new Date()) {
     return new Date(date.getFullYear(), date.getMonth(), date.getDate());
   }
@@ -644,6 +620,73 @@
     return null;
   }
 
+  const FRENCH_MONTH_INDEX = {
+    janvier: 0, janv: 0, jan: 0,
+    fevrier: 1, fevr: 1, fev: 1,
+    mars: 2,
+    avril: 3, avr: 3,
+    mai: 4,
+    juin: 5,
+    juillet: 6, juil: 6,
+    aout: 7, aou: 7,
+    septembre: 8, sept: 8, sep: 8,
+    octobre: 9, oct: 9,
+    novembre: 10, nov: 10,
+    decembre: 11, dec: 11
+  };
+
+  function resolveNearbyYear(monthIndex, dayOfMonth) {
+    const today = startOfLocalDay(new Date());
+    const currentYear = today.getFullYear();
+    const candidate = new Date(currentYear, monthIndex, dayOfMonth);
+    const startWindow = startOfLocalDay(today);
+    const endWindow = new Date(startWindow);
+    endWindow.setDate(endWindow.getDate() + Math.max(30, currentNearbyLookaheadDays + 10));
+
+    if (candidate >= startWindow && candidate < endWindow) return currentYear;
+
+    const nextYearCandidate = new Date(currentYear + 1, monthIndex, dayOfMonth);
+    if (nextYearCandidate >= startWindow && nextYearCandidate < endWindow) return currentYear + 1;
+
+    const previousYearCandidate = new Date(currentYear - 1, monthIndex, dayOfMonth);
+    if (previousYearCandidate >= startWindow && previousYearCandidate < endWindow) return currentYear - 1;
+
+    return currentYear;
+  }
+
+  function parseFrenchCalendarDate(text) {
+    const normalized = stripAccents(String(text || '').toLowerCase())
+      .replace(/[,|]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!normalized) return null;
+
+    const namedMonthMatch = normalized.match(/(?:\b(?:lun|mar|mer|jeu|ven|sam|dim)(?:di)?\.?\s+)?(\d{1,2})\s+(janv(?:ier)?|jan(?:vier)?|fevr(?:ier)?|fev(?:rier)?|mars|avr(?:il)?|mai|juin|juil(?:let)?|aou?t|sept(?:embre)?|sep(?:tembre)?|oct(?:obre)?|nov(?:embre)?|dec(?:embre)?)(?:\s+(20\d{2}))?/i);
+    if (namedMonthMatch) {
+      const dayOfMonth = Number(namedMonthMatch[1]);
+      const rawMonth = stripAccents(namedMonthMatch[2]).replace(/\.$/, '');
+      const monthIndex = FRENCH_MONTH_INDEX[rawMonth] ?? FRENCH_MONTH_INDEX[rawMonth.slice(0, 4)] ?? FRENCH_MONTH_INDEX[rawMonth.slice(0, 3)];
+      if (Number.isFinite(dayOfMonth) && Number.isFinite(monthIndex)) {
+        const year = namedMonthMatch[3] ? Number(namedMonthMatch[3]) : resolveNearbyYear(monthIndex, dayOfMonth);
+        const parsed = new Date(year, monthIndex, dayOfMonth);
+        return Number.isNaN(parsed.getTime()) ? null : parsed;
+      }
+    }
+
+    const slashMatch = normalized.match(/\b(\d{1,2})[\/-](\d{1,2})(?:[\/-](20\d{2}))?\b/);
+    if (slashMatch) {
+      const dayOfMonth = Number(slashMatch[1]);
+      const monthIndex = Number(slashMatch[2]) - 1;
+      if (monthIndex >= 0 && monthIndex <= 11) {
+        const year = slashMatch[3] ? Number(slashMatch[3]) : resolveNearbyYear(monthIndex, dayOfMonth);
+        const parsed = new Date(year, monthIndex, dayOfMonth);
+        return Number.isNaN(parsed.getTime()) ? null : parsed;
+      }
+    }
+
+    return null;
+  }
+
   function combineDayAndTime(dayDate, hour, minute) {
     if (!(dayDate instanceof Date) || Number.isNaN(dayDate.getTime())) return null;
     const combined = startOfLocalDay(dayDate);
@@ -658,45 +701,13 @@
     if (!text) return null;
 
     const relativeDate = getDateFromRelativeFrenchLabel(text);
-    const relativeTimeMatch = text.match(/\b(\d{1,2})[:h](\d{2})\b/);
-    if (relativeDate && relativeTimeMatch) {
-      return combineDayAndTime(relativeDate, relativeTimeMatch[1], relativeTimeMatch[2]);
+    const frenchCalendarDate = parseFrenchCalendarDate(text);
+    const relativeTimeMatch = text.match(/(\d{1,2})[:h](\d{2})/);
+    if ((relativeDate || frenchCalendarDate) && relativeTimeMatch) {
+      return combineDayAndTime(relativeDate || frenchCalendarDate, relativeTimeMatch[1], relativeTimeMatch[2]);
     }
     if (relativeDate) return relativeDate;
-
-    const normalized = stripAccents(text.toLowerCase())
-      .replace(/[,()]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-
-    const monthMatch = normalized.match(/\b(?:lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche|lun|mar|mer|jeu|ven|sam|dim)?\.?\s*(\d{1,2})(?:er)?\s+(janvier|janv|jan|fevrier|fevr|fev|mars|avril|avr|mai|juin|juillet|juil|aout|aou|septembre|sept|octobre|oct|novembre|nov|decembre|dec)(?:\s+(\d{4}))?/i);
-    if (monthMatch) {
-      const day = Number(monthMatch[1]);
-      const monthIndex = NEARBY_MONTH_INDEX[normalizeMonthToken(monthMatch[2])];
-      const fallbackYear = (fallbackDate instanceof Date && !Number.isNaN(fallbackDate.getTime())) ? fallbackDate.getFullYear() : new Date().getFullYear();
-      const year = monthMatch[3] ? Number(monthMatch[3]) : fallbackYear;
-      const absoluteDate = buildNearbyAbsoluteDate(year, monthIndex, day);
-      if (absoluteDate) {
-        const timeMatch = text.match(/\b(\d{1,2})[:h](\d{2})\b/);
-        if (timeMatch) return combineDayAndTime(absoluteDate, timeMatch[1], timeMatch[2]);
-        return absoluteDate;
-      }
-    }
-
-    const slashMatch = normalized.match(/\b(\d{1,2})[\/-](\d{1,2})(?:[\/-](\d{2,4}))?\b/);
-    if (slashMatch) {
-      const day = Number(slashMatch[1]);
-      const monthIndex = Number(slashMatch[2]) - 1;
-      const fallbackYear = (fallbackDate instanceof Date && !Number.isNaN(fallbackDate.getTime())) ? fallbackDate.getFullYear() : new Date().getFullYear();
-      let year = slashMatch[3] ? Number(slashMatch[3]) : fallbackYear;
-      if (year < 100) year += 2000;
-      const absoluteDate = buildNearbyAbsoluteDate(year, monthIndex, day);
-      if (absoluteDate) {
-        const timeMatch = text.match(/\b(\d{1,2})[:h](\d{2})\b/);
-        if (timeMatch) return combineDayAndTime(absoluteDate, timeMatch[1], timeMatch[2]);
-        return absoluteDate;
-      }
-    }
+    if (frenchCalendarDate) return frenchCalendarDate;
 
     // Format ISO : 2026-05-23T17:00:00 ou 2026-05-23 17:00.
     const isoMatch = text.match(/(20\d{2}-\d{2}-\d{2})(?:[T\s]+(\d{1,2})[:h](\d{2}))?/);
@@ -713,7 +724,7 @@
     }
 
     // Format heure seule : 17:00 ou 17h00. On rattache à la date de la séance si elle existe, sinon aujourd'hui.
-    const timeMatch = text.match(/\b(\d{1,2})[:h](\d{2})\b/);
+    const timeMatch = text.match(/(\d{1,2})[:h](\d{2})/);
     if (timeMatch) {
       const base = fallbackDate ? startOfLocalDay(fallbackDate) : startOfLocalDay(new Date());
       base.setHours(Number(timeMatch[1]), Number(timeMatch[2]), 0, 0);
@@ -743,7 +754,54 @@
   }
 
   function keyLooksLikeShowtimeDate(key = '') {
-    return /(startsAt|startAt|datetime|dateTime|showtime|showTime|horaire|time|date|jour|day|seance|séance|session|label|display)/i.test(String(key));
+    return /(startsAt|startAt|datetime|dateTime|showtime|showTime|horaire|time|date|jour|day|seance|séance|session)/i.test(String(key));
+  }
+
+  function textLooksLikeDateCarrier(value = '') {
+    const text = stripAccents(String(value || '').toLowerCase()).trim();
+    if (!text) return false;
+    return /(aujourd hui|demain|apres demain)/.test(text)
+      || /\d{1,2}[\/-]\d{1,2}(?:[\/-]20\d{2})?/.test(text)
+      || /\d{1,2}\s+(janv(?:ier)?|jan(?:vier)?|fevr(?:ier)?|fev(?:rier)?|mars|avr(?:il)?|mai|juin|juil(?:let)?|aou?t|sept(?:embre)?|sep(?:tembre)?|oct(?:obre)?|nov(?:embre)?|dec(?:embre)?)/i.test(text);
+  }
+
+  function collectLooseShowtimeStrings(item) {
+    const found = [];
+    const seen = new Set();
+    const seenObjects = new WeakSet();
+
+    function push(value) {
+      const text = String(value || '').trim();
+      if (!text) return;
+      if (!textLooksLikeDateCarrier(text) && !/\d{1,2}[:h]\d{2}/.test(text)) return;
+      if (seen.has(text)) return;
+      seen.add(text);
+      found.push(text);
+    }
+
+    function visit(node, depth = 0) {
+      if (node === null || node === undefined || depth > 10) return;
+      if (typeof node === 'string' || typeof node === 'number') {
+        push(node);
+        return;
+      }
+      if (typeof node !== 'object') return;
+      if (seenObjects.has(node)) return;
+      seenObjects.add(node);
+      if (Array.isArray(node)) {
+        node.forEach(child => visit(child, depth + 1));
+        return;
+      }
+      for (const [key, value] of Object.entries(node)) {
+        if ((typeof value === 'string' || typeof value === 'number') && (keyLooksLikeShowtimeDate(key) || /label|display|caption|text|day|date/i.test(key))) {
+          push(value);
+        }
+        visit(value, depth + 1);
+      }
+    }
+
+    visit(item);
+    return found;
   }
 
   function extractShowtimeEntries(item) {
@@ -757,11 +815,12 @@
     }
 
     function visit(node, path = '$', fallbackDate = null, depth = 0) {
-      if (node === null || node === undefined || depth > 12) return;
+      if (node === null || node === undefined || depth > 10) return;
 
       if (typeof node === 'string' || typeof node === 'number' || node instanceof Date) {
-        const parsedDirect = parseShowtimeDate(node, fallbackDate);
-        if (keyLooksLikeShowtimeDate(path) || parsedDirect) pushDate(node, fallbackDate);
+        if (keyLooksLikeShowtimeDate(path) || textLooksLikeDateCarrier(node) || /\d{1,2}[:h]\d{2}/.test(String(node))) {
+          pushDate(node, fallbackDate);
+        }
         return;
       }
 
@@ -773,12 +832,13 @@
         node.__nearbyFallbackDate, node.__nearbyRequestedDate, node.__nearbyApiDate,
         node.date, node.day, node.jour, node.showDate, node.sessionDate,
         node.dateLabel, node.dayLabel, node.label, node.tabLabel, node.displayDate, node.displayDay,
-        node.sessionLabel, node.dayText, node.dateText, node.heading, node.header
+        node.caption, node.text
       ), fallbackDate) || fallbackDate;
 
       const directValues = [
         node.startsAt, node.startAt, node.start, node.datetime, node.dateTime,
-        node.showtime, node.showTime, node.time, node.horaire, node.hour, node.heure
+        node.showtime, node.showTime, node.time, node.horaire, node.hour, node.heure,
+        node.label, node.displayLabel, node.displayDate, node.displayTime, node.caption, node.text
       ];
       for (const value of directValues) pushDate(value, objectDate);
 
@@ -797,7 +857,7 @@
     const unique = [];
     const seen = new Set();
     for (const entry of entries.sort((a, b) => a.date - b.date)) {
-      const key = entry.date.toISOString().slice(0, 16);
+      const key = `${entry.date.getFullYear()}-${String(entry.date.getMonth() + 1).padStart(2, '0')}-${String(entry.date.getDate()).padStart(2, '0')}T${String(entry.date.getHours()).padStart(2, '0')}:${String(entry.date.getMinutes()).padStart(2, '0')}`;
       if (seen.has(key)) continue;
       seen.add(key);
       unique.push(entry.label);
@@ -810,27 +870,43 @@
     const filtered = extractShowtimeEntries(item);
     if (filtered.length) return filtered;
 
-    // Sécurité : si l'API ne donne que des heures sans date dans un tableau classique,
-    // on les rattache à la date du bloc si elle existe, sinon aujourd'hui.
-    const possibleArrays = [item.horaires, item.times, item.showtimes, item.seances, item.sessions, item.scr, item.version?.times];
+    const possibleArrays = [
+      item.horaires, item.times, item.showtimes, item.seances, item.sessions, item.scr,
+      item.version?.times, item.slots, item.schedule, item.events, item.performances,
+      item.days, item.calendar, item.screenings
+    ];
     const fallback = [];
     const itemDate = parseShowtimeDate(firstString(
       item.__nearbyFallbackDate, item.__nearbyRequestedDate, item.__nearbyApiDate,
       item.date, item.day, item.jour, item.showDate, item.sessionDate,
       item.dateLabel, item.dayLabel, item.label, item.tabLabel, item.displayDate, item.displayDay,
-      item.sessionLabel, item.dayText, item.dateText, item.heading, item.header
+      item.caption, item.text
     ));
     for (const arr of possibleArrays) {
       if (!Array.isArray(arr)) continue;
       for (const value of arr) {
         const parsed = parseShowtimeDate(
-          typeof value === 'string' ? value : firstString(value?.startsAt, value?.startAt, value?.time, value?.horaire, value?.hour, value?.heure),
+          typeof value === 'string'
+            ? value
+            : firstString(
+                value?.startsAt, value?.startAt, value?.time, value?.horaire, value?.hour, value?.heure,
+                value?.label, value?.displayLabel, value?.displayDate, value?.displayTime, value?.caption, value?.text,
+                value?.date, value?.day, value?.jour
+              ),
           itemDate
         );
         if (parsed && isShowtimeInNearbyWindow(parsed)) fallback.push(formatNearbyShowtime(parsed));
       }
     }
-    return [...new Set(fallback)];
+
+    if (fallback.length) return [...new Set(fallback)];
+
+    const loose = [];
+    for (const rawValue of collectLooseShowtimeStrings(item)) {
+      const parsed = parseShowtimeDate(rawValue, itemDate);
+      if (parsed && isShowtimeInNearbyWindow(parsed)) loose.push(formatNearbyShowtime(parsed));
+    }
+    return [...new Set(loose)];
   }
 
   function normalizeShowtimeItem(rawItem) {
@@ -838,15 +914,18 @@
     const title = extractMovieTitle(movieObject) || extractMovieTitle(rawItem);
     if (!title || !looksLikeRealMovieTitle(title)) return null;
     const horaires = extractShowtimes(rawItem);
-    // ZIP 4.9 : le Catalogue garde les films avec au moins une séance dans la fenêtre configurée.
-    if (!horaires.length) return null;
+    const movieHoraires = movieObject && movieObject !== rawItem ? extractShowtimes(movieObject) : [];
+    const mergedHoraires = [...new Set([...(Array.isArray(horaires) ? horaires : []), ...(Array.isArray(movieHoraires) ? movieHoraires : [])])];
+    if (!mergedHoraires.length) {
+      return null;
+    }
     return {
       title,
       normalizedKey: normalizeNearbyTitle(title),
       rawMovie: movieObject || rawItem,
       rawItem,
       poster: extractPoster(movieObject, rawItem),
-      horaires
+      horaires: mergedHoraires
     };
   }
 
@@ -1110,10 +1189,13 @@
       // Si ce premier objet ne portait pas les horaires, les séances UGC étaient perdues.
       // On fusionne donc les tableaux d'horaires au lieu d'écraser/ignorer les doublons.
       if (existing && typeof existing === 'object' && raw && typeof raw === 'object') {
-        for (const key of ['showtimes', 'horaires', 'times', 'seances', 'sessions']) {
+        for (const key of ['showtimes', 'horaires', 'times', 'seances', 'sessions', 'scr', 'slots', 'schedule', 'events', 'performances', 'days', 'calendar', 'screenings']) {
           const a = Array.isArray(existing[key]) ? existing[key] : [];
           const b = Array.isArray(raw[key]) ? raw[key] : [];
           if (b.length) existing[key] = [...a, ...b];
+        }
+        for (const key of ['date', 'day', 'jour', 'showDate', 'sessionDate', 'dateLabel', 'dayLabel', 'label', 'tabLabel', 'displayDate', 'displayDay', 'displayLabel', 'displayTime', 'caption', 'text']) {
+          if (!existing[key] && raw[key]) existing[key] = raw[key];
         }
       }
     }
@@ -1136,7 +1218,7 @@
   }
 
   async function getCinemaShowtimes(cinema, options = {}) {
-    const allocineId = await getCinemaAllocineId(cinema);
+    const allocineId = options.allocineId || await getCinemaAllocineId(cinema);
     if (!allocineId) return [];
 
     // ZIP 3.5.4 : surtout ne pas utiliser toISOString() ici.
@@ -1263,7 +1345,7 @@
         <div class="nearby-catalogue-head">
           <div>
             <h2>Films proches trouvés</h2>
-            <p>ZIP 4.9.1 : films avec au moins une séance proche dans les prochains jours, y compris les libellés de dates françaises.</p>
+            <p>ZIP 4.9 : films avec au moins une séance proche dans les prochains jours, avec horaires lisibles.</p>
           </div>
           <div class="nearby-catalogue-stats">
             <div class="nearby-catalogue-stat"><strong>${stats.total}</strong> films</div>
@@ -1613,7 +1695,7 @@
     }
     if (!location) location = await window.PLACES.geolocate();
 
-    console.log(`[Catalogue proche] ZIP 4.9.1 actif — séances proches analysées sur ${lookaheadDays} jour(s).`);
+    console.log(`[Catalogue proche] ZIP 4.9 actif — séances proches analysées sur ${lookaheadDays} jour(s).`);
     debugLog('[Catalogue proche] Position utilisée :', location);
 
     // ZIP 3.6.7 : une nouvelle recherche remplace toujours l'ancien cache.
@@ -1626,17 +1708,40 @@
 
     const cinemas = await window.PLACES.findNearbycinemas(location, radius);
     const maxCinemas = getConfiguredNearbyMaxCinemas(radius, options);
-    console.log(`[Catalogue proche] ${cinemas.length} cinéma(s) trouvé(s). Analyse sur ${Math.min(cinemas.length, maxCinemas)} cinéma(s) et ${lookaheadDays} jour(s).`);
+    const analysedCinemas = cinemas.slice(0, maxCinemas);
+    console.log(`[Catalogue proche] ${cinemas.length} cinéma(s) trouvé(s). Analyse sur ${analysedCinemas.length} cinéma(s) et ${lookaheadDays} jour(s).`);
     debugLog('[Catalogue proche] Cinémas trouvés :', cinemas);
 
     const moviesByKey = new Map();
     const matchDebug = [];
+    const extractionStats = {
+      cinemasFound: cinemas.length,
+      cinemasAnalysed: analysedCinemas.length,
+      cinemasWithAllocineId: 0,
+      cinemasWithShowtimes: 0,
+      cinemasWithMovies: 0,
+      cinemaFailures: 0,
+      extractedMovies: 0
+    };
 
-    for (const cinema of cinemas.slice(0, maxCinemas)) {
+    for (const cinema of analysedCinemas) {
       try {
         debugLog(`[Catalogue proche] Recherche films pour ${cinema.nom}...`);
-        const showtimes = await getCinemaShowtimes(cinema, { lookaheadDays, apiBaseUrl: currentNearbyApiBaseUrl });
+        const allocineId = await getCinemaAllocineId(cinema);
+        if (!allocineId) {
+          console.warn(`[Catalogue proche] Aucun identifiant Allociné trouvé pour ${cinema.nom}.`);
+          continue;
+        }
+        extractionStats.cinemasWithAllocineId += 1;
+        const showtimes = await getCinemaShowtimes(cinema, { lookaheadDays, apiBaseUrl: currentNearbyApiBaseUrl, allocineId });
+        if (showtimes.length) extractionStats.cinemasWithShowtimes += 1;
+        if (!showtimes.length) {
+          console.warn(`[Catalogue proche] ${cinema.nom} : aucune séance exploitable trouvée sur ${lookaheadDays} jours.`);
+          continue;
+        }
+        console.log(`[Catalogue proche] ${cinema.nom} : ${showtimes.length} film(s) exploitable(s).`);
         debugLog(`[Catalogue proche] ${cinema.nom} : ${showtimes.length} film(s) trouvé(s).`, showtimes);
+        extractionStats.cinemasWithMovies += 1;
 
         for (const item of showtimes) {
           const title = item.title;
@@ -1717,9 +1822,14 @@
           movie.rawShowtimes.push(item.rawItem || item);
         }
       } catch (error) {
+        extractionStats.cinemaFailures += 1;
+        console.warn(`[Catalogue proche] ${cinema.nom} : échec de récupération des séances.`, error?.message || error);
         debugWarn(`[Catalogue proche][DEBUG] Impossible de charger les films pour ${cinema.nom} :`, error?.message || error);
       }
     }
+
+    extractionStats.extractedMovies = moviesByKey.size;
+    console.log(`[Catalogue proche] Bilan extraction : ${extractionStats.cinemasWithAllocineId}/${extractionStats.cinemasAnalysed} cinémas avec ID, ${extractionStats.cinemasWithShowtimes} avec séances, ${extractionStats.cinemasWithMovies} avec films exploitables, ${extractionStats.extractedMovies} film(s) unique(s).`);
 
     const ranked = Array.from(moviesByKey.values()).sort((a, b) => {
       if (a.ratingValue === null && b.ratingValue === null) return a.title.localeCompare(b.title, 'fr');
@@ -1737,18 +1847,13 @@
       return b.ratingValue - a.ratingValue;
     });
 
-    const cinemasWithShowtimes = Array.from(moviesByKey.values()).filter(movie => Array.isArray(movie.cinemas) && movie.cinemas.length).length;
-
     const stats = {
       total: ranked.length,
       rated: ranked.filter(movie => movie.ratingValue !== null && movie.ratingValue !== undefined).length,
       local: ranked.filter(movie => movie.ratingKind === 'local').length,
       tmdb: ranked.filter(movie => movie.ratingKind === 'tmdb').length,
       missing: ranked.filter(movie => movie.enrichmentStatus === 'missing').length,
-      tmdbEnriched: ranked.filter(movie => movie.enrichmentStatus === 'tmdb-enriched').length,
-      scannedCinemas: Math.min(cinemas.length, maxCinemas),
-      cinemasFound: cinemas.length,
-      cinemasWithShowtimes
+      tmdbEnriched: ranked.filter(movie => movie.enrichmentStatus === 'tmdb-enriched').length
     };
 
     const missingDraft = buildMissingCatalogueDraft(ranked);
@@ -1756,8 +1861,7 @@
     const runtimeFusion = buildRuntimeCatalogueFusion(ranked);
     const nearbyRankedCatalogue = buildNearbyCatalogueRankedExport(ranked);
 
-    console.log(`[Catalogue proche] Résultat ZIP 4.9.1 : ${stats.total} film(s), ${stats.rated} avec note, ${stats.tmdbEnriched} film(s) fusionné(s) TMDB.`);
-    console.log(`[Catalogue proche] Cinémas trouvés : ${stats.cinemasFound}, analysés : ${stats.scannedCinemas}, avec séances exploitables : ${stats.cinemasWithShowtimes}.`);
+    console.log(`[Catalogue proche] Résultat ZIP 3.9.2 : ${stats.total} film(s), ${stats.rated} avec note, ${stats.tmdbEnriched} film(s) fusionné(s) TMDB.`);
     debugGroup('[Catalogue proche] Debug correspondances titres');
     debugTable(matchDebug);
     debugGroupEnd();
@@ -1828,20 +1932,20 @@
     window.NEARBY_CATALOGUE_RUNTIME_TMDB_ONLY = runtimeFusion.tmdbRuntimeFilms;
     window.NEARBY_CATALOGUE_NEARBY_RANKED = nearbyRankedCatalogue;
     window.NEARBY_TMDB_ENRICHMENT_CACHE = tmdbEnrichmentCache;
-    window.NEARBY_CATALOGUE_STATS = { ...stats, runtimeTotal: runtimeFusion.total, runtimeTmdbAdded: runtimeFusion.tmdbRuntimeCount };
+    window.NEARBY_CATALOGUE_STATS = { ...stats, runtimeTotal: runtimeFusion.total, runtimeTmdbAdded: runtimeFusion.tmdbRuntimeCount, extraction: extractionStats };
 
     try {
       const storedPayload = {
-        version: '4.9.1',
+        version: '4.9.2',
         updatedAt: new Date().toISOString(),
         lookaheadDays,
         radius,
         films: runtimeFusion.films,
         tmdbRuntimeFilms: runtimeFusion.tmdbRuntimeFilms,
-        stats: window.NEARBY_CATALOGUE_STATS
+        stats: { ...window.NEARBY_CATALOGUE_STATS, extraction: extractionStats }
       };
       const activePayload = {
-        version: '4.9.1',
+        version: '4.9.2',
         source: 'active-nearby-catalogue',
         searchDate: formatLocalDateYYYYMMDD(new Date()),
         updatedAt: new Date().toISOString(),
@@ -1856,7 +1960,7 @@
       localStorage.setItem('cinepro_nearby_ranked_catalogue', JSON.stringify(nearbyPayload));
       localStorage.setItem('cinepro_active_catalogue', JSON.stringify(activePayload));
       window.CINEPRO_ACTIVE_CATALOGUE = nearbyRankedCatalogue;
-      console.log(`[Catalogue proche] ZIP 4.9.1 : catalogue actif sauvegardé (${nearbyRankedCatalogue.length} films, fenêtre ${lookaheadDays} jours).`);
+      console.log(`[Catalogue proche] ZIP 4.9 : catalogue actif sauvegardé (${nearbyRankedCatalogue.length} films, fenêtre ${lookaheadDays} jours).`);
       window.dispatchEvent(new CustomEvent('nearby-catalogue-runtime-ready', { detail: storedPayload }));
       window.dispatchEvent(new CustomEvent('nearby-catalogue-ranked-ready', { detail: nearbyPayload }));
       window.dispatchEvent(new CustomEvent('cinepro-active-catalogue-ready', { detail: activePayload }));
