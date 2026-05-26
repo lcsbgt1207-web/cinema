@@ -1,4 +1,4 @@
-/* CinéProche — Catalogue proche — ZIP 4.9.2
+/* CinéProche — Catalogue proche — ZIP 4.9.3
    Objectif : stabiliser le catalogue proche et réduire les logs/traitements inutiles.
    Objectif précédent : normalisation des horaires UGC pour la popup catalogue.
    - Les films reconnus dans js/data.js gardent leur note locale.
@@ -702,7 +702,7 @@
 
     const relativeDate = getDateFromRelativeFrenchLabel(text);
     const frenchCalendarDate = parseFrenchCalendarDate(text);
-    const relativeTimeMatch = text.match(/(\d{1,2})[:h](\d{2})/);
+    const relativeTimeMatch = text.match(/\b(\d{1,2})[:h](\d{2})\b/);
     if ((relativeDate || frenchCalendarDate) && relativeTimeMatch) {
       return combineDayAndTime(relativeDate || frenchCalendarDate, relativeTimeMatch[1], relativeTimeMatch[2]);
     }
@@ -724,7 +724,7 @@
     }
 
     // Format heure seule : 17:00 ou 17h00. On rattache à la date de la séance si elle existe, sinon aujourd'hui.
-    const timeMatch = text.match(/(\d{1,2})[:h](\d{2})/);
+    const timeMatch = text.match(/\b(\d{1,2})[:h](\d{2})\b/);
     if (timeMatch) {
       const base = fallbackDate ? startOfLocalDay(fallbackDate) : startOfLocalDay(new Date());
       base.setHours(Number(timeMatch[1]), Number(timeMatch[2]), 0, 0);
@@ -760,9 +760,9 @@
   function textLooksLikeDateCarrier(value = '') {
     const text = stripAccents(String(value || '').toLowerCase()).trim();
     if (!text) return false;
-    return /(aujourd hui|demain|apres demain)/.test(text)
-      || /\d{1,2}[\/-]\d{1,2}(?:[\/-]20\d{2})?/.test(text)
-      || /\d{1,2}\s+(janv(?:ier)?|jan(?:vier)?|fevr(?:ier)?|fev(?:rier)?|mars|avr(?:il)?|mai|juin|juil(?:let)?|aou?t|sept(?:embre)?|sep(?:tembre)?|oct(?:obre)?|nov(?:embre)?|dec(?:embre)?)/i.test(text);
+    return /\b(aujourd hui|demain|apres demain)\b/.test(text)
+      || /\b\d{1,2}[\/-]\d{1,2}(?:[\/-]20\d{2})?\b/.test(text)
+      || /\b\d{1,2}\s+(janv(?:ier)?|jan(?:vier)?|fevr(?:ier)?|fev(?:rier)?|mars|avr(?:il)?|mai|juin|juil(?:let)?|aou?t|sept(?:embre)?|sep(?:tembre)?|oct(?:obre)?|nov(?:embre)?|dec(?:embre)?)\b/i.test(text);
   }
 
   function collectLooseShowtimeStrings(item) {
@@ -773,7 +773,7 @@
     function push(value) {
       const text = String(value || '').trim();
       if (!text) return;
-      if (!textLooksLikeDateCarrier(text) && !/\d{1,2}[:h]\d{2}/.test(text)) return;
+      if (!textLooksLikeDateCarrier(text) && !/\b\d{1,2}[:h]\d{2}\b/.test(text)) return;
       if (seen.has(text)) return;
       seen.add(text);
       found.push(text);
@@ -818,7 +818,7 @@
       if (node === null || node === undefined || depth > 10) return;
 
       if (typeof node === 'string' || typeof node === 'number' || node instanceof Date) {
-        if (keyLooksLikeShowtimeDate(path) || textLooksLikeDateCarrier(node) || /\d{1,2}[:h]\d{2}/.test(String(node))) {
+        if (keyLooksLikeShowtimeDate(path) || textLooksLikeDateCarrier(node) || /\b\d{1,2}[:h]\d{2}\b/.test(String(node))) {
           pushDate(node, fallbackDate);
         }
         return;
@@ -1695,7 +1695,7 @@
     }
     if (!location) location = await window.PLACES.geolocate();
 
-    console.log(`[Catalogue proche] ZIP 4.9 actif — séances proches analysées sur ${lookaheadDays} jour(s).`);
+    console.log(`[Catalogue proche] ZIP 4.9.3 actif — séances proches analysées sur ${lookaheadDays} jour(s).`);
     debugLog('[Catalogue proche] Position utilisée :', location);
 
     // ZIP 3.6.7 : une nouvelle recherche remplace toujours l'ancien cache.
@@ -1861,7 +1861,7 @@
     const runtimeFusion = buildRuntimeCatalogueFusion(ranked);
     const nearbyRankedCatalogue = buildNearbyCatalogueRankedExport(ranked);
 
-    console.log(`[Catalogue proche] Résultat ZIP 3.9.2 : ${stats.total} film(s), ${stats.rated} avec note, ${stats.tmdbEnriched} film(s) fusionné(s) TMDB.`);
+    console.log(`[Catalogue proche] Résultat ZIP 4.9.3 : ${stats.total} film(s), ${stats.rated} avec note, ${stats.tmdbEnriched} film(s) fusionné(s) TMDB.`);
     debugGroup('[Catalogue proche] Debug correspondances titres');
     debugTable(matchDebug);
     debugGroupEnd();
