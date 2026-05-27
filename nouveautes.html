@@ -160,7 +160,7 @@
 <script src="js/config.js?v=2"></script>
 <script src="js/tmdb.js?v=2"></script>
 <script src="js/places.js?v=2"></script>
-<script src="js/pagination.js?v=3"></script>
+<script src="js/pagination.js?v=2"></script>
 <script>
   let currentTab = 'now';
   let pendingReservation = null;
@@ -230,7 +230,6 @@
       PAGINATION.create({
         items: films,
         perPage: 8,
-        pageSizes: [8, 12, 24],
         containerId: 'films-grid',
         scrollTo: 'films-grid',
         renderFn: (pageFilms, pagerHtml) => {
@@ -446,21 +445,21 @@
     zone.innerHTML = '<span style="color:#bbb;">Recherche des séances proches...</span>';
 
     try {
-      // Étape 1 : cinémas proches via Google Places (rayon élargi pour maximiser les chances)
+      // Étape 1 : cinémas proches via Google Places
       let cinemas = [];
       if (typeof PLACES !== 'undefined' && PLACES.placesService) {
         PLACES.userLocation = { lat, lng };
-        cinemas = await PLACES.findNearbycinemas({ lat, lng }, 50000);
+        cinemas = await PLACES.findNearbycinemas({ lat, lng }, 15000);
       }
 
       if (!cinemas || cinemas.length === 0) {
-        zone.innerHTML = '<span style="color:#aaa;">Aucun cinéma trouvé dans un rayon de 50 km.</span>';
+        zone.innerHTML = '<span style="color:#aaa;">Aucun cinéma trouvé dans un rayon de 15 km.</span>';
         return;
       }
 
       // Étape 2 : pour chaque cinéma, récupérer l'ID AlloCiné puis les séances
       let toutesSeances = [];
-      await Promise.all(cinemas.slice(0, 15).map(async cinema => {
+      await Promise.all(cinemas.slice(0, 5).map(async cinema => {
         try {
           // Chercher l'ID AlloCiné par nom
           const params = new URLSearchParams({ name: cinema.nom, lat: cinema.location.lat, lng: cinema.location.lng });

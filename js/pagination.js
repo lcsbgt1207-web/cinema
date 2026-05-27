@@ -4,9 +4,9 @@
    ═══════════════════════════════════════ */
 
 const PAGINATION = {
-  create({ items, perPage = 8, containerId, renderFn, scrollTo = null, pageSizes = null }) {
+  create({ items, perPage = 5, containerId, renderFn, scrollTo = null }) {
     let currentPage = 1;
-    let currentPerPage = perPage;
+    let currentPerPage = 5;
     const allItems = Array.isArray(items) ? items : [];
 
     function totalPages() {
@@ -35,32 +35,20 @@ const PAGINATION = {
       return pages;
     }
 
-    function buildPerPageSelect() {
-      if (!pageSizes || pageSizes.length === 0) return '';
-      const options = pageSizes.map(size =>
-        `<option value="${size}" ${size === currentPerPage ? 'selected' : ''}>${size} par page</option>`
-      ).join('');
-      return `<select class="page-size-select" onchange="PAGINATION._changePerPage('${containerId}', this.value)">${options}</select>`;
-    }
-
     function buildPager() {
       const total = totalPages();
-      const selectHtml = buildPerPageSelect();
-
-      if (total <= 1 && !selectHtml) return '';
-
+      if (total <= 1) return '';
       const pages = getVisiblePages(total);
 
       return `
         <div class="catalogue-bottom pagination-bottom">
           <div class="page-state">Page ${currentPage} sur ${total}</div>
           <div class="pagination-controls">
-            ${selectHtml}
             <button class="page-btn" ${currentPage === 1 ? 'disabled' : ''} onclick="PAGINATION._go('${containerId}', ${currentPage - 1})"><i class="ti ti-chevron-left"></i></button>
-            ${total > 1 ? pages.map(page => page === 'ellipsis'
+            ${pages.map(page => page === 'ellipsis'
               ? `<span class="page-ellipsis">…</span>`
               : `<button class="page-btn ${page === currentPage ? 'active' : ''}" onclick="PAGINATION._go('${containerId}', ${page})">${page}</button>`
-            ).join('') : ''}
+            ).join('')}
             <button class="page-btn" ${currentPage === total ? 'disabled' : ''} onclick="PAGINATION._go('${containerId}', ${currentPage + 1})"><i class="ti ti-chevron-right"></i></button>
           </div>
         </div>`;
@@ -82,11 +70,7 @@ const PAGINATION = {
     PAGINATION._instances[containerId] = {
       render,
       totalPages,
-      items: allItems,
-      changePerPage(newPerPage) {
-        currentPerPage = Number(newPerPage);
-        render(1);
-      }
+      items: allItems
     };
 
     render(1);
@@ -96,12 +80,6 @@ const PAGINATION = {
     const inst = this._instances?.[containerId];
     if (!inst) return;
     inst.render(page);
-  },
-
-  _changePerPage(containerId, newPerPage) {
-    const inst = this._instances?.[containerId];
-    if (!inst) return;
-    inst.changePerPage(newPerPage);
   },
 
   _instances: {}

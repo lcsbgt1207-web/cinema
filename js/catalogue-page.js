@@ -182,7 +182,7 @@ function isFreshNearbyPayload(payload) {
   // ZIP 3.8.1 : un seul catalogue proche actif, valable toute la journée.
   // On ne rejette plus un bon catalogue après 30 minutes : cela faisait retomber la page sur les 80 films.
   if (!payload || typeof payload !== 'object') return false;
-  const acceptedVersions = new Set(['3.7.3', '3.7.4', '3.8.1', '3.8.3', '3.8.4', '3.8.5', '3.8.6', '3.9.2', '3.9.4', '3.9.8', '4.9.0', '4.9.1', '4.9.2', '5.0.0', '5.0.1', '5.0.2', '5.0.3']);
+  const acceptedVersions = new Set(['3.7.3', '3.7.4', '3.8.1', '3.8.3', '3.8.4', '3.8.5', '3.8.6', '3.9.2', '3.9.4', '3.9.8', '4.9.0', '4.9.1', '4.9.2', '5.0.0', '5.0.1', '5.0.2', '5.0.3', '5.1.0']);
   if (payload.version && !acceptedVersions.has(String(payload.version))) return false;
   if (!Array.isArray(payload.films) || !payload.films.length) return false;
   const stamp = payload.searchDate || payload.updatedAt || payload.createdAt;
