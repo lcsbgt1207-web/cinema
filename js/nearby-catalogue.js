@@ -1743,21 +1743,12 @@
     console.log(`[Catalogue proche] ZIP 4.9 actif — séances proches analysées sur ${lookaheadDays} jour(s).`);
     debugLog('[Catalogue proche] Position utilisée :', location);
 
-    // ZIP 5.1 : on ne vide plus le catalogue au début d'une recherche.
-    // Sinon le changement de rayon affiche artificiellement 0 film pendant le scan.
-    // On garde l'ancien catalogue visible jusqu'à ce que le nouveau soit prêt.
-
+    // ZIP 3.6.7 : une nouvelle recherche remplace toujours l'ancien cache.
+    // Cela évite de garder des horaires d'hier dans la popup.
     try {
-      localStorage.setItem('cinepro_last_nearby_search', JSON.stringify({
-        address: options.address || '',
-        query: options.address || '',
-        radius,
-        location: location && Number.isFinite(Number(location.lat)) && Number.isFinite(Number(location.lng))
-          ? { lat: Number(location.lat), lng: Number(location.lng) }
-          : null,
-        lookaheadDays,
-        updatedAt: new Date().toISOString()
-      }));
+      localStorage.removeItem('cinepro_runtime_catalogue');
+      localStorage.removeItem('cinepro_nearby_ranked_catalogue');
+      localStorage.removeItem('cinepro_active_catalogue');
     } catch (_) {}
 
     const cinemas = await window.PLACES.findNearbycinemas(location, radius);
@@ -1893,43 +1884,6 @@
       return b.ratingValue - a.ratingValue;
     });
 
-    function persistActiveNearbyCatalogue(films, sourceLabel = 'active-nearby-catalogue', extra = {}) {
-      if (!Array.isArray(films) || !films.length) return null;
-      try {
-        const nowIso = new Date().toISOString();
-        const basePayload = {
-          version: '4.9.2',
-          searchDate: formatLocalDateYYYYMMDD(new Date()),
-          updatedAt: nowIso,
-          address: options.address || '',
-          query: options.address || '',
-          radius,
-          lookaheadDays,
-          films,
-          stats: { total: films.length },
-          ...extra
-        };
-        const activePayload = { ...basePayload, source: sourceLabel };
-        const nearbyPayload = { ...basePayload, source: `${sourceLabel}-nearby-ranked` };
-        localStorage.setItem('cinepro_nearby_ranked_catalogue', JSON.stringify(nearbyPayload));
-        localStorage.setItem('cinepro_active_catalogue', JSON.stringify(activePayload));
-        window.CINEPRO_ACTIVE_CATALOGUE = films;
-        window.NEARBY_CATALOGUE_NEARBY_RANKED = films;
-        window.dispatchEvent(new CustomEvent('nearby-catalogue-ranked-ready', { detail: nearbyPayload }));
-        window.dispatchEvent(new CustomEvent('cinepro-active-catalogue-ready', { detail: activePayload }));
-        return activePayload;
-      } catch (storageError) {
-        console.warn('[Catalogue proche] Impossible de sauvegarder le catalogue actif intermédiaire :', storageError?.message || storageError);
-        return null;
-      }
-    }
-
-    const immediateNearbyRankedCatalogue = buildNearbyCatalogueRankedExport(ranked);
-    if (immediateNearbyRankedCatalogue.length) {
-      persistActiveNearbyCatalogue(immediateNearbyRankedCatalogue, 'active-nearby-catalogue-raw');
-      console.log(`[Catalogue proche] Catalogue brut sauvegardé immédiatement (${immediateNearbyRankedCatalogue.length} films).`);
-    }
-
     const tmdbEnrichment = await enrichMissingMoviesWithTmdb(ranked, options);
 
     ranked.sort((a, b) => {
@@ -2036,12 +1990,26 @@
         tmdbRuntimeFilms: runtimeFusion.tmdbRuntimeFilms,
         stats: { ...window.NEARBY_CATALOGUE_STATS, extraction: extractionStats }
       };
-      localStorage.setItem('cinepro_runtime_catalogue', JSON.stringify(storedPayload));
-      persistActiveNearbyCatalogue(nearbyRankedCatalogue, 'active-nearby-catalogue-final', {
+      const activePayload = {
+        version: '4.9.2',
+        source: 'active-nearby-catalogue',
+        searchDate: formatLocalDateYYYYMMDD(new Date()),
+        updatedAt: new Date().toISOString(),
+        address: options.address || '',
+        radius,
+        lookaheadDays,
+        films: nearbyRankedCatalogue,
         stats: { total: nearbyRankedCatalogue.length, rated: nearbyRankedCatalogue.filter(f => Number.isFinite(Number(f.bestNote))).length }
-      });
-      console.log(`[Catalogue proche] ZIP 5.1 : catalogue actif sauvegardé (${nearbyRankedCatalogue.length} films, fenêtre ${lookaheadDays} jours).`);
+      };
+      const nearbyPayload = { ...activePayload, source: 'legacy-nearby-ranked' };
+      localStorage.setItem('cinepro_runtime_catalogue', JSON.stringify(storedPayload));
+      localStorage.setItem('cinepro_nearby_ranked_catalogue', JSON.stringify(nearbyPayload));
+      localStorage.setItem('cinepro_active_catalogue', JSON.stringify(activePayload));
+      window.CINEPRO_ACTIVE_CATALOGUE = nearbyRankedCatalogue;
+      console.log(`[Catalogue proche] ZIP 4.9 : catalogue actif sauvegardé (${nearbyRankedCatalogue.length} films, fenêtre ${lookaheadDays} jours).`);
       window.dispatchEvent(new CustomEvent('nearby-catalogue-runtime-ready', { detail: storedPayload }));
+      window.dispatchEvent(new CustomEvent('nearby-catalogue-ranked-ready', { detail: nearbyPayload }));
+      window.dispatchEvent(new CustomEvent('cinepro-active-catalogue-ready', { detail: activePayload }));
     } catch (storageError) {
       console.warn('[Catalogue proche] Impossible de sauvegarder le catalogue runtime :', storageError?.message || storageError);
     }

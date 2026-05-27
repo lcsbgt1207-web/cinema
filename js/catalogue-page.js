@@ -182,7 +182,7 @@ function isFreshNearbyPayload(payload) {
   // ZIP 3.8.1 : un seul catalogue proche actif, valable toute la journée.
   // On ne rejette plus un bon catalogue après 30 minutes : cela faisait retomber la page sur les 80 films.
   if (!payload || typeof payload !== 'object') return false;
-  const acceptedVersions = new Set(['3.7.3', '3.7.4', '3.8.1', '3.8.3', '3.8.4', '3.8.5', '3.8.6', '3.9.2', '3.9.4', '3.9.8', '4.9.0', '4.9.1', '4.9.2', '5.0.0', '5.0.1', '5.0.2', '5.0.3', '5.1.0']);
+  const acceptedVersions = new Set(['3.7.3', '3.7.4', '3.8.1', '3.8.3', '3.8.4', '3.8.5', '3.8.6', '3.9.2', '3.9.4', '3.9.8', '4.9.0', '4.9.1', '4.9.2', '5.0.0', '5.0.1', '5.0.2', '5.0.3']);
   if (payload.version && !acceptedVersions.has(String(payload.version))) return false;
   if (!Array.isArray(payload.films) || !payload.films.length) return false;
   const stamp = payload.searchDate || payload.updatedAt || payload.createdAt;
@@ -504,6 +504,29 @@ function setCatalogueSearchStatus(message) {
   if (filmCount) filmCount.textContent = message;
 }
 
+
+function writeLastNearbySearch(payload = {}) {
+  const clean = {
+    query: String(payload.query || payload.address || '').trim(),
+    address: String(payload.address || payload.query || '').trim(),
+    location: payload.location && Number.isFinite(Number(payload.location.lat)) && Number.isFinite(Number(payload.location.lng))
+      ? { lat: Number(payload.location.lat), lng: Number(payload.location.lng) }
+      : null,
+    radius: Number(payload.radius || 0) || getCatalogueSelectedRadius(),
+    lookaheadDays: Number(payload.lookaheadDays || CATALOGUE_LOOKAHEAD_DAYS) || CATALOGUE_LOOKAHEAD_DAYS,
+    updatedAt: new Date().toISOString(),
+    searchDate: new Date().toISOString().slice(0, 10)
+  };
+  try {
+    if (CINEPRO_STORAGE?.writeJSON) {
+      CINEPRO_STORAGE.writeJSON(STORAGE_KEYS.LAST_NEARBY_SEARCH, clean);
+      return clean;
+    }
+    localStorage.setItem(STORAGE_KEYS.LAST_NEARBY_SEARCH, JSON.stringify(clean));
+  } catch (_) {}
+  return clean;
+}
+
 function waitForCatalogueSearchServices(timeout = 12000) {
   const startedAt = Date.now();
   return new Promise((resolve, reject) => {
@@ -533,12 +556,20 @@ function getNearbyRankedMoviesSafe() {
 async function runCatalogueLocationSearch(target = {}) {
   if (catalogueSearchRunning) return false;
   const radius = getCatalogueSelectedRadius();
-  const address = String(target.address || '').trim();
-  const location = target.location || null;
+  const input = document.getElementById('search-input');
+  const typedAddress = String(input?.value || '').trim();
+  const address = String(target.address || typedAddress || '').trim();
+  const location = address
+    ? null
+    : (target.location && Number.isFinite(Number(target.location.lat)) && Number.isFinite(Number(target.location.lng))
+      ? { lat: Number(target.location.lat), lng: Number(target.location.lng) }
+      : null);
   if (!address && !location) return false;
 
   catalogueSearchRunning = true;
   lastCatalogueSearchTarget = { address, location };
+  if (input && address) input.value = address;
+  const pendingSearch = writeLastNearbySearch({ address, location, radius, lookaheadDays: CATALOGUE_LOOKAHEAD_DAYS });
   setCatalogueSearchStatus(address ? `Recherche des films proches dans les ${CATALOGUE_LOOKAHEAD_DAYS} prochains jours près de ${address}…` : `Recherche des films proches dans les ${CATALOGUE_LOOKAHEAD_DAYS} prochains jours autour de vous…`);
 
   try {
@@ -551,6 +582,7 @@ async function runCatalogueLocationSearch(target = {}) {
 
     const options = location ? { location, radius, lookaheadDays: CATALOGUE_LOOKAHEAD_DAYS } : { address, radius, lookaheadDays: CATALOGUE_LOOKAHEAD_DAYS };
     await searchFn(options);
+    writeLastNearbySearch({ ...pendingSearch, address, location, radius, lookaheadDays: CATALOGUE_LOOKAHEAD_DAYS });
     catalogue = getCatalogueSource();
     sortKey = 'bestNote';
     sortDir = -1;
@@ -558,7 +590,7 @@ async function runCatalogueLocationSearch(target = {}) {
     filterTable();
     return true;
   } catch (error) {
-    console.warn('[Catalogue] ZIP 4.9 : recherche autonome impossible :', error?.message || error);
+    console.warn('[Catalogue] ZIP 5.1.1 : recherche autonome impossible :', error?.message || error);
     if (!hasNearbyCatalogue()) {
       setCatalogueSearchStatus('Recherche impossible. Autorisez la position ou entrez une ville pour voir les films proches des prochains jours.');
     } else {
@@ -571,6 +603,9 @@ async function runCatalogueLocationSearch(target = {}) {
 }
 
 function scheduleCatalogueLocationSearch() {
+  const input = document.getElementById('search-input');
+  const typedAddress = String(input?.value || '').trim();
+  if (typedAddress) lastCatalogueSearchTarget = { address: typedAddress, location: null };
   window.clearTimeout(catalogueLocationSearchTimer);
   catalogueLocationSearchTimer = window.setTimeout(() => {
     const input = document.getElementById('search-input');
@@ -578,42 +613,19 @@ function scheduleCatalogueLocationSearch() {
     if (address.length >= 3) runCatalogueLocationSearch({ address });
   }, 700);
 }
-window.scheduleCatalogueLocationSearch = scheduleCatalogueLocationSearch;
-
-function hydrateCatalogueSearchTargetFromStorage() {
-  const lastSearch = readLastNearbySearch();
-  if (!lastSearch || typeof lastSearch !== 'object') return null;
-
-  const address = String(lastSearch.address || lastSearch.query || '').trim();
-  const location = lastSearch.location && Number.isFinite(Number(lastSearch.location.lat)) && Number.isFinite(Number(lastSearch.location.lng))
-    ? { lat: Number(lastSearch.location.lat), lng: Number(lastSearch.location.lng) }
-    : null;
-
-  if (!address && !location) return null;
-
-  lastCatalogueSearchTarget = { address, location };
-
-  const input = document.getElementById('search-input');
-  if (input && address && !String(input.value || '').trim()) input.value = address;
-
-  const radiusSelect = document.getElementById('radius-filter');
-  const radiusKm = Number(lastSearch.radius || 0) / 1000;
-  if (radiusSelect && [5, 15, 30, 50].includes(radiusKm)) radiusSelect.value = String(radiusKm);
-
-  return lastCatalogueSearchTarget;
-}
 
 function handleCatalogueRadiusChange() {
-  const restored = lastCatalogueSearchTarget || hydrateCatalogueSearchTargetFromStorage();
-  if (restored) {
-    runCatalogueLocationSearch(restored);
-    return;
-  }
-
   const input = document.getElementById('search-input');
   const address = String(input?.value || '').trim();
   if (address.length >= 3) {
+    lastCatalogueSearchTarget = { address, location: null };
     runCatalogueLocationSearch({ address });
+    return;
+  }
+
+  const restored = lastCatalogueSearchTarget || hydrateCatalogueSearchTargetFromStorage();
+  if (restored) {
+    runCatalogueLocationSearch(restored);
     return;
   }
 
@@ -621,9 +633,9 @@ function handleCatalogueRadiusChange() {
     setCatalogueSearchStatus('Actualisation du rayon…');
     navigator.geolocation.getCurrentPosition(
       position => {
-        runCatalogueLocationSearch({
-          location: { lat: position.coords.latitude, lng: position.coords.longitude }
-        });
+        const location = { lat: position.coords.latitude, lng: position.coords.longitude };
+        lastCatalogueSearchTarget = { address: '', location };
+        runCatalogueLocationSearch({ location });
       },
       () => {
         setCatalogueSearchStatus('Entrez une ville ou autorisez la position pour recalculer le rayon.');
