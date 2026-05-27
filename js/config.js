@@ -22,9 +22,10 @@ const CONFIG = {
   // ZIP 4.9 : paramètres Catalogue à venir.
   CATALOGUE_LOOKAHEAD_DAYS: 21,
   CATALOGUE_MAX_CINEMAS: {
-    small: 18,
-    medium: 24,
-    large: 32
+    tiny: 16,
+    small: 24,
+    medium: 48,
+    large: 80
   }
 };
 

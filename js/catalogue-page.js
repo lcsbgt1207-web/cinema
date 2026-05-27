@@ -228,7 +228,7 @@ function writeActiveCatalogueFromFilms(films, meta = {}) {
   const now = new Date();
   const lastSearch = readLastNearbySearch();
   const payload = {
-    version: '4.9.2',
+    version: '5.2.0',
     source: meta.source || 'active-nearby-catalogue',
     searchDate: getLocalDateKey(now),
     updatedAt: now.toISOString(),

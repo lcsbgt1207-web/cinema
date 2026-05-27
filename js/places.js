@@ -56,22 +56,83 @@ const PLACES = {
     });
   },
 
-  async findNearbycinemas(location, radius = 15000) {
-    const CLOSE_RADIUS = Math.min(5000, radius);
-    let results;
-    if (radius <= 5000) {
-      results = await this._searchRadius(location, radius);
-    } else {
-      const [closeResults, farResults] = await Promise.all([
-        this._searchRadius(location, CLOSE_RADIUS),
-        this._searchRadius(location, radius)
-      ]);
-      const seen = new Set();
-      results = [];
-      for (const r of [...closeResults, ...farResults]) {
-        if (!seen.has(r.place_id)) { seen.add(r.place_id); results.push(r); }
-      }
+  _offsetLocation(origin, distanceKm, bearingDegrees) {
+    const R = 6371;
+    const bearing = bearingDegrees * Math.PI / 180;
+    const lat1 = origin.lat * Math.PI / 180;
+    const lng1 = origin.lng * Math.PI / 180;
+    const angularDistance = distanceKm / R;
+    const sinLat1 = Math.sin(lat1);
+    const cosLat1 = Math.cos(lat1);
+    const sinAd = Math.sin(angularDistance);
+    const cosAd = Math.cos(angularDistance);
+
+    const lat2 = Math.asin(sinLat1 * cosAd + cosLat1 * sinAd * Math.cos(bearing));
+    const lng2 = lng1 + Math.atan2(
+      Math.sin(bearing) * sinAd * cosLat1,
+      cosAd - sinLat1 * Math.sin(lat2)
+    );
+
+    return {
+      lat: lat2 * 180 / Math.PI,
+      lng: ((lng2 * 180 / Math.PI) + 540) % 360 - 180
+    };
+  },
+
+  _buildSearchPlan(location, radiusMeters) {
+    const radiusKm = Math.max(1, Number(radiusMeters || 0) / 1000);
+    if (radiusKm <= 5) {
+      return [{ location, radius: Math.max(1500, Math.round(radiusMeters)) }];
     }
+
+    const plan = [];
+    const pushPoint = (distanceKm, bearing, searchRadiusKm) => {
+      plan.push({
+        location: distanceKm > 0 ? this._offsetLocation(location, distanceKm, bearing) : location,
+        radius: Math.max(2500, Math.round(searchRadiusKm * 1000))
+      });
+    };
+
+    // Toujours chercher le centre pour garder les cinémas les plus proches.
+    pushPoint(0, 0, Math.min(8, Math.max(4.5, radiusKm * 0.32)));
+
+    if (radiusKm <= 15) {
+      for (let bearing = 0; bearing < 360; bearing += 60) {
+        pushPoint(Math.max(3, radiusKm * 0.55), bearing, Math.min(7, Math.max(4.5, radiusKm * 0.42)));
+      }
+      return plan;
+    }
+
+    // Rayon moyen/large : un anneau intermédiaire.
+    for (let bearing = 0; bearing < 360; bearing += 60) {
+      pushPoint(Math.max(5, radiusKm * 0.42), bearing, Math.min(9, Math.max(5.5, radiusKm * 0.28)));
+    }
+
+    // Grand rayon : un anneau extérieur pour casser l'effet "mêmes cinémas centraux".
+    const outerStep = 45;
+    const outerDistance = Math.max(10, radiusKm * 0.78);
+    const outerSearchRadius = Math.min(12, Math.max(6.5, radiusKm * 0.24));
+    for (let bearing = 0; bearing < 360; bearing += outerStep) {
+      pushPoint(outerDistance, bearing, outerSearchRadius);
+    }
+
+    return plan;
+  },
+
+  async _searchMultiplePlan(plan) {
+    const aggregated = [];
+    const concurrency = 3;
+    for (let index = 0; index < plan.length; index += concurrency) {
+      const chunk = plan.slice(index, index + concurrency);
+      const results = await Promise.all(chunk.map(step => this._searchRadius(step.location, step.radius)));
+      aggregated.push(...results.flat());
+    }
+    return aggregated;
+  },
+
+  async findNearbycinemas(location, radius = 15000) {
+    const plan = this._buildSearchPlan(location, radius);
+    const results = await this._searchMultiplePlan(plan);
 
     // ── MOTS À EXCLURE ABSOLUMENT ──
     const EXCLUDE = [
@@ -112,8 +173,14 @@ const PLACES = {
       'magic','ciné-club','cineclub'
     ];
 
-    const filtered = results.filter(place => {
-      const name = place.name.toLowerCase();
+    const byPlaceId = new Map();
+    for (const place of results) {
+      if (!place?.place_id || byPlaceId.has(place.place_id)) continue;
+      byPlaceId.set(place.place_id, place);
+    }
+
+    const filtered = Array.from(byPlaceId.values()).filter(place => {
+      const name = String(place.name || '').toLowerCase();
       const types = place.types || [];
 
       // 1. Exclure si contient un mot interdit
@@ -135,15 +202,18 @@ const PLACES = {
       return true;
     });
 
-    const cinemas = filtered.map(place => ({
-      id: place.place_id,
-      nom: place.name,
-      adresse: place.vicinity,
-      location: { lat: place.geometry.location.lat(), lng: place.geometry.location.lng() },
-      ouvert: place.opening_hours ? place.opening_hours.open_now : null,
-      rating: place.rating,
-      dist: this.calcDistance(location, { lat: place.geometry.location.lat(), lng: place.geometry.location.lng() })
-    }));
+    const exactRadiusKm = Math.max(1, radius / 1000);
+    const cinemas = filtered
+      .map(place => ({
+        id: place.place_id,
+        nom: place.name,
+        adresse: place.vicinity,
+        location: { lat: place.geometry.location.lat(), lng: place.geometry.location.lng() },
+        ouvert: place.opening_hours ? place.opening_hours.open_now : null,
+        rating: place.rating,
+        dist: this.calcDistance(location, { lat: place.geometry.location.lat(), lng: place.geometry.location.lng() })
+      }))
+      .filter(cinema => cinema.dist <= exactRadiusKm + 0.35);
 
     cinemas.sort((a, b) => a.dist - b.dist);
     return cinemas;

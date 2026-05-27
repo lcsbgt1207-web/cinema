@@ -220,9 +220,10 @@
 
     const cfg = getNearbyConfig();
     const defaults = cfg.CATALOGUE_MAX_CINEMAS || {};
-    if (radius >= 50000) return Number(defaults.large) || 24;
-    if (radius >= 30000) return Number(defaults.medium) || 18;
-    return Number(defaults.small) || 12;
+    if (radius >= 50000) return Number(defaults.large) || 80;
+    if (radius >= 30000) return Number(defaults.medium) || 48;
+    if (radius >= 15000) return Number(defaults.small) || 24;
+    return Number(defaults.tiny) || Number(defaults.small) || 16;
   }
 
   function getTmdbImageBase(size = 'w500') {
@@ -1740,7 +1741,7 @@
     }
     if (!location) location = await window.PLACES.geolocate();
 
-    console.log(`[Catalogue proche] ZIP 4.9 actif — séances proches analysées sur ${lookaheadDays} jour(s).`);
+    console.log(`[Catalogue proche] ZIP 5.2 actif — séances proches analysées sur ${lookaheadDays} jour(s).`);
     debugLog('[Catalogue proche] Position utilisée :', location);
 
     // ZIP 3.6.7 : une nouvelle recherche remplace toujours l'ancien cache.
@@ -1907,7 +1908,7 @@
     const runtimeFusion = buildRuntimeCatalogueFusion(ranked);
     const nearbyRankedCatalogue = buildNearbyCatalogueRankedExport(ranked);
 
-    console.log(`[Catalogue proche] Résultat ZIP 3.9.2 : ${stats.total} film(s), ${stats.rated} avec note, ${stats.tmdbEnriched} film(s) fusionné(s) TMDB.`);
+    console.log(`[Catalogue proche] Résultat ZIP 5.2 : ${stats.total} film(s), ${stats.rated} avec note, ${stats.tmdbEnriched} film(s) fusionné(s) TMDB.`);
     debugGroup('[Catalogue proche] Debug correspondances titres');
     debugTable(matchDebug);
     debugGroupEnd();
@@ -1982,7 +1983,7 @@
 
     try {
       const storedPayload = {
-        version: '4.9.2',
+        version: '5.2.0',
         updatedAt: new Date().toISOString(),
         lookaheadDays,
         radius,
@@ -1991,7 +1992,7 @@
         stats: { ...window.NEARBY_CATALOGUE_STATS, extraction: extractionStats }
       };
       const activePayload = {
-        version: '4.9.2',
+        version: '5.2.0',
         source: 'active-nearby-catalogue',
         searchDate: formatLocalDateYYYYMMDD(new Date()),
         updatedAt: new Date().toISOString(),
@@ -2006,7 +2007,7 @@
       localStorage.setItem('cinepro_nearby_ranked_catalogue', JSON.stringify(nearbyPayload));
       localStorage.setItem('cinepro_active_catalogue', JSON.stringify(activePayload));
       window.CINEPRO_ACTIVE_CATALOGUE = nearbyRankedCatalogue;
-      console.log(`[Catalogue proche] ZIP 4.9 : catalogue actif sauvegardé (${nearbyRankedCatalogue.length} films, fenêtre ${lookaheadDays} jours).`);
+      console.log(`[Catalogue proche] ZIP 5.2 : catalogue actif sauvegardé (${nearbyRankedCatalogue.length} films, fenêtre ${lookaheadDays} jours).`);
       window.dispatchEvent(new CustomEvent('nearby-catalogue-runtime-ready', { detail: storedPayload }));
       window.dispatchEvent(new CustomEvent('nearby-catalogue-ranked-ready', { detail: nearbyPayload }));
       window.dispatchEvent(new CustomEvent('cinepro-active-catalogue-ready', { detail: activePayload }));
