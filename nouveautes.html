@@ -230,6 +230,7 @@
       PAGINATION.create({
         items: films,
         perPage: 8,
+        pageSizes: [8, 12, 24],
         containerId: 'films-grid',
         scrollTo: 'films-grid',
         renderFn: (pageFilms, pagerHtml) => {
