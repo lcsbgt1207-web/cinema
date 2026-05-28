@@ -19,6 +19,10 @@ const CONFIG = {
   BACKEND_LOCAL_URL: 'http://localhost:3000',
   BACKEND_PROD_URL: 'https://cinepro-api-yal8.onrender.com',
 
+  // Phase 1 Résultats v3 : API dédiée aux séances/cinémas AlloCiné.
+  // Ces routes ne sont pas dans le backend Render du ZIP actuel, donc on garde Railway ici.
+  SEANCES_API_PROD_URL: 'https://cinepro-api-production.up.railway.app',
+
   // ZIP 4.9 : paramètres Catalogue à venir.
   CATALOGUE_LOOKAHEAD_DAYS: 21,
   CATALOGUE_MAX_CINEMAS: {
@@ -38,3 +42,10 @@ CONFIG.BACKEND_BASE_URL = (() => {
   } catch (_) {}
   return CONFIG.BACKEND_PROD_URL;
 })();
+
+// Les séances utilisent une API séparée tant que le backend principal ne contient pas
+// /search-cinema, /seances et /seances-auto.
+CONFIG.SEANCES_API_BASE_URL = CONFIG.SEANCES_API_PROD_URL;
+
+// Rend la config disponible aussi via window.CONFIG pour les pages inline.
+if (typeof window !== 'undefined') window.CONFIG = CONFIG;

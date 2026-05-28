@@ -735,15 +735,51 @@
 
   // Fetch avec retry automatique
   async function fetchWithRetry(url, timeout = 45000, retries = 2) {
+    let lastError = null;
     for (let i = 0; i <= retries; i++) {
       try {
         const r = await fetchWithTimeout(url, timeout);
         if (r.ok) return r;
+        lastError = new Error(`Réponse backend invalide (${r.status})`);
+        lastError.status = r.status;
       } catch(e) {
-        if (i === retries) throw e;
-        await new Promise(res => setTimeout(res, 1000));
+        lastError = e;
       }
+      if (i < retries) await new Promise(res => setTimeout(res, 1000));
     }
+    throw lastError || new Error('Serveur indisponible');
+  }
+
+  function allocineSearchUrl(query) {
+    return `https://www.allocine.fr/recherche/?q=${encodeURIComponent(query || '')}`;
+  }
+
+  function backendErrorMessage(error) {
+    if (error?.name === 'AbortError') {
+      return 'Le serveur des séances met trop de temps à répondre.';
+    }
+    if (error?.status) {
+      return `Serveur des séances momentanément indisponible (${error.status}).`;
+    }
+    return 'Serveur des séances momentanément indisponible.';
+  }
+
+  function backendNoticeHTML(message, linkUrl = '', linkLabel = 'Voir sur AlloCiné →') {
+    const link = linkUrl
+      ? `<a href="${linkUrl}" target="_blank" style="color:var(--black);font-weight:500;text-decoration:none;">${linkLabel}</a>`
+      : '';
+    return `<div style="font-size:12px;color:var(--gray-500);padding:6px 0;line-height:1.4;">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:${link ? '4px' : '0'};">
+        <i class="ti ti-alert-circle" style="font-size:14px;"></i>
+        <span>${message}</span>
+      </div>
+      ${link}
+    </div>`;
+  }
+
+  function showBackendNotice(container, message, linkQuery = '') {
+    if (!container) return;
+    container.innerHTML = backendNoticeHTML(message, linkQuery ? allocineSearchUrl(linkQuery) : '');
   }
 
   async function loadFilmsForCinema(cinema, searchId) {
@@ -764,13 +800,13 @@
       const searchR = await fetchWithRetry(`${CINEPRO_API}/search-cinema?${searchParams}`, 45000, 2);
       if (searchId !== activeSearchId) return;
       if (!searchR || !searchR.ok) {
-        container.innerHTML = '<span style="font-size:12px;color:var(--gray-400);padding:4px 0;">Séances non disponibles.</span>';
+        showBackendNotice(container, 'Serveur des séances momentanément indisponible.', cinema.nom);
         return;
       }
       const searchData = await searchR.json();
       if (searchId !== activeSearchId) return;
       if (!searchData.id) {
-        container.innerHTML = '<span style="font-size:12px;color:var(--gray-400);padding:4px 0;">Séances non disponibles.</span>';
+        showBackendNotice(container, 'Cinéma non reconnu par le service des séances.', cinema.nom);
         return;
       }
 
@@ -779,7 +815,7 @@
       const s = await fetchWithRetry(`${CINEPRO_API}/seances-auto?id=${searchData.id}&date=${todayStr}&days=3`, 45000, 2);
       if (searchId !== activeSearchId) return;
       if (!s || !s.ok) {
-        container.innerHTML = "<span style='font-size:12px;color:var(--gray-400);padding:4px 0;'>Séances non disponibles.</span>";
+        showBackendNotice(container, 'Serveur des séances momentanément indisponible.', cinema.nom);
         return;
       }
       const data = await s.json();
@@ -787,7 +823,7 @@
       const films = data.seances || [];
 
       if (!films.length) {
-        container.innerHTML = "<span style='font-size:12px;color:var(--gray-400);padding:4px 0;'>Séances non disponibles.</span>";
+        showBackendNotice(container, 'Aucune séance trouvée pour les prochains jours.', cinema.nom);
         return;
       }
 
@@ -831,7 +867,7 @@
     } catch(e) {
       if (searchId !== activeSearchId) return;
       // Retry échoué — afficher message propre
-      if (container) container.innerHTML = "<span style='font-size:12px;color:var(--gray-400);padding:4px 0;'>S\u00e9ances non disponibles pour l'instant.</span>";
+      showBackendNotice(container, backendErrorMessage(e), cinema?.nom || '');
     }
   }
 
@@ -857,7 +893,7 @@
   }
 
   // ── API CinéProche — Récupération séances AlloCiné ──
-  const CINEPRO_API = 'https://cinepro-api-production.up.railway.app';
+  const CINEPRO_API = window.CONFIG?.SEANCES_API_BASE_URL || window.CONFIG?.BACKEND_BASE_URL || 'https://cinepro-api-production.up.railway.app';
   const seancesCache = {};
 
   const VILLES_COORDS = {
@@ -1118,31 +1154,31 @@
         lat: cinema.location?.lat || '',
         lng: cinema.location?.lng || ''
       });
-      const searchR = await fetch(`${CINEPRO_API}/search-cinema?${searchParams}`);
+      const popupFilmsEl = document.getElementById('cinema-popup-films');
+      const searchR = await fetchWithRetry(`${CINEPRO_API}/search-cinema?${searchParams}`, 45000, 2);
       const searchData = await searchR.json();
 
       if (!searchData.id) {
-        document.getElementById('cinema-popup-films').innerHTML = `
-          <a href="https://www.allocine.fr/recherche/?q=${encodeURIComponent(cinema.nom)}" target="_blank"
-             style="font-size:13px;color:var(--black);font-weight:500;">Voir sur AlloCiné →</a>`;
+        popupFilmsEl.innerHTML = backendNoticeHTML('Cinéma non reconnu par le service des séances.', allocineSearchUrl(cinema.nom));
         return;
       }
 
       const todayStr = new Date().toISOString().split('T')[0];
       const tomorrowStr = new Date(Date.now()+86400000).toISOString().split('T')[0];
-      const [r1, r2] = await Promise.all([
-        fetch(`${CINEPRO_API}/seances-auto?id=${searchData.id}&date=${todayStr}&days=3`),
-        fetch(`${CINEPRO_API}/seances?id=${searchData.id}&date=${tomorrowStr}`)
-      ]);
+      const r1 = await fetchWithRetry(`${CINEPRO_API}/seances-auto?id=${searchData.id}&date=${todayStr}&days=3`, 45000, 2);
       const d1 = await r1.json();
-      const d2 = r2.ok ? await r2.json() : { seances: [] };
+      let d2 = { seances: [] };
+      try {
+        const r2 = await fetchWithRetry(`${CINEPRO_API}/seances?id=${searchData.id}&date=${tomorrowStr}`, 30000, 1);
+        d2 = await r2.json();
+      } catch(e) {
+        console.warn('Séances demain indisponibles:', e);
+      }
       const foundDate = d1.date || todayStr;
 
       const films = d1.seances || [];
       if (!films.length) {
-        document.getElementById('cinema-popup-films').innerHTML = `
-          <a href="https://www.allocine.fr/recherche/?q=${encodeURIComponent(cinema.nom)}" target="_blank"
-             style="font-size:13px;color:var(--black);font-weight:500;">Voir sur AlloCiné →</a>`;
+        document.getElementById('cinema-popup-films').innerHTML = backendNoticeHTML('Aucune séance trouvée pour les prochains jours.', allocineSearchUrl(cinema.nom));
         return;
       }
 
@@ -1214,7 +1250,8 @@
 
       document.getElementById('cinema-popup-films').innerHTML = filmsHtml.join('');
     } catch(e) {
-      document.getElementById('cinema-popup-films').innerHTML = `<div style="font-size:13px;color:var(--gray-400);">Erreur de chargement.</div>`;
+      const popupFilmsEl = document.getElementById('cinema-popup-films');
+      if (popupFilmsEl) popupFilmsEl.innerHTML = backendNoticeHTML(backendErrorMessage(e), allocineSearchUrl(cinema?.nom || ''));
     }
   }
 
