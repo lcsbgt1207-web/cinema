@@ -1982,11 +1982,20 @@
     window.NEARBY_CATALOGUE_STATS = { ...stats, runtimeTotal: runtimeFusion.total, runtimeTmdbAdded: runtimeFusion.tmdbRuntimeCount, extraction: extractionStats };
 
     try {
+      const requestId = options.requestId || null;
+      if (requestId && window.CINEPRO_ACTIVE_CATALOGUE_REQUEST_ID && String(window.CINEPRO_ACTIVE_CATALOGUE_REQUEST_ID) !== String(requestId)) {
+        console.info('[Catalogue proche] Recherche obsolète ignorée : une recherche plus récente est active.');
+        return ranked;
+      }
+
       const storedPayload = {
         version: '5.2.0',
         updatedAt: new Date().toISOString(),
         lookaheadDays,
         radius,
+        requestId,
+        address: options.address || '',
+        location: location ? { lat: Number(location.lat), lng: Number(location.lng) } : null,
         films: runtimeFusion.films,
         tmdbRuntimeFilms: runtimeFusion.tmdbRuntimeFilms,
         stats: { ...window.NEARBY_CATALOGUE_STATS, extraction: extractionStats }
@@ -1997,8 +2006,11 @@
         searchDate: formatLocalDateYYYYMMDD(new Date()),
         updatedAt: new Date().toISOString(),
         address: options.address || '',
+        query: options.address || '',
+        location: location ? { lat: Number(location.lat), lng: Number(location.lng) } : null,
         radius,
         lookaheadDays,
+        requestId,
         films: nearbyRankedCatalogue,
         stats: { total: nearbyRankedCatalogue.length, rated: nearbyRankedCatalogue.filter(f => Number.isFinite(Number(f.bestNote))).length }
       };

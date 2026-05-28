@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Catalogue — CinéProche</title>
   <link rel="icon" href="img/logo.svg" type="image/svg+xml" />
-  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/style.css?v=5.3.0" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css" />
   <style>
     .page-content { max-width: 1320px; padding: 0 32px 56px; }
@@ -145,8 +145,11 @@
   <div class="toolbar">
     <div class="toolbar-search">
       <i class="ti ti-search"></i>
-      <input type="text" id="search-input" placeholder="Ville ou adresse…" oninput="scheduleCatalogueLocationSearch()" autocomplete="street-address" />
+      <input type="text" id="search-input" placeholder="Ville ou adresse…" oninput="scheduleCatalogueLocationSearch()" onkeydown="handleCatalogueSearchKey(event)" autocomplete="street-address" />
     </div>
+    <button type="button" class="catalogue-search-btn" id="catalogue-search-btn" onclick="submitCatalogueLocationSearch()">
+      <i class="ti ti-search"></i><span>Rechercher</span>
+    </button>
     <select class="filter-select" id="genre-filter" onchange="filterTable()">
       <option value="">Tous les genres</option>
       <option>Drame</option>
@@ -257,11 +260,11 @@
 <script src="js/omdb.js?v=5.1.1"></script>
 <script src="js/tmdb.js?v=5.1.1"></script>
 <script src="js/places.js?v=5.2.0"></script>
-<script src="js/nearby-catalogue.js?v=5.2.0"></script>
+<script src="js/nearby-catalogue.js?v=5.3.0"></script>
 <script src="js/storage.js?v=5.1.1"></script>
 <script src="js/catalogue-render.js?v=5.1.1"></script>
 <script src="js/film-modal.js?v=5.1.1"></script>
-<script src="js/catalogue-page.js?v=5.2.0"></script>
+<script src="js/catalogue-page.js?v=5.3.0"></script>
 <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAx4ILK4VPFvYxaZX-HwpUPMEOpkQLJEmE&libraries=places&language=fr&callback=initNearbyCatalogueGoogleMaps"></script>
 </body>
 </html>
