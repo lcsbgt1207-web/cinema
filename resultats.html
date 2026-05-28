@@ -33,6 +33,13 @@
     .radius-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: var(--black); cursor: pointer; }
     .radius-slider::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--black); cursor: pointer; border: none; }
 
+    .results-map-card { margin: 16px 0 8px; border: 0.5px solid var(--gray-200); border-radius: 16px; overflow: hidden; background: var(--white); }
+    .results-map-header { padding: 12px 14px; border-bottom: 0.5px solid var(--gray-200); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .results-map-title { font-size: 13px; font-weight: 600; color: var(--black); display: flex; align-items: center; gap: 6px; }
+    .results-map-summary { display: block; margin-top: 3px; font-size: 12px; font-weight: 400; color: var(--gray-500); }
+    #results-map { width: 100%; height: 320px; background: var(--gray-100); }
+    @media (max-width: 700px) { #results-map { height: 260px; } .results-map-header { align-items: flex-start; } }
+
     .view { display: none; }
     .view.active { display: block; }
 
@@ -174,7 +181,8 @@
       <span>Rayon</span>
       <input type="range" class="radius-slider" id="radius-slider"
              min="2" max="50" step="1" value="15"
-             oninput="updateRadius(this.value)" />
+             oninput="previewRadius(this.value)"
+             onchange="applyRadius(this.value)" />
       <span class="radius-label" id="radius-label">15 km</span>
     </div>
     <div class="results-info" id="results-info"></div>
@@ -182,6 +190,15 @@
 
   <!-- Vue LIEU -->
   <div class="view" id="view-lieu">
+    <section class="results-map-card" aria-label="Carte des cinémas proches">
+      <div class="results-map-header">
+        <div>
+          <div class="results-map-title"><i class="ti ti-map"></i> Carte des cinémas proches</div>
+          <span class="results-map-summary" id="map-summary">Recherche en attente</span>
+        </div>
+      </div>
+      <div id="results-map"></div>
+    </section>
     <div id="cinemas-list"></div>
     <div id="cinemas-pager"></div>
   </div>
@@ -290,17 +307,28 @@
   const params      = new URLSearchParams(window.location.search);
   let searchQuery   = params.get('q') || '';
   let searchMode    = params.get('mode') || 'lieu';
-  const lat         = parseFloat(params.get('lat'));
-  const lng         = parseFloat(params.get('lng'));
+  let initialLat    = parseFloat(params.get('lat'));
+  let initialLng    = parseFloat(params.get('lng'));
   let mapsReady     = false;
   let currentRadius = Number(params.get('radius') || params.get('rayon') || 15) * 1000; // 15km par défaut
+  let activeSearchId = 0;
+  let resultsMap = null;
+  let userMarker = null;
+  let cinemaMarkers = [];
 
-  function updateRadius(val) {
-    currentRadius = val * 1000;
+  function previewRadius(val) {
     document.getElementById('radius-label').textContent = val + ' km';
-    // Relancer la recherche si Maps est prêt
+  }
+
+  function applyRadius(val) {
+    currentRadius = Number(val) * 1000;
+    previewRadius(val);
     if (mapsReady && searchMode === 'lieu') runSearch();
   }
+
+  // Compatibilité si un ancien bouton appelle encore updateRadius.
+  function updateRadius(val) { applyRadius(val); }
+
   let nowPlayingFilms = [];
   let pendingReservation = null;
   let currentCinemaForFilm = null;
@@ -333,8 +361,98 @@
 
   async function runSearch() {
     if (!mapsReady) return;
-    if (searchMode === 'lieu') await searchLieu();
-    else await searchFilm();
+    const slider = document.getElementById('radius-slider');
+    if (slider) currentRadius = Number(slider.value) * 1000;
+    const searchId = ++activeSearchId;
+    if (searchMode === 'lieu') await searchLieu(searchId);
+    else await searchFilm(searchId);
+  }
+
+  function safeDomId(value, fallback = 'item') {
+    const cleaned = String(value || fallback).replace(/[^a-zA-Z0-9_-]/g, '_');
+    return cleaned || fallback;
+  }
+
+  async function resolveSearchLocation() {
+    const typedQuery = (searchQuery || '').trim();
+
+    // Priorité à l'adresse/ville tapée par l'utilisateur.
+    // Sinon une ancienne URL avec lat/lng pouvait continuer à gagner sur une nouvelle recherche texte.
+    if (typedQuery && typedQuery !== 'Ma position') {
+      const geo = await PLACES.geocodeAddress(typedQuery);
+      return geo.location;
+    }
+
+    if (!isNaN(initialLat) && !isNaN(initialLng)) {
+      const location = { lat: initialLat, lng: initialLng };
+      PLACES.userLocation = location;
+      return location;
+    }
+
+    if (PLACES.userLocation) return PLACES.userLocation;
+    return null;
+  }
+
+  function clearCinemaMarkers() {
+    cinemaMarkers.forEach(marker => marker.setMap(null));
+    cinemaMarkers = [];
+  }
+
+  function renderResultsMap(location, cinemas = []) {
+    const mapEl = document.getElementById('results-map');
+    const summaryEl = document.getElementById('map-summary');
+    if (!mapEl || !window.google) return;
+
+    clearCinemaMarkers();
+    if (userMarker) {
+      userMarker.setMap(null);
+      userMarker = null;
+    }
+
+    if (!location || typeof location.lat !== 'number' || typeof location.lng !== 'number') {
+      if (summaryEl) summaryEl.textContent = 'Position à définir';
+      return;
+    }
+
+    if (!resultsMap) {
+      resultsMap = new google.maps.Map(mapEl, {
+        center: location,
+        zoom: 12,
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: true
+      });
+    }
+
+    resultsMap.setCenter(location);
+    userMarker = new google.maps.Marker({
+      position: location,
+      map: resultsMap,
+      title: 'Votre recherche'
+    });
+
+    const bounds = new google.maps.LatLngBounds();
+    bounds.extend(location);
+
+    const validCinemas = (cinemas || []).filter(c => c?.location && typeof c.location.lat === 'number' && typeof c.location.lng === 'number');
+    validCinemas.forEach((cinema, index) => {
+      const marker = new google.maps.Marker({
+        position: cinema.location,
+        map: resultsMap,
+        title: cinema.nom,
+        label: String(index + 1)
+      });
+      marker.addListener('click', () => openCinemaPopup(cinema));
+      cinemaMarkers.push(marker);
+      bounds.extend(cinema.location);
+    });
+
+    if (validCinemas.length) resultsMap.fitBounds(bounds, 56);
+    else resultsMap.setZoom(12);
+
+    if (summaryEl) {
+      summaryEl.textContent = `${validCinemas.length} cinéma${validCinemas.length > 1 ? 's' : ''} affiché${validCinemas.length > 1 ? 's' : ''} sur la carte`;
+    }
   }
 
   function saveLastNearbySearch(location) {
@@ -350,28 +468,30 @@
   }
 
   // ── RECHERCHE LIEU ──
-  async function searchLieu() {
+  async function searchLieu(searchId) {
     const list = document.getElementById('cinemas-list');
+    const pager = document.getElementById('cinemas-pager');
+    if (pager) pager.innerHTML = '';
     list.innerHTML = `<div class="state-box"><i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block;"></i><p>Recherche des cinémas…</p></div>`;
     document.getElementById('results-info').innerHTML = `<i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block;"></i> Recherche en cours…`;
 
     try {
-      let location;
-      if (!isNaN(lat) && !isNaN(lng)) {
-        location = { lat, lng };
-        PLACES.userLocation = location;
-      } else if (searchQuery && searchQuery !== 'Ma position') {
-        const geo = await PLACES.geocodeAddress(searchQuery);
-        location = geo.location;
-      } else if (PLACES.userLocation) {
-        location = PLACES.userLocation;
-      } else {
+      const location = await resolveSearchLocation();
+      if (searchId !== activeSearchId) return;
+
+      if (!location) {
         list.innerHTML = `<div class="state-box"><i class="ti ti-map-pin-off"></i><p>Entrez une ville ou activez votre position.</p></div>`;
+        document.getElementById('results-info').innerHTML = 'Aucune position définie';
+        renderResultsMap(null, []);
         return;
       }
 
       saveLastNearbySearch(location);
       const cinemas = await PLACES.findNearbycinemas(location, currentRadius);
+      if (searchId !== activeSearchId) return;
+
+      renderResultsMap(location, cinemas);
+
       if (!cinemas.length) {
         list.innerHTML = `<div class="state-box"><i class="ti ti-building-off"></i><p>Aucun cinéma trouvé dans ce secteur.</p></div>`;
         document.getElementById('results-info').innerHTML = 'Aucun résultat';
@@ -381,21 +501,23 @@
       document.getElementById('results-info').innerHTML =
         `<i class="ti ti-building"></i> ${cinemas.length} cinéma${cinemas.length > 1 ? 's' : ''} trouvé${cinemas.length > 1 ? 's' : ''}`;
 
-      function renderCinemaCard(c, ci) {
-        const ouvertClass = c.ouvert === true ? 'chip-open' : c.ouvert === false ? 'chip-closed' : 'chip-unknown';
-        const ouvertLabel = c.ouvert === true ? 'Ouvert' : c.ouvert === false ? 'Fermé' : 'Horaires inconnus';
+      function renderCinemaCard(c, ci, absoluteIndex = ci) {
+        const rank = absoluteIndex + 1;
+        const openedClass = c.ouvert === true ? 'chip-open' : c.ouvert === false ? 'chip-closed' : 'chip-unknown';
+        const openedLabel = c.ouvert === true ? 'Ouvert' : c.ouvert === false ? 'Fermé' : 'Horaires inconnus';
+        const safeCinemaId = safeDomId(c.id || c.nom || absoluteIndex, 'cinema_' + absoluteIndex);
         const cineDataStr = JSON.stringify({id:c.id,nom:c.nom,adresse:c.adresse,location:c.location,dist:c.dist,ouvert:c.ouvert}).replace(/"/g,'&quot;');
-        return `<div class="cinema-item" style="animation-delay:${ci * 0.06}s;cursor:pointer;" id="cinema-card-${ci}" onclick="openCinemaPopup(JSON.parse(this.dataset.c))" data-c="${cineDataStr}">
+        return `<div class="cinema-item" style="animation-delay:${ci * 0.06}s;cursor:pointer;" id="cinema-card-${safeCinemaId}" onclick="openCinemaPopup(JSON.parse(this.dataset.c))" data-c="${cineDataStr}">
           <div class="cinema-item-top">
             <div class="cinema-item-left">
               <div class="cinema-rank-name">
-                <span class="cinema-rank">${ci + 1}.</span>
+                <span class="cinema-rank">${rank}.</span>
                 <span class="cinema-item-name" style="text-decoration:underline;text-underline-offset:3px;">${c.nom}</span>
               </div>
               <div class="cinema-item-addr"><i class="ti ti-map-pin"></i>${c.adresse}</div>
               <div class="cinema-chips">
                 <span class="chip chip-dist"><i class="ti ti-walk"></i>${PLACES.formatDist(c.dist)}</span>
-                <span class="chip ${ouvertClass}">${ouvertLabel}</span>
+                <span class="chip ${openedClass}">${openedLabel}</span>
               </div>
             </div>
             <div class="cinema-item-actions" onclick="event.stopPropagation()">
@@ -408,7 +530,7 @@
             </div>
           </div>
           <div class="cinema-films-label">Films à l'affiche</div>
-          <div class="cinema-films" id="films-cinema-${ci}" onclick="event.stopPropagation()">
+          <div class="cinema-films" id="films-cinema-${safeCinemaId}" onclick="event.stopPropagation()">
             <div style="font-size:12px;color:var(--gray-400);padding:8px 0;display:flex;align-items:center;gap:6px;">
               <i class="ti ti-loader"></i> Chargement des films…
             </div>
@@ -421,13 +543,16 @@
         perPage: 5,
         containerId: 'cinemas-list',
         scrollTo: 'cinemas-list',
-        renderFn: (pageCinemas, pagerHtml) => {
-          list.innerHTML = pageCinemas.map((c, ci) => renderCinemaCard(c, ci)).join('');
+        renderFn: (pageCinemas, pagerHtml, pageMeta = {}) => {
+          if (searchId !== activeSearchId) return;
+          const startIndex = pageMeta.startIndex || 0;
+          list.innerHTML = pageCinemas.map((c, ci) => renderCinemaCard(c, ci, startIndex + ci)).join('');
           document.getElementById('cinemas-pager').innerHTML = pagerHtml;
-          // Charger les films UN PAR UN avec délai pour ne pas saturer Railway
+          // Charger les films UN PAR UN pour limiter les appels au backend.
           (async () => {
             for (let ci = 0; ci < pageCinemas.length; ci++) {
-              await loadFilmsForCinema(pageCinemas[ci], ci);
+              if (searchId !== activeSearchId) return;
+              await loadFilmsForCinema(pageCinemas[ci], searchId);
               if (ci < pageCinemas.length - 1) await new Promise(res => setTimeout(res, 600));
             }
           })();
@@ -435,17 +560,21 @@
       });
 
     } catch(e) {
+      if (searchId !== activeSearchId) return;
       list.innerHTML = `<div class="state-box"><i class="ti ti-alert-circle"></i><p>Erreur : ${e.message}</p></div>`;
+      document.getElementById('results-info').innerHTML = 'Erreur de recherche';
+      renderResultsMap(null, []);
     }
   }
 
   // ── RECHERCHE FILM ──
-  async function searchFilm() {
+  async function searchFilm(searchId) {
     document.getElementById('film-banner-wrap').innerHTML = `<div class="state-box"><i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block;"></i><p>Recherche du film…</p></div>`;
     document.getElementById('film-cinemas-list').innerHTML = '';
 
     try {
       const results = await TMDB.searchMovie(searchQuery);
+      if (searchId !== activeSearchId) return;
       if (!results.length) {
         document.getElementById('film-banner-wrap').innerHTML = `<div class="state-box"><i class="ti ti-mood-sad"></i><p>Aucun film trouvé pour "${searchQuery}"</p></div>`;
         return;
@@ -453,6 +582,7 @@
 
       const film = results[0];
       const filmDetails = await TMDB.getMovie(film.id);
+      if (searchId !== activeSearchId) return;
       const poster = TMDB.posterUrl(film.poster_path, 'w185');
       const director = filmDetails.credits?.crew?.find(c => c.job === 'Director');
       const duree = TMDB.formatDuration(filmDetails.runtime);
@@ -485,7 +615,8 @@
       }
 
       if (PLACES.userLocation) {
-        const cinemas = await PLACES.findNearbycinemas(PLACES.userLocation);
+        const cinemas = await PLACES.findNearbycinemas(PLACES.userLocation, currentRadius);
+        if (searchId !== activeSearchId) return;
         if (cinemas.length) {
           // Chercher les 10 cinémas les plus proches et filtrer ceux qui ont des séances
           const cinemasPool = cinemas.slice(0, 15);
@@ -499,7 +630,9 @@
           const cinemasAvecSeances = [];
           for (let i = 0; i < cinemasPool.length; i++) {
             const c = cinemasPool[i];
+            if (searchId !== activeSearchId) return;
             const seances = await fetchSeancesForCinema(c.nom, film.title, c.location?.lat, c.location?.lng);
+            if (searchId !== activeSearchId) return;
             if (seances && Object.keys(seances).length > 0) {
               cinemasAvecSeances.push({ cinema: c, seances });
             }
@@ -548,6 +681,7 @@
       }
 
     } catch(e) {
+      if (searchId !== activeSearchId) return;
       document.getElementById('film-banner-wrap').innerHTML = `<div class="state-box"><i class="ti ti-alert-circle"></i><p>Erreur : ${e.message}</p></div>`;
     }
   }
@@ -581,9 +715,10 @@
     }
   }
 
-  async function loadFilmsForCinema(cinema, ci) {
-    const container = document.getElementById('films-cinema-' + ci);
-    if (!container) return;
+  async function loadFilmsForCinema(cinema, searchId) {
+    const safeCinemaId = safeDomId(cinema?.id || cinema?.nom, 'cinema');
+    const container = document.getElementById('films-cinema-' + safeCinemaId);
+    if (!container || searchId !== activeSearchId) return;
 
     // Afficher spinner pendant le chargement
     container.innerHTML = '<span style="font-size:12px;color:var(--gray-400);padding:4px 0;display:flex;align-items:center;gap:6px;"><i class="ti ti-loader" style="animation:spin 1s linear infinite;"></i> Chargement...</span>';
@@ -596,7 +731,13 @@
         lng: cinema.location?.lng || ''
       });
       const searchR = await fetchWithRetry(`${CINEPRO_API}/search-cinema?${searchParams}`, 45000, 2);
+      if (searchId !== activeSearchId) return;
+      if (!searchR || !searchR.ok) {
+        container.innerHTML = '<span style="font-size:12px;color:var(--gray-400);padding:4px 0;">Séances non disponibles.</span>';
+        return;
+      }
       const searchData = await searchR.json();
+      if (searchId !== activeSearchId) return;
       if (!searchData.id) {
         container.innerHTML = '<span style="font-size:12px;color:var(--gray-400);padding:4px 0;">Séances non disponibles.</span>';
         return;
@@ -605,7 +746,13 @@
       // 2. Récupérer les séances (avec retry)
       const todayStr = new Date().toISOString().split('T')[0];
       const s = await fetchWithRetry(`${CINEPRO_API}/seances-auto?id=${searchData.id}&date=${todayStr}&days=3`, 45000, 2);
+      if (searchId !== activeSearchId) return;
+      if (!s || !s.ok) {
+        container.innerHTML = "<span style='font-size:12px;color:var(--gray-400);padding:4px 0;'>Séances non disponibles.</span>";
+        return;
+      }
       const data = await s.json();
+      if (searchId !== activeSearchId) return;
       const films = data.seances || [];
 
       if (!films.length) {
@@ -647,9 +794,11 @@
         }
       }));
 
+      if (searchId !== activeSearchId) return;
       container.innerHTML = filmsHtml.join('');
 
     } catch(e) {
+      if (searchId !== activeSearchId) return;
       // Retry échoué — afficher message propre
       if (container) container.innerHTML = "<span style='font-size:12px;color:var(--gray-400);padding:4px 0;'>S\u00e9ances non disponibles pour l'instant.</span>";
     }
@@ -677,7 +826,7 @@
   }
 
   // ── API CinéProche — Récupération séances AlloCiné ──
-  const CINEPRO_API = 'https://cinepro-api-production.up.railway.app';
+  const CINEPRO_API = window.CONFIG?.BACKEND_BASE_URL || 'http://localhost:3000';
   const seancesCache = {};
 
   const VILLES_COORDS = {
@@ -1123,6 +1272,8 @@
     navigator.geolocation.getCurrentPosition(
       pos => {
         PLACES.userLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        initialLat = PLACES.userLocation.lat;
+        initialLng = PLACES.userLocation.lng;
         if (_geoResolve) _geoResolve();
       },
       () => { if (_geoReject) _geoReject(new Error('geo_refused')); },
@@ -1143,6 +1294,8 @@
     btn.disabled=true;
     navigator.geolocation.getCurrentPosition(pos=>{
       PLACES.userLocation={lat:pos.coords.latitude,lng:pos.coords.longitude};
+      initialLat = PLACES.userLocation.lat;
+      initialLng = PLACES.userLocation.lng;
       searchQuery='Ma position';
       document.getElementById('main-search').value=searchQuery;
       btn.innerHTML='<i class="ti ti-current-location"></i> Ma position';
