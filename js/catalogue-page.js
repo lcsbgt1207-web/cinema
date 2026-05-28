@@ -70,6 +70,8 @@ let catalogueLocationSearchTimer = null;
 let catalogueAutoSearchStarted = false;
 let catalogueSearchRunning = false;
 let activeCatalogueSearchId = 0;
+let lastStableCatalogueSnapshot = [];
+let lastStableCatalogueMeta = null;
 let lastCatalogueFilterStats = {
   sourceTotal: 0,
   kept: 0,
@@ -488,13 +490,50 @@ function getCatalogueSelectedRadius() {
   return Math.max(1000, km * 1000);
 }
 
-function setCatalogueSearchStatus(message) {
-  const countLabel = document.getElementById('count-label');
-  const filmCount = document.getElementById('film-count');
-  if (countLabel) countLabel.textContent = message;
-  if (filmCount) filmCount.textContent = message;
+function setCatalogueSearchStatus(message, type = 'info') {
+  const status = document.getElementById('catalogue-search-status');
+  if (!status) return;
+  const clean = String(message || '').trim();
+  status.textContent = clean;
+  status.hidden = !clean;
+  status.className = 'catalogue-search-status';
+  if (clean) status.classList.add(`is-${type}`);
 }
 
+function clearCatalogueSearchStatus() {
+  setCatalogueSearchStatus('');
+}
+
+function rememberStableCatalogue(meta = {}) {
+  if (Array.isArray(catalogue) && catalogue.length) {
+    lastStableCatalogueSnapshot = catalogue.slice();
+    lastStableCatalogueMeta = { ...meta, count: catalogue.length, savedAt: new Date().toISOString() };
+  }
+}
+
+function restoreStableCatalogueIfPossible(message = '') {
+  if (!Array.isArray(lastStableCatalogueSnapshot) || !lastStableCatalogueSnapshot.length) return false;
+  catalogue = lastStableCatalogueSnapshot.slice();
+  currentPage = 1;
+  filterTable();
+  if (message) setCatalogueSearchStatus(message, 'warning');
+  return true;
+}
+
+function formatCatalogueSearchSummary(address, radius, filmsCount) {
+  const radiusKm = Math.round(Number(radius || getCatalogueSelectedRadius()) / 1000);
+  const stats = window.NEARBY_CATALOGUE_STATS || {};
+  const extraction = stats.extraction || {};
+  const cinemasFound = Number(extraction.cinemasFound || stats.cinemasFound || 0);
+  const cinemasAnalysed = Number(extraction.cinemasAnalysed || stats.cinemasAnalysed || 0);
+  const parts = [`${filmsCount} film${filmsCount > 1 ? 's' : ''} proche${filmsCount > 1 ? 's' : ''}`];
+  if (address) parts.push(`près de ${address}`);
+  parts.push(`rayon ${radiusKm} km`);
+  if (cinemasFound || cinemasAnalysed) {
+    parts.push(`${cinemasAnalysed || cinemasFound}/${cinemasFound || cinemasAnalysed} cinéma${(cinemasFound || cinemasAnalysed) > 1 ? 's' : ''} analysé${(cinemasAnalysed || cinemasFound) > 1 ? 's' : ''}`);
+  }
+  return `Recherche terminée : ${parts.join(' · ')}.`;
+}
 
 function writeLastNearbySearch(payload = {}) {
   const clean = {
@@ -577,23 +616,24 @@ async function runCatalogueLocationSearch(target = {}) {
       ? { lat: Number(target.location.lat), lng: Number(target.location.lng) }
       : null);
   if (!address && !location) {
-    setCatalogueSearchStatus('Entrez une ville ou autorisez votre position pour lancer une recherche.');
+    setCatalogueSearchStatus('Entrez une ville ou autorisez votre position pour lancer une recherche.', 'warning');
     return false;
   }
 
+  rememberStableCatalogue({ reason: 'before-new-search', address, radius });
   catalogueSearchRunning = true;
   setCatalogueSearchButtonLoading(true);
   lastCatalogueSearchTarget = { address, location };
   if (input && address) input.value = address;
-  const pendingSearch = writeLastNearbySearch({ address, location, radius, lookaheadDays: CATALOGUE_LOOKAHEAD_DAYS, requestId: searchId });
-  setCatalogueSearchStatus(address ? `Recherche des films proches dans les ${CATALOGUE_LOOKAHEAD_DAYS} prochains jours près de ${address}…` : `Recherche des films proches dans les ${CATALOGUE_LOOKAHEAD_DAYS} prochains jours autour de vous…`);
+
+  const pendingSearch = { address, location, radius, lookaheadDays: CATALOGUE_LOOKAHEAD_DAYS, requestId: searchId };
+  const targetLabel = address || 'votre position';
+  const radiusKm = Math.round(radius / 1000);
+  setCatalogueSearchStatus(`Recherche en cours près de ${targetLabel} — rayon ${radiusKm} km. Les résultats actuels restent affichés pendant le chargement.`, 'loading');
 
   try {
-    setCatalogueSearchStatus('Chargement de Google Maps…');
     await waitForCatalogueSearchServices();
     if (!isCatalogueSearchCurrent(searchId)) return false;
-
-    setCatalogueSearchStatus(address ? `Recherche des films proches dans les ${CATALOGUE_LOOKAHEAD_DAYS} prochains jours près de ${address}…` : `Recherche des films proches dans les ${CATALOGUE_LOOKAHEAD_DAYS} prochains jours autour de vous…`);
 
     const searchFn = getNearbyRankedMoviesSafe();
     if (!searchFn) throw new Error('Recherche catalogue indisponible.');
@@ -601,23 +641,38 @@ async function runCatalogueLocationSearch(target = {}) {
     const options = location
       ? { location, radius, lookaheadDays: CATALOGUE_LOOKAHEAD_DAYS, requestId: searchId }
       : { address, radius, lookaheadDays: CATALOGUE_LOOKAHEAD_DAYS, requestId: searchId };
-    await searchFn(options);
+
+    const ranked = await searchFn(options);
     if (!isCatalogueSearchCurrent(searchId)) return false;
 
-    writeLastNearbySearch({ ...pendingSearch, address, location, radius, lookaheadDays: CATALOGUE_LOOKAHEAD_DAYS, requestId: searchId });
+    const returnedCount = Array.isArray(ranked) ? ranked.length : 0;
+    if (!returnedCount) {
+      const restored = restoreStableCatalogueIfPossible(`Aucun nouveau film exploitable trouvé près de ${targetLabel}. Les anciens résultats sont conservés pour éviter un écran vide.`);
+      if (!restored) {
+        catalogue = [];
+        currentPage = 1;
+        filterTable();
+        setCatalogueSearchStatus(`Aucun film proche trouvé près de ${targetLabel} pour ce rayon.`, 'warning');
+      }
+      return false;
+    }
+
+    writeLastNearbySearch(pendingSearch);
     catalogue = getCatalogueSource();
     sortKey = 'bestNote';
     sortDir = -1;
     currentPage = 1;
     filterTable();
+    rememberStableCatalogue({ reason: 'successful-search', address, radius });
+    setCatalogueSearchStatus(formatCatalogueSearchSummary(address, radius, catalogue.length), 'success');
     return true;
   } catch (error) {
     if (!isCatalogueSearchCurrent(searchId)) return false;
     console.warn('[Catalogue] Phase 2 : recherche autonome impossible :', error?.message || error);
-    if (!hasNearbyCatalogue()) {
-      setCatalogueSearchStatus('Recherche impossible. Autorisez la position ou entrez une ville pour voir les films proches des prochains jours.');
-    } else {
-      refreshCatalogueFromRuntime();
+    const targetLabel = address || 'votre position';
+    const restored = restoreStableCatalogueIfPossible(`Recherche impossible près de ${targetLabel}. Les anciens résultats sont conservés.`);
+    if (!restored) {
+      setCatalogueSearchStatus('Recherche impossible. Autorisez la position ou entrez une ville pour voir les films proches des prochains jours.', 'error');
     }
     return false;
   } finally {
@@ -720,9 +775,15 @@ function startCatalogueAutonomousSearch() {
 
 function refreshCatalogueFromRuntime() {
   updateCatalogueModeControl();
-  catalogue = getCatalogueSource();
+  const nextCatalogue = getCatalogueSource();
+  if ((!Array.isArray(nextCatalogue) || !nextCatalogue.length) && catalogueSearchRunning && Array.isArray(catalogue) && catalogue.length) {
+    // Pendant une recherche, on ne remplace pas une liste visible par un écran vide.
+    return;
+  }
+  catalogue = nextCatalogue;
   currentPage = 1;
   filterTable();
+  rememberStableCatalogue({ reason: 'runtime-refresh' });
 }
 
 
@@ -1164,17 +1225,16 @@ async function initCatalogue() {
   // puisse relancer une vraie recherche même si la page s'ouvre d'abord sur le cache.
   hydrateCatalogueSearchTargetFromStorage();
 
-  // ZIP 3.8.1 : on lance la reconstruction proche dès le début.
-  // Si aucune donnée proche n'est prête, le tableau affiche un état d'attente au lieu des 80 films classiques.
-  scheduleNearbyCatalogueAutoBuild();
-
-  // 1) Le Catalogue est autonome : on demande la position puis on peut chercher une ville.
-  startCatalogueAutonomousSearch();
-
+  // Phase 2 v2 : on ne lance plus de grosse recherche automatique au chargement.
+  // L'utilisateur valide avec Rechercher ou Entrée ; le cache actif reste affiché si disponible.
   updateCatalogueModeControl();
   catalogue = getCatalogueSource();
   sortKey = 'bestNote'; sortDir = -1;
   filterTable();
+  rememberStableCatalogue({ reason: 'initial-load' });
+  if (!catalogue.length) {
+    setCatalogueSearchStatus('Entrez une ville puis cliquez sur Rechercher pour afficher les films proches.', 'info');
+  }
 
   // 2) Letterboxd ne bloque plus l'ouverture du catalogue.
   // Si l'API locale n'est pas lancée, on garde le catalogue proche tel quel.

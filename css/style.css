@@ -721,3 +721,21 @@ img { max-width: 100%; display: block; }
 .popup-showtime-pill strong{font-weight:800;color:inherit;}
 .popup-showtime-pill em{font-style:normal;font-size:10px;font-weight:800;line-height:1;border-radius:999px;padding:3px 5px;background:#f1f1f1;color:#555;}
 .popup-day-tab.active:focus-visible,.popup-day-tab:focus-visible{outline:2px solid #111;outline-offset:2px;}
+
+
+/* Catalogue search status */
+.catalogue-search-status{
+  margin:0 0 12px;
+  padding:10px 14px;
+  border:1px solid var(--gray-200);
+  border-radius:14px;
+  background:var(--gray-50);
+  color:var(--gray-600);
+  font-size:13px;
+  line-height:1.4;
+}
+.catalogue-search-status[hidden]{display:none!important;}
+.catalogue-search-status.is-loading{background:#fff;border-color:var(--gray-200);color:var(--black);}
+.catalogue-search-status.is-success{background:#f7fbf7;border-color:#dceedd;color:#267a35;}
+.catalogue-search-status.is-warning{background:#fffaf0;border-color:#f3dfb5;color:#8a5a00;}
+.catalogue-search-status.is-error{background:#fff5f5;border-color:#f0c6c6;color:#a32626;}
