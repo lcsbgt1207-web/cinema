@@ -455,6 +455,37 @@
     }
   }
 
+
+  function mergeCinemasById(groups, maxRadiusMeters) {
+    const maxRadiusKm = Math.max(1, Number(maxRadiusMeters || 0) / 1000);
+    const byId = new Map();
+    (groups || []).flat().forEach(cinema => {
+      if (!cinema) return;
+      const key = cinema.id || `${cinema.nom || ''}_${cinema.adresse || ''}`;
+      if (!key) return;
+      if (typeof cinema.dist === 'number' && cinema.dist > maxRadiusKm + 0.35) return;
+      if (!byId.has(key) || (cinema.dist || Infinity) < (byId.get(key).dist || Infinity)) {
+        byId.set(key, cinema);
+      }
+    });
+    return Array.from(byId.values()).sort((a, b) => (a.dist || 9999) - (b.dist || 9999));
+  }
+
+  async function findNearbyCinemasStable(location, radiusMeters) {
+    const radius = Number(radiusMeters || 15000);
+    const searches = [];
+
+    // Google Places peut renvoyer moins de résultats sur un grand rayon dense, notamment à Paris,
+    // car chaque recherche est paginée et limitée. On ajoute donc les rayons internes pour garantir
+    // qu'un rayon large ne perde pas les cinémas proches déjà trouvés à 15 km.
+    if (radius > 15000) searches.push(PLACES.findNearbycinemas(location, 15000));
+    if (radius > 30000) searches.push(PLACES.findNearbycinemas(location, 30000));
+    searches.push(PLACES.findNearbycinemas(location, radius));
+
+    const results = await Promise.all(searches);
+    return mergeCinemasById(results, radius);
+  }
+
   function saveLastNearbySearch(location) {
     const payload = {
       query: searchQuery || 'Ma position',
@@ -487,7 +518,7 @@
       }
 
       saveLastNearbySearch(location);
-      const cinemas = await PLACES.findNearbycinemas(location, currentRadius);
+      const cinemas = await findNearbyCinemasStable(location, currentRadius);
       if (searchId !== activeSearchId) return;
 
       renderResultsMap(location, cinemas);
@@ -615,7 +646,7 @@
       }
 
       if (PLACES.userLocation) {
-        const cinemas = await PLACES.findNearbycinemas(PLACES.userLocation, currentRadius);
+        const cinemas = await findNearbyCinemasStable(PLACES.userLocation, currentRadius);
         if (searchId !== activeSearchId) return;
         if (cinemas.length) {
           // Chercher les 10 cinémas les plus proches et filtrer ceux qui ont des séances
@@ -826,7 +857,7 @@
   }
 
   // ── API CinéProche — Récupération séances AlloCiné ──
-  const CINEPRO_API = window.CONFIG?.BACKEND_BASE_URL || 'http://localhost:3000';
+  const CINEPRO_API = 'https://cinepro-api-production.up.railway.app';
   const seancesCache = {};
 
   const VILLES_COORDS = {
